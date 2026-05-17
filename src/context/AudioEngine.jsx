@@ -1,0 +1,349 @@
+import { createContext, useContext, useRef, useCallback, useState } from 'react'
+
+const AudioEngineCtx = createContext(null)
+
+export function AudioEngineProvider({ children }) {
+  const acRef         = useRef(null)   // AudioContext
+  const masterRef     = useRef(null)   // GainNode → destination + streamDest
+  const streamDestRef = useRef(null)   // MediaStreamDestinationNode
+
+  // channelId → { gainNode, hiEQ, midEQ, loEQ, panNode, faderNode, analyserNode }
+  const channelNodes  = useRef({})
+
+  // 'dj-a' | 'dj-b' → HTMLMediaElement
+  const mediaElements = useRef({})
+
+  // 'dj-a' | 'dj-b' → MediaElementSourceNode (created once per element)
+  const mediaSources  = useRef({})
+
+  // 'dj-a' | 'dj-b' → AnalyserNode tapped right off the deck source
+  const deckAnalysers = useRef({})
+
+  // 'dj-a' | 'dj-b' → { hi, mid, lo } BiquadFilterNodes (per-deck EQ)
+  const deckEqNodes = useRef({})
+
+  // Master output AnalyserNode
+  const masterAnalyserRef = useRef(null)
+
+  // channelId → { stream: MediaStream, sourceNode: MediaStreamSourceNode }
+  const micStreams     = useRef({})
+
+  // channelId to connect once both dj-a and dj-b elements are registered
+  const pendingDjChannel = useRef(null)
+
+  // true once a Mixer channel has DJ Player assigned
+  const [djConnected, setDjConnected] = useState(false)
+
+  // ── Lazy AudioContext init ────────────────────────────────────────────────
+  const getAC = useCallback(() => {
+    if (!acRef.current) {
+      const ac = new AudioContext()
+      acRef.current = ac
+
+      const master = ac.createGain()
+      master.gain.value = 0.85
+      masterRef.current = master
+
+      const streamDest = ac.createMediaStreamDestination()
+      streamDestRef.current = streamDest
+
+      // Master analyser — tap after the master gain, before destination
+      const masterAnalyser = ac.createAnalyser()
+      masterAnalyser.fftSize = 256
+      masterAnalyser.smoothingTimeConstant = 0.85
+      masterAnalyserRef.current = masterAnalyser
+      master.connect(masterAnalyser)
+      masterAnalyser.connect(ac.destination)
+      masterAnalyser.connect(streamDest)
+    }
+    return acRef.current
+  }, [])
+
+  // Resume suspended context (required after user gesture)
+  const resume = useCallback(async () => {
+    if (acRef.current?.state === 'suspended') {
+      await acRef.current.resume()
+    }
+  }, [])
+
+  // ── Build/rebuild a channel's node chain ─────────────────────────────────
+  const setupChannelNodes = useCallback((channelId, { gain, hi, mid, lo, pan, fader, on, mute }) => {
+    const ac = getAC()
+
+    // Disconnect old fader node from master bus if it exists
+    if (channelNodes.current[channelId]) {
+      try { channelNodes.current[channelId].faderNode.disconnect() } catch { /* ignore */ }
+    }
+
+    const gainNode = ac.createGain()
+    gainNode.gain.value = (gain ?? 0.5) * 2
+
+    const hiEQ = ac.createBiquadFilter()
+    hiEQ.type = 'highshelf'
+    hiEQ.frequency.value = 8000
+    hiEQ.gain.value = ((hi ?? 0.5) - 0.5) * 24
+
+    const midEQ = ac.createBiquadFilter()
+    midEQ.type = 'peaking'
+    midEQ.frequency.value = 1000
+    midEQ.Q.value = 0.8
+    midEQ.gain.value = ((mid ?? 0.5) - 0.5) * 24
+
+    const loEQ = ac.createBiquadFilter()
+    loEQ.type = 'lowshelf'
+    loEQ.frequency.value = 200
+    loEQ.gain.value = ((lo ?? 0.5) - 0.5) * 24
+
+    const panNode = ac.createStereoPanner()
+    panNode.pan.value = ((pan ?? 0.5) - 0.5) * 2
+
+    const faderNode = ac.createGain()
+    const isActive = (on ?? false) && !(mute ?? false)
+    faderNode.gain.value = isActive ? (fader ?? 0) * (fader ?? 0) : 0
+
+    // Chain: gainNode → hiEQ → midEQ → loEQ → pan → fader → master
+    gainNode.connect(hiEQ)
+    hiEQ.connect(midEQ)
+    midEQ.connect(loEQ)
+    loEQ.connect(panNode)
+    panNode.connect(faderNode)
+
+    // Per-channel analyser — post-fader so VU reflects what actually hits the bus
+    const analyserNode = ac.createAnalyser()
+    analyserNode.fftSize = 256
+    analyserNode.smoothingTimeConstant = 0.8
+    faderNode.connect(analyserNode)
+    analyserNode.connect(masterRef.current)
+
+    channelNodes.current[channelId] = { gainNode, hiEQ, midEQ, loEQ, panNode, faderNode, analyserNode }
+  }, [getAC])
+
+  // ── Smooth-update a single parameter on an existing channel ──────────────
+  const updateChannelParam = useCallback((channelId, param, value) => {
+    const nodes = channelNodes.current[channelId]
+    if (!nodes || !acRef.current) return
+    const t = acRef.current.currentTime
+    switch (param) {
+      case 'gain': nodes.gainNode.gain.setTargetAtTime(value * 2,            t, 0.01); break
+      case 'hi':   nodes.hiEQ.gain.setTargetAtTime((value - 0.5) * 24,       t, 0.01); break
+      case 'mid':  nodes.midEQ.gain.setTargetAtTime((value - 0.5) * 24,      t, 0.01); break
+      case 'lo':   nodes.loEQ.gain.setTargetAtTime((value - 0.5) * 24,       t, 0.01); break
+      case 'pan':  nodes.panNode.pan.setTargetAtTime((value - 0.5) * 2,      t, 0.01); break
+    }
+  }, [])
+
+  // ── Gate the fader (called when on/mute/fader changes) ───────────────────
+  const setChannelActive = useCallback((channelId, on, mute, fader) => {
+    const nodes = channelNodes.current[channelId]
+    if (!nodes || !acRef.current) return
+    const target = (on && !mute) ? fader * fader : 0
+    nodes.faderNode.gain.setTargetAtTime(target, acRef.current.currentTime, 0.02)
+  }, [])
+
+  // ── Per-deck EQ ──────────────────────────────────────────────────────────
+  const updateDeckEq = useCallback((key, band, value) => {
+    const eq = deckEqNodes.current[key]
+    if (!eq || !acRef.current) return
+    const t  = acRef.current.currentTime
+    const dB = (value - 0.5) * 24
+    switch (band) {
+      case 'hi':  eq.hi.gain.setTargetAtTime(dB,  t, 0.01); break
+      case 'mid': eq.mid.gain.setTargetAtTime(dB, t, 0.01); break
+      case 'lo':  eq.lo.gain.setTargetAtTime(dB,  t, 0.01); break
+    }
+  }, [])
+
+  // ── Master fader ─────────────────────────────────────────────────────────
+  const updateMasterFader = useCallback((value) => {
+    if (!masterRef.current || !acRef.current) return
+    masterRef.current.gain.setTargetAtTime(value, acRef.current.currentTime, 0.02)
+  }, [])
+
+  // ── Register a media element so AudioEngine can create a source from it ──
+  const registerMediaElement = useCallback((key, element) => {
+    if (!element) return
+    mediaElements.current[key] = element
+    // Complete any pending DJ connection once both decks are available
+    if (
+      pendingDjChannel.current !== null &&
+      mediaElements.current['dj-a'] &&
+      mediaElements.current['dj-b']
+    ) {
+      const channelId = pendingDjChannel.current
+      pendingDjChannel.current = null
+      const nodes = channelNodes.current[channelId]
+      if (nodes) {
+        const ac = getAC()
+        ;['dj-a', 'dj-b'].forEach(k => {
+          const el = mediaElements.current[k]
+          if (!mediaSources.current[k]) {
+            mediaSources.current[k] = ac.createMediaElementSource(el)
+          }
+          if (!deckAnalysers.current[k]) {
+            const da = ac.createAnalyser()
+            da.fftSize = 256
+            da.smoothingTimeConstant = 0.8
+            deckAnalysers.current[k] = da
+          }
+          if (!deckEqNodes.current[k]) {
+            const ac2 = getAC()
+            const hi  = ac2.createBiquadFilter(); hi.type  = 'highshelf'; hi.frequency.value  = 8000; hi.gain.value  = 0
+            const mid = ac2.createBiquadFilter(); mid.type = 'peaking';   mid.frequency.value = 1000; mid.Q.value    = 0.8; mid.gain.value = 0
+            const lo  = ac2.createBiquadFilter(); lo.type  = 'lowshelf';  lo.frequency.value  = 200;  lo.gain.value  = 0
+            hi.connect(mid); mid.connect(lo)
+            deckEqNodes.current[k] = { hi, mid, lo }
+          }
+          const src = mediaSources.current[k]
+          const deq = deckEqNodes.current[k]
+          const dka = deckAnalysers.current[k]
+          try { src.disconnect() } catch { /* ignore */ }
+          try { deq.lo.disconnect() } catch { /* ignore */ }
+          try { dka.disconnect() } catch { /* ignore */ }
+          src.connect(deq.hi)
+          deq.lo.connect(dka)
+          dka.connect(nodes.gainNode)
+        })
+      }
+    }
+  }, [getAC])
+
+  // ── Connect a DJ deck source to a mixer channel ───────────────────────────
+  const connectSourceToChannel = useCallback((sourceType, channelId) => {
+    const nodes = channelNodes.current[channelId]
+    if (!nodes) return
+
+    // 'dj' connects both decks (A and B) so the crossfader blend comes through
+    // 'podcast' connects only deck A (the video/podcast element)
+    const keys = sourceType === 'dj' ? ['dj-a', 'dj-b'] : sourceType === 'podcast' ? ['dj-a'] : [sourceType]
+    if (!keys.every(k => k === 'dj-a' || k === 'dj-b')) return
+
+    // Mark DJ as connected (user's intent is set — playback now allowed)
+    setDjConnected(true)
+
+    const ac = getAC()
+    let anyMissing = false
+
+    keys.forEach(key => {
+      const el = mediaElements.current[key]
+      if (!el) {
+        anyMissing = true
+        console.warn('[AudioEngine] media element not yet registered for', key)
+        return
+      }
+      if (!mediaSources.current[key]) {
+        mediaSources.current[key] = ac.createMediaElementSource(el)
+      }
+      // Create a deck-level analyser once per deck key
+      if (!deckAnalysers.current[key]) {
+        const da = ac.createAnalyser()
+        da.fftSize = 256
+        da.smoothingTimeConstant = 0.8
+        deckAnalysers.current[key] = da
+      }
+      if (!deckEqNodes.current[key]) {
+        const hi  = ac.createBiquadFilter(); hi.type  = 'highshelf'; hi.frequency.value  = 8000; hi.gain.value  = 0
+        const mid = ac.createBiquadFilter(); mid.type = 'peaking';   mid.frequency.value = 1000; mid.Q.value    = 0.8; mid.gain.value = 0
+        const lo  = ac.createBiquadFilter(); lo.type  = 'lowshelf';  lo.frequency.value  = 200;  lo.gain.value  = 0
+        hi.connect(mid); mid.connect(lo)
+        deckEqNodes.current[key] = { hi, mid, lo }
+      }
+      const src = mediaSources.current[key]
+      const deq = deckEqNodes.current[key]
+      const dka = deckAnalysers.current[key]
+      try { src.disconnect() } catch { /* not yet connected */ }
+      try { deq.lo.disconnect() } catch { /* not yet connected */ }
+      try { dka.disconnect() } catch { /* not yet connected */ }
+      src.connect(deq.hi)
+      deq.lo.connect(dka)
+      dka.connect(nodes.gainNode)
+    })
+  }, [getAC])
+
+  // ── Enable / disable DJ-connect gate ─────────────────────────────────────
+  const setDjActive = useCallback((active) => {
+    setDjConnected(active)
+  }, [])
+
+  // ── Connect a physical mic/line-in device to a mixer channel ─────────────
+  const connectMicToChannel = useCallback(async (channelId, deviceId) => {
+    const nodes = channelNodes.current[channelId]
+    if (!nodes) return
+    const ac = getAC()
+
+    // Tear down any existing stream on this channel
+    const prev = micStreams.current[channelId]
+    if (prev) {
+      try { prev.sourceNode.disconnect() } catch { /* ignore */ }
+      prev.stream.getTracks().forEach(t => t.stop())
+      delete micStreams.current[channelId]
+    }
+
+    if (!deviceId) return
+
+    try {
+      if (ac.state === 'suspended') await ac.resume()
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          deviceId: { exact: deviceId },
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+      })
+      const sourceNode = ac.createMediaStreamSource(stream)
+      sourceNode.connect(nodes.gainNode)
+      micStreams.current[channelId] = { stream, sourceNode }
+    } catch (err) {
+      console.warn('[AudioEngine] mic/line-in connect failed:', err)
+    }
+  }, [getAC])
+
+  // connectLineInToChannel is the same as connectMicToChannel
+  const connectLineInToChannel = connectMicToChannel
+
+  // ── Analyser getters ─────────────────────────────────────────────────────
+  const getAnalyser = useCallback((channelId) => {
+    return channelNodes.current[channelId]?.analyserNode ?? null
+  }, [])
+
+  const getMasterAnalyser = useCallback(() => {
+    return masterAnalyserRef.current
+  }, [])
+
+  const getDeckAnalyser = useCallback((key) => {
+    return deckAnalysers.current[key] ?? null
+  }, [])
+
+  // ── Get the stream output track (for WebRTC/recording) ───────────────────
+  const getStreamTrack = useCallback(() => {
+    getAC()
+    return streamDestRef.current?.stream ?? null
+  }, [getAC])
+
+  return (
+    <AudioEngineCtx.Provider value={{
+      setupChannelNodes,
+      updateChannelParam,
+      setChannelActive,
+      updateMasterFader,
+      registerMediaElement,
+      connectSourceToChannel,
+      connectMicToChannel,
+      connectLineInToChannel,
+      getStreamTrack,
+      resume,
+      djConnected,
+      getAnalyser,
+      getMasterAnalyser,
+      getDeckAnalyser,
+      updateDeckEq,
+      setDjActive,
+    }}>
+      {children}
+    </AudioEngineCtx.Provider>
+  )
+}
+
+export function useAudioEngine() {
+  return useContext(AudioEngineCtx)
+}

@@ -1,0 +1,125 @@
+import { useState, useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import Player from './components/Player'
+import Chat from './components/Chat'
+import ViewerCount from './components/ViewerCount'
+import AdminPanel from './components/AdminPanel'
+import NowPlaying from './components/NowPlaying'
+import Sidebar from './components/Sidebar'
+import StreamSetup from './components/StreamSetup'
+import Mixer from './components/Mixer'
+import SocialLive from './components/SocialLive'
+import LandingPage from './pages/LandingPage'
+import { AuthProvider, useAuth } from './context/AuthContext'
+import { AudioEngineProvider } from './context/AudioEngine'
+
+function ProtectedRoute({ children }) {
+  const { isAuthenticated } = useAuth()
+  return isAuthenticated ? children : <Navigate to="/" replace />
+}
+
+function MainApp() {
+  const [mode, setMode] = useState('radio')
+  const [playerMode, setPlayerMode] = useState('radio')  // sticky: only updates on radio/video
+  const [config, setConfig] = useState(null)
+  const [showAdmin, setShowAdmin] = useState(false)
+  const [trackA, setTrackA] = useState(null)
+  const [trackB, setTrackB] = useState(null)
+
+  useEffect(() => {
+    fetch('/api/config')
+      .then((r) => r.json())
+      .then(setConfig)
+      .catch(() =>
+        setConfig({
+          radioUrl: '',
+          videoUrl: '',
+          stationName: 'Radio In One Stop',
+        })
+      )
+  }, [])
+
+  const handleModeChange = (m) => {
+    setMode(m)
+    if (m === 'radio' || m === 'video') setPlayerMode(m)
+  }
+
+  if (!config) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <span className="text-gray-500 text-lg">Loading…</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-950 text-white flex">
+      {/* Sidebar */}
+      <Sidebar
+        stationName={config.stationName}
+        mode={mode}
+        onModeChange={handleModeChange}
+        onSettingsClick={() => handleModeChange('stream')}
+      />
+
+      {/* Main area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
+        <header className="bg-gray-900 border-b border-gray-800 px-4 lg:px-6 py-3 flex items-center justify-between">
+          {/* Spacer for mobile hamburger */}
+          <div className="w-8 lg:hidden" />
+          <h1 className="text-base font-semibold tracking-tight truncate">{config.stationName}</h1>
+          <ViewerCount />
+        </header>
+
+        {/* Content */}
+        <main className="flex-1 flex flex-col lg:flex-row gap-4 p-4 lg:p-6 max-w-6xl mx-auto w-full">
+          {mode === 'stream' && <StreamSetup />}
+          {mode === 'mixer' && <Mixer config={config} />}
+
+          {/* Player + NowPlaying + Chat — always mounted so audio elements survive
+              mode switches. Hidden (display:none) when not in radio/video mode. */}
+          <div className={`flex-1 flex flex-col lg:flex-row gap-4 w-full${
+            mode !== 'radio' && mode !== 'video' ? ' hidden' : ''
+          }`}>
+            <div className="flex-1 flex flex-col gap-4 min-w-0">
+              <Player mode={playerMode} config={config} trackA={trackA} trackB={trackB} />
+              <NowPlaying config={config} mode={mode} onTrackLoadA={setTrackA} onTrackLoadB={setTrackB} />
+            </div>
+            <div className="lg:w-80 xl:w-96 flex-shrink-0 flex flex-col gap-3">
+              <SocialLive />
+              <Chat />
+            </div>
+          </div>
+        </main>
+      </div>
+
+      {showAdmin && (
+        <AdminPanel config={config} onSave={setConfig} onClose={() => setShowAdmin(false)} />
+      )}
+    </div>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route
+            path="/app"
+            element={
+              <ProtectedRoute>
+                <AudioEngineProvider>
+                  <MainApp />
+                </AudioEngineProvider>
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  )
+}
