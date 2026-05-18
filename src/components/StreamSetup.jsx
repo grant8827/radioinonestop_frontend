@@ -614,6 +614,10 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio' }) {
   const { token } = useAuth()
   const { getStreamTrack, getMasterAnalyser, resume } = useAudioEngine()
 
+  // 'hub' = broadcast directly to this server's fan-out hub (no Icecast needed)
+  // 'icecast' = legacy path: server transcodes via ffmpeg and pushes to Icecast
+  const [broadcastMode, setBroadcastMode] = useState('hub')
+
   const [cfg, setCfg] = useState({
     host: defaultHost,
     port: '8000',
@@ -752,17 +756,22 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio' }) {
       ws.binaryType = 'arraybuffer'
 
       ws.onopen = () => {
-        addLog('Connected — sending encoder config…')
-        ws.send(JSON.stringify({
-          action: 'start',
-          host: cfg.host,
-          port: cfg.port,
-          mount: cfg.mount,
-          username: cfg.username,
-          password: cfg.password,
-          codec: cfg.codec,
-          bitrate: cfg.bitrate,
-        }))
+        if (broadcastMode === 'hub') {
+          addLog('Connected — starting hub broadcast…')
+          ws.send(JSON.stringify({ action: 'broadcast' }))
+        } else {
+          addLog('Connected — sending encoder config…')
+          ws.send(JSON.stringify({
+            action: 'start',
+            host: cfg.host,
+            port: cfg.port,
+            mount: cfg.mount,
+            username: cfg.username,
+            password: cfg.password,
+            codec: cfg.codec,
+            bitrate: cfg.bitrate,
+          }))
+        }
       }
 
       ws.onmessage = (e) => {
@@ -831,16 +840,32 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio' }) {
           isLive ? 'bg-orange-400 animate-pulse' : isBusy ? 'bg-yellow-400 animate-pulse' : 'bg-gray-600'
         }`} />
         <div>
-          <h3 className="text-sm font-semibold text-white">Browser Encoder → Icecast / Shoutcast</h3>
-          <p className="text-xs text-gray-400">Stream mic audio directly from your browser — no BUTT or desktop app needed</p>
+          <h3 className="text-sm font-semibold text-white">Browser Encoder</h3>
+          <p className="text-xs text-gray-400">
+            {broadcastMode === 'hub'
+              ? 'Broadcast to the station hub — listeners connect directly through this server'
+              : 'Transcode via FFmpeg and push to Icecast / Shoutcast'}
+          </p>
         </div>
-        <span className={`ml-auto text-[10px] font-bold border rounded px-2 py-0.5 flex-shrink-0 ${statusCls}`}>
+        {/* Mode selector */}
+        <div className="ml-auto flex items-center gap-1 bg-gray-800 border border-gray-700 rounded-lg p-0.5">
+          <button onClick={() => canStart && setBroadcastMode('hub')}
+            className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${broadcastMode === 'hub' ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'}`}>
+            Hub
+          </button>
+          <button onClick={() => canStart && setBroadcastMode('icecast')}
+            className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${broadcastMode === 'icecast' ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'}`}>
+            Icecast
+          </button>
+        </div>
+        <span className={`text-[10px] font-bold border rounded px-2 py-0.5 flex-shrink-0 ${statusCls}`}>
           {statusLabel}
         </span>
       </div>
 
       <div className="px-5 py-4 space-y-4">
-        {/* Config grid */}
+        {/* Config grid — hidden in hub mode */}
+        {broadcastMode === 'icecast' && (
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
             <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Host</label>
@@ -896,6 +921,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio' }) {
             </div>
           </div>
         </div>
+        )}
 
         {/* Frequency spectrum visualizer */}
         <div>
@@ -926,10 +952,10 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio' }) {
         {/* Go Live / Stop */}
         {canStart ? (
           <button onClick={goLive}
-            disabled={isBusy || !cfg.host || !token}
+            disabled={isBusy || !token || (broadcastMode === 'icecast' && !cfg.host)}
             className="w-full flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold text-sm rounded-lg px-4 py-2.5 transition-colors shadow-lg shadow-orange-900/20">
             <span className="w-2 h-2 rounded-full bg-white inline-block" />
-            Go Live → Icecast / Shoutcast
+            {broadcastMode === 'hub' ? 'Go Live → Station Hub' : 'Go Live → Icecast / Shoutcast'}
           </button>
         ) : (
           <button onClick={stopStream} disabled={isBusy}
@@ -943,8 +969,9 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio' }) {
         )}
 
         <p className="text-xs text-gray-600">
-          The Mixer&apos;s main output is captured and sent to the server via WebSocket, transcoded by FFmpeg, and pushed
-          to Icecast. Open the Mixer and activate a channel before going live. Expected latency: 0.5–2 s.
+          {broadcastMode === 'hub'
+            ? 'The Mixer\'s main output is streamed directly to this server\'s fan-out hub. Listeners receive your audio at /listen/{station-id}. Open the Mixer and activate a channel before going live.'
+            : 'The Mixer\'s main output is captured and sent to the server via WebSocket, transcoded by FFmpeg, and pushed to Icecast. Open the Mixer and activate a channel before going live. Expected latency: 0.5–2 s.'}
         </p>
       </div>
     </div>
@@ -1132,7 +1159,7 @@ function ChannelTab({ host, audioKey, videoKey }) {
     })
       .then((r) => r.json())
       .then((data) => {
-        setCreds({ stream_key: data.stream_key, rtmp_ingest_base: data.rtmp_ingest_base })
+        setCreds({ stream_key: data.stream_key, rtmp_ingest_base: data.rtmp_ingest_base, station_slug: data.station_slug, listen_url: data.listen_url })
         if (Array.isArray(data.destinations)) {
           const keys = {}
           const enabled = {}
@@ -1207,6 +1234,7 @@ function ChannelTab({ host, audioKey, videoKey }) {
               <Field label="RTMP Server URL" value={myRtmpBase} />
               <MaskedField label="Stream Key" value={myStreamKey} />
               <Field label="Full Publish URL" value={`${myRtmpBase}/${myStreamKey}`} />
+              {creds?.station_slug && <Field label="Station ID" value={creds.station_slug} />}
             </>
           )}
         </div>
@@ -1305,6 +1333,9 @@ function ChannelTab({ host, audioKey, videoKey }) {
         <div className="px-5 py-4 space-y-4">
           <Field label="Audio Stream (HLS)" value={hlsAudio} />
           <Field label="Video Stream (HLS)" value={hlsVideo} />
+          {creds?.listen_url && (
+            <Field label="Direct Listener URL" value={`https://${host}${creds.listen_url}`} />
+          )}
           <div className="bg-gray-800/40 border border-gray-700/50 rounded-lg px-4 py-3 text-sm text-gray-400">
             These HLS URLs work in VLC, any browser with HLS support, and can be embedded with an HLS.js player.
             They go live automatically when you start streaming.
