@@ -13,7 +13,6 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # Defaults work for Docker Compose; override on Railway with correct URLs.
 ENV PORT=80
 ENV BACKEND_URL=http://backend:8080
-ENV ICECAST_URL=http://icecast:8000
 COPY nginx.conf /etc/nginx/templates/default.conf.template
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
