@@ -8,6 +8,7 @@ export default defineConfig({
     proxy: {
       '/api': { target: 'http://localhost:8080', changeOrigin: true },
       '/ws': { target: 'ws://localhost:8080', ws: true, changeOrigin: true },
+      '/listen/': { target: 'http://localhost:8080', changeOrigin: true },
       // Strip /webrtc prefix: /webrtc/radio/whip → http://localhost:8889/radio/whip
       '/webrtc': { target: 'http://localhost:8889', changeOrigin: true, rewrite: (path) => path.replace(/^\/webrtc/, '') },
       // Strip /hls prefix: /hls/radio/index.m3u8 → http://localhost:8888/radio/index.m3u8

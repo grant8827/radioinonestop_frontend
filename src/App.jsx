@@ -74,7 +74,11 @@ function MainApp() {
 
         {/* Content */}
         <main className="flex-1 flex flex-col lg:flex-row gap-4 p-4 lg:p-6 max-w-6xl mx-auto w-full">
-          {mode === 'stream' && <StreamSetup />}
+          {/* Keep StreamSetup mounted so an active broadcast isn't killed by tab navigation.
+              Hidden via CSS — the WS + MediaRecorder stay alive. */}
+          <div className={mode !== 'stream' ? 'hidden' : 'contents'}>
+            <StreamSetup />
+          </div>
           {mode === 'mixer' && <Mixer config={config} />}
 
           {/* Player + NowPlaying + Chat — always mounted so audio elements survive
