@@ -157,7 +157,7 @@ function DashboardCard({ label, colorClass, iconPath, stream, viewers }) {
 
 /* ─── Tab content ─────────────────────────────────────────────── */
 
-function StreamSettingsTab({ rtmpBase, audioKey, videoKey, liveStreams, viewers }) {
+function StreamSettingsTab({ rtmpBase, audioKey, videoKey, liveStreams, viewers, host }) {
   const audioStream = liveStreams.find(s => s.key === audioKey)
   const videoStream = liveStreams.find(s => s.key === videoKey)
   const anyLive = liveStreams.some(s => s.live)
@@ -289,6 +289,9 @@ function StreamSettingsTab({ rtmpBase, audioKey, videoKey, liveStreams, viewers 
           all others produce full audio + video streams.
         </p>
       </div>
+
+      {/* Icecast / source client settings */}
+      <IcecastCard host={host} audioKey={audioKey} />
     </div>
   )
 }
@@ -999,7 +1002,6 @@ function AudioEncoderTab({ audioKey, host, listenUrl }) {
   const mount = '/' + audioKey
   return (
     <div className="space-y-5">
-      <IcecastCard host={host} audioKey={audioKey} />
       <IcecastEncoder defaultHost={host} defaultMount={mount} listenUrl={listenUrl} />
     </div>
   )
@@ -1544,6 +1546,7 @@ export default function StreamSetup() {
           videoKey={videoKey}
           liveStreams={liveStreams}
           viewers={viewers}
+          host={host}
         />
       )}
       {tab === 'audio' && <AudioEncoderTab audioKey={audioKey} host={host} listenUrl={creds?.listen_url} />}
