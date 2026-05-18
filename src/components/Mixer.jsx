@@ -279,10 +279,37 @@ function SectionLabel({ children, color = T.muted }) {
   )
 }
 
+// ─── Device type helpers ─────────────────────────────────────────────────────
+function deviceType(label) {
+  const l = (label || '').toLowerCase()
+  if (l.includes('bluetooth') || l.includes(' bt ') || l.includes('airpod') || l.includes('headset')) return 'bluetooth'
+  if (l.includes('usb'))       return 'usb'
+  if (l.includes('line') || l.includes('external') || l.includes('aux') || l.includes('xlr') || l.includes('interface')) return 'linein'
+  if (l.includes('built-in') || l.includes('internal') || l.includes('macbook') || l.includes('imac')) return 'builtin'
+  return 'other'
+}
+const DEVICE_GROUPS = [
+  { key: 'bluetooth', label: 'Bluetooth',     icon: '⬡' },
+  { key: 'usb',       label: 'USB',            icon: '⚡' },
+  { key: 'linein',    label: 'Line In / XLR',  icon: '⬤' },
+  { key: 'builtin',   label: 'Built-in',       icon: '◈' },
+  { key: 'other',     label: 'Other',          icon: '◇' },
+]
+function groupDevices(devices) {
+  const groups = {}
+  DEVICE_GROUPS.forEach(g => { groups[g.key] = [] })
+  devices.forEach(d => {
+    const t = deviceType(d.label)
+    groups[t].push(d)
+  })
+  return groups
+}
+
 // ─── Channel settings popup ─────────────────────────────────────────────────
 function ChannelSettings({ anchorRef, ch, onUpdate, onClose }) {
   const popupRef = useRef(null)
   const [devices, setDevices] = useState([])
+  const [permNeeded, setPermNeeded] = useState(false)
   const [pos, setPos] = useState({ top: 0, left: 0 })
   const color = ch.isMic ? '#e879a0' : '#38bdf8'
 
@@ -294,12 +321,29 @@ function ChannelSettings({ anchorRef, ch, onUpdate, onClose }) {
     }
   }, [])
 
-  // Enumerate devices
-  useEffect(() => {
-    navigator.mediaDevices?.enumerateDevices?.()
-      .then(devs => setDevices(devs.filter(d => d.kind === 'audioinput')))
-      .catch(() => {})
+  // Enumerate & keep up-to-date (also fires when USB/BT devices connect)
+  const refreshDevices = useCallback(async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) return
+    try {
+      const all = await navigator.mediaDevices.enumerateDevices()
+      const inputs = all.filter(d => d.kind === 'audioinput')
+      // If no labeled devices found, permission hasn't been granted yet
+      const hasLabels = inputs.some(d => d.label)
+      if (!hasLabels) {
+        setPermNeeded(true)
+        setDevices([])
+      } else {
+        setPermNeeded(false)
+        setDevices(inputs.filter(d => d.deviceId)) // drop phantom entries with no id
+      }
+    } catch { setPermNeeded(true) }
   }, [])
+
+  useEffect(() => {
+    refreshDevices()
+    navigator.mediaDevices?.addEventListener?.('devicechange', refreshDevices)
+    return () => navigator.mediaDevices?.removeEventListener?.('devicechange', refreshDevices)
+  }, [refreshDevices])
 
   // Click-outside to close
   useEffect(() => {
@@ -317,8 +361,7 @@ function ChannelSettings({ anchorRef, ch, onUpdate, onClose }) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       stream.getTracks().forEach(t => t.stop())
-      const devs = await navigator.mediaDevices.enumerateDevices()
-      setDevices(devs.filter(d => d.kind === 'audioinput'))
+      await refreshDevices()
     } catch {}
   }
 
@@ -357,8 +400,8 @@ function ChannelSettings({ anchorRef, ch, onUpdate, onClose }) {
       {/* Audio Input Device (mic channels) */}
       {ch.isMic && (
         <div style={row}>
-          <label style={lbl}>Microphone Device</label>
-          {devices.length === 0 ? (
+          <label style={lbl}>Input Device</label>
+          {permNeeded ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
               <p style={{ fontSize: 8, color: T.muted, margin: 0 }}>Grant mic permission to list devices</p>
               <button onClick={requestPermission} style={{
@@ -368,22 +411,51 @@ function ChannelSettings({ anchorRef, ch, onUpdate, onClose }) {
               }}>Allow Microphone</button>
             </div>
           ) : (
-            <select
-              value={ch.deviceId || ''}
-              onChange={(e) => {
-                const sel = devices.find(d => d.deviceId === e.target.value)
-                onUpdate('deviceId', e.target.value)
-                onUpdate('deviceLabel', sel?.label || '')
-              }}
-              style={inputStyle}
-            >
-              <option value="">— Select device —</option>
-              {devices.map(d => (
-                <option key={d.deviceId} value={d.deviceId}>
-                  {d.label || `Device ${d.deviceId.slice(0, 8)}`}
-                </option>
-              ))}
-            </select>
+            <>
+              <select
+                value={ch.deviceId || ''}
+                onChange={(e) => {
+                  const sel = devices.find(d => d.deviceId === e.target.value)
+                  onUpdate('deviceId', e.target.value)
+                  onUpdate('deviceLabel', sel?.label || '')
+                }}
+                style={inputStyle}
+              >
+                <option value="">— Select device —</option>
+                {DEVICE_GROUPS.map(g => {
+                  const grouped = groupDevices(devices)
+                  if (!grouped[g.key].length) return null
+                  return (
+                    <optgroup key={g.key} label={`${g.icon} ${g.label}`}>
+                      {grouped[g.key].map(d => (
+                        <option key={d.deviceId} value={d.deviceId}>
+                          {d.label || `Device ${d.deviceId.slice(0, 8)}`}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )
+                })}
+              </select>
+              {ch.deviceId && ch.deviceLabel && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 5 }}>
+                  {(() => {
+                    const t = deviceType(ch.deviceLabel)
+                    const g = DEVICE_GROUPS.find(x => x.key === t) || DEVICE_GROUPS[4]
+                    const typeColors = { bluetooth: '#38bdf8', usb: '#34d399', linein: '#fb923c', builtin: '#a78bfa', other: T.muted }
+                    return (
+                      <span style={{
+                        fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                        background: `${typeColors[t]}22`, color: typeColors[t], border: `1px solid ${typeColors[t]}44`,
+                        textTransform: 'uppercase', letterSpacing: '0.08em',
+                      }}>{g.icon} {g.label}</span>
+                    )
+                  })()}
+                  <span style={{ fontSize: 8, color: T.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                    {ch.deviceLabel}
+                  </span>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
@@ -415,7 +487,7 @@ function ChannelSettings({ anchorRef, ch, onUpdate, onClose }) {
           {ch.sourceType === 'line-in' && (
             <div style={{ marginTop: 8 }}>
               <label style={lbl}>Input Device</label>
-              {devices.length === 0 ? (
+              {permNeeded ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                   <p style={{ fontSize: 8, color: T.muted, margin: 0 }}>Grant permission to list devices</p>
                   <button onClick={requestPermission} style={{
@@ -425,22 +497,51 @@ function ChannelSettings({ anchorRef, ch, onUpdate, onClose }) {
                   }}>Allow Access</button>
                 </div>
               ) : (
-                <select
-                  value={ch.deviceId || ''}
-                  onChange={(e) => {
-                    const sel = devices.find(d => d.deviceId === e.target.value)
-                    onUpdate('deviceId', e.target.value)
-                    onUpdate('deviceLabel', sel?.label || '')
-                  }}
-                  style={inputStyle}
-                >
-                  <option value="">— Select device —</option>
-                  {devices.map(d => (
-                    <option key={d.deviceId} value={d.deviceId}>
-                      {d.label || `Device ${d.deviceId.slice(0, 8)}`}
-                    </option>
-                  ))}
-                </select>
+                <>
+                  <select
+                    value={ch.deviceId || ''}
+                    onChange={(e) => {
+                      const sel = devices.find(d => d.deviceId === e.target.value)
+                      onUpdate('deviceId', e.target.value)
+                      onUpdate('deviceLabel', sel?.label || '')
+                    }}
+                    style={inputStyle}
+                  >
+                    <option value="">— Select device —</option>
+                    {DEVICE_GROUPS.map(g => {
+                      const grouped = groupDevices(devices)
+                      if (!grouped[g.key].length) return null
+                      return (
+                        <optgroup key={g.key} label={`${g.icon} ${g.label}`}>
+                          {grouped[g.key].map(d => (
+                            <option key={d.deviceId} value={d.deviceId}>
+                              {d.label || `Device ${d.deviceId.slice(0, 8)}`}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )
+                    })}
+                  </select>
+                  {ch.deviceId && ch.deviceLabel && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 5 }}>
+                      {(() => {
+                        const t = deviceType(ch.deviceLabel)
+                        const g = DEVICE_GROUPS.find(x => x.key === t) || DEVICE_GROUPS[4]
+                        const typeColors = { bluetooth: '#38bdf8', usb: '#34d399', linein: '#fb923c', builtin: '#a78bfa', other: T.muted }
+                        return (
+                          <span style={{
+                            fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                            background: `${typeColors[t]}22`, color: typeColors[t], border: `1px solid ${typeColors[t]}44`,
+                            textTransform: 'uppercase', letterSpacing: '0.08em',
+                          }}>{g.icon} {g.label}</span>
+                        )
+                      })()}
+                      <span style={{ fontSize: 8, color: T.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                        {ch.deviceLabel}
+                      </span>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -709,10 +810,10 @@ function mkLine(id, label, type) {
     deviceId: null, deviceLabel: '' }
 }
 
-// ─── Mixer page ───────────────────────────────────────────────────────────────
-export default function Mixer({ config }) {
-  const audioEngine = useAudioEngine()
-  const [channels, setChannels] = useState([
+const SAVED_CH_KEYS = ['gain','hi','mid','lo','aux','pan','fader','pfl','mute','on','phantom','pad','deviceId','deviceLabel','sourceType']
+
+function loadSavedChannels() {
+  const defaults = [
     mkMic(1, 'MIC 1', 'XLR'),
     mkMic(2, 'MIC 2', 'XLR'),
     mkMic(3, 'MIC 3', 'XLR'),
@@ -720,26 +821,50 @@ export default function Mixer({ config }) {
     mkLine(5, 'LINE 2', 'RCA'),
     mkLine(6, 'LINE 3', 'AUX'),
     mkLine(7, 'PHONE',  'TEL'),
-  ])
+  ]
+  try {
+    const saved = JSON.parse(localStorage.getItem('mixer_channels') || '{}')
+    return defaults.map(ch => {
+      const s = saved[ch.id]
+      if (!s) return ch
+      const merged = { ...ch }
+      SAVED_CH_KEYS.forEach(k => { if (s[k] !== undefined) merged[k] = s[k] })
+      return merged
+    })
+  } catch { return defaults }
+}
 
-  const [master, setMaster] = useState({
-    fader: 0.8, monitor: 0.75, booth: 0.6, phones: 0.7,
-    aux1: 0.0, aux2: 0.0, fx: [], rec: false, onAir: false,
-  })
+function loadSavedMaster() {
+  const defaults = { fader: 0.8, monitor: 0.75, booth: 0.6, phones: 0.7, aux1: 0.0, aux2: 0.0, fx: [], rec: false, onAir: false }
+  try {
+    const saved = JSON.parse(localStorage.getItem('mixer_master') || 'null')
+    if (!saved) return defaults
+    return { ...defaults, ...saved }
+  } catch { return defaults }
+}
+
+// ─── Mixer page ───────────────────────────────────────────────────────────────
+export default function Mixer({ config }) {
+  const audioEngine = useAudioEngine()
+  const [channels, setChannels] = useState(loadSavedChannels)
+  const [master, setMaster] = useState(loadSavedMaster)
 
   // Set up AudioEngine channel nodes once on mount, then restore saved sources
   useEffect(() => {
     if (!audioEngine) return
-    channels.forEach(ch => audioEngine.setupChannelNodes(ch.id, ch))
-    // Restore saved source assignments so user doesn't have to re-select
-    try {
-      const saved = JSON.parse(localStorage.getItem('mixer_sources') || '{}')
-      Object.entries(saved).forEach(([rawId, sourceType]) => {
-        if (!sourceType || sourceType === 'none') return
-        const channelId = parseInt(rawId, 10)
-        updateChannel(channelId, 'sourceType', sourceType)
-      })
-    } catch { /* ignore bad localStorage data */ }
+    channels.forEach(ch => {
+      audioEngine.setupChannelNodes(ch.id, ch)
+      // Reconnect saved audio sources
+      if (ch.isMic && ch.deviceId) {
+        audioEngine.connectMicToChannel(ch.id, ch.deviceId)
+      } else if (!ch.isMic) {
+        if (ch.sourceType === 'dj' || ch.sourceType === 'podcast') {
+          audioEngine.connectSourceToChannel(ch.sourceType, ch.id)
+        } else if (ch.sourceType === 'line-in' && ch.deviceId) {
+          audioEngine.connectLineInToChannel(ch.id, ch.deviceId)
+        }
+      }
+    })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateChannel = useCallback((id, key, value) => {
@@ -755,6 +880,10 @@ export default function Mixer({ config }) {
           // Gate/fader changes
           if (['on', 'mute', 'fader'].includes(key)) {
             audioEngine.setChannelActive(id, next.on, next.mute, next.fader)
+          }
+          // Sync mic on/off state with NowPlaying via shared micOnAirMap
+          if (key === 'on' && next.isMic) {
+            audioEngine.setMicOnAir(id, value)
           }
           // Source type change (line channels)
           if (key === 'sourceType' && !next.isMic) {
@@ -778,20 +907,41 @@ export default function Mixer({ config }) {
         }
         return next
       })
-      // Persist source types whenever a sourceType changes
-      if (key === 'sourceType') {
-        try {
-          const sources = {}
-          updated.forEach(ch => { if (!ch.isMic) sources[ch.id] = ch.sourceType })
-          localStorage.setItem('mixer_sources', JSON.stringify(sources))
-        } catch { /* ignore */ }
-      }
+      // Persist all channel settings
+      try {
+        const toSave = {}
+        updated.forEach(ch => {
+          toSave[ch.id] = {}
+          SAVED_CH_KEYS.forEach(k => { toSave[ch.id][k] = ch[k] })
+        })
+        localStorage.setItem('mixer_channels', JSON.stringify(toSave))
+      } catch { /* ignore */ }
       return updated
     })
   }, [audioEngine])
 
+  // Sync mic channel on/off when NowPlaying button changes micOnAirMap
+  useEffect(() => {
+    if (!audioEngine?.micOnAirMap) return
+    const map = audioEngine.micOnAirMap
+    setChannels(prev => {
+      let changed = false
+      const next = prev.map(ch => {
+        if (!ch.isMic || map[ch.id] === undefined || map[ch.id] === ch.on) return ch
+        changed = true
+        audioEngine.setChannelActive(ch.id, map[ch.id], ch.mute, ch.fader)
+        return { ...ch, on: map[ch.id] }
+      })
+      return changed ? next : prev
+    })
+  }, [audioEngine, audioEngine?.micOnAirMap]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const updateMaster = useCallback((key, value) => {
-    setMaster(prev => ({ ...prev, [key]: value }))
+    setMaster(prev => {
+      const next = { ...prev, [key]: value }
+      try { localStorage.setItem('mixer_master', JSON.stringify(next)) } catch { /* ignore */ }
+      return next
+    })
     if (key === 'fader' && audioEngine) audioEngine.updateMasterFader(value)
   }, [audioEngine])
 

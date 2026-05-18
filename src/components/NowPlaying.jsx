@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { useAudioEngine } from '../context/AudioEngine'
 
 // Parse "Artist - Title.ext" or fall back gracefully
 function parseFilename(filename) {
@@ -32,7 +33,8 @@ function readDuration(url) {
 }
 
 export default function NowPlaying({ config, mode, onTrackLoadA, onTrackLoadB }) {
-  const [micOn, setMicOn] = useState(false)
+  const audioEngine = useAudioEngine()
+  const micOn = audioEngine?.micOnAirMap?.[1] ?? false
   const [showLibrary, setShowLibrary] = useState(false)
   const [library, setLibrary] = useState([])
   const fileInputRef = useRef(null)
@@ -75,7 +77,7 @@ export default function NowPlaying({ config, mode, onTrackLoadA, onTrackLoadB })
 
       {/* ON AIR MIC button */}
       <button
-        onClick={() => setMicOn((v) => !v)}
+        onClick={() => audioEngine?.setMicOnAir(1, !micOn)}
         className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm uppercase tracking-widest transition-all duration-150 flex-shrink-0 ${
           micOn
             ? 'bg-red-600 text-white shadow-[0_0_18px_#ef444455] animate-pulse'

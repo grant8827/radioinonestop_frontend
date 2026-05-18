@@ -34,6 +34,9 @@ export function AudioEngineProvider({ children }) {
   // true once a Mixer channel has DJ Player assigned
   const [djConnected, setDjConnected] = useState(false)
 
+  // current duck state (true = mics on-air, line channels at 10%)
+  const isDuckedRef = useRef(false)
+
   // ── Lazy AudioContext init ────────────────────────────────────────────────
   const getAC = useCallback(() => {
     if (!acRef.current) {
@@ -113,9 +116,15 @@ export function AudioEngineProvider({ children }) {
     analyserNode.fftSize = 256
     analyserNode.smoothingTimeConstant = 0.8
     faderNode.connect(analyserNode)
-    analyserNode.connect(masterRef.current)
 
-    channelNodes.current[channelId] = { gainNode, hiEQ, midEQ, loEQ, panNode, faderNode, analyserNode }
+    // Duck node — sits between analyser and master; muted during mic on-air for non-mic channels
+    const isMicChannel = channelId <= 3
+    const duckNode = ac.createGain()
+    duckNode.gain.value = (!isMicChannel && isDuckedRef.current) ? 0.1 : 1.0
+    analyserNode.connect(duckNode)
+    duckNode.connect(masterRef.current)
+
+    channelNodes.current[channelId] = { gainNode, hiEQ, midEQ, loEQ, panNode, faderNode, analyserNode, duckNode }
   }, [getAC])
 
   // ── Smooth-update a single parameter on an existing channel ──────────────
@@ -320,6 +329,30 @@ export function AudioEngineProvider({ children }) {
     return streamDestRef.current?.stream ?? null
   }, [getAC])
 
+  // ── On-Air mic tracking (shared across NowPlaying + Mixer) ───────────────
+  const [micOnAirMap, setMicOnAirMap] = useState({})
+
+  // Duck/unduck all non-mic channels (smooth 200ms ramp)
+  const duckLineChannels = useCallback((duck) => {
+    isDuckedRef.current = duck
+    if (!acRef.current) return
+    const t = acRef.current.currentTime
+    Object.entries(channelNodes.current).forEach(([id, nodes]) => {
+      if (parseInt(id) <= 3) return // mic channels — never duck
+      nodes.duckNode?.gain.setTargetAtTime(duck ? 0.1 : 1.0, t, 0.08)
+    })
+  }, [])
+
+  const setMicOnAir = useCallback((channelId, bool) => {
+    setMicOnAirMap(prev => {
+      if (prev[channelId] === bool) return prev
+      const next = { ...prev, [channelId]: bool }
+      const anyMicOn = Object.values(next).some(v => v)
+      duckLineChannels(anyMicOn)
+      return next
+    })
+  }, [duckLineChannels])
+
   return (
     <AudioEngineCtx.Provider value={{
       setupChannelNodes,
@@ -338,6 +371,8 @@ export function AudioEngineProvider({ children }) {
       getDeckAnalyser,
       updateDeckEq,
       setDjActive,
+      micOnAirMap,
+      setMicOnAir,
     }}>
       {children}
     </AudioEngineCtx.Provider>

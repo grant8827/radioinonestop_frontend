@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import AuthModal from '../components/AuthModal'
+import LoginModal from '../components/LoginModal'
+import RegisterModal from '../components/RegisterModal'
 
 const FEATURES = [
   {
@@ -78,15 +79,16 @@ const FEATURES = [
 ]
 
 export default function LandingPage() {
-  const [showAuth, setShowAuth] = useState(false)
-  const [authMode, setAuthMode] = useState('login')
+  const [showLogin, setShowLogin] = useState(false)
+  const [showRegister, setShowRegister] = useState(false)
   const navigate = useNavigate()
 
-  function openLogin() { setAuthMode('login'); setShowAuth(true) }
-  function openRegister() { setAuthMode('register'); setShowAuth(true) }
+  function openLogin() { setShowRegister(false); setShowLogin(true) }
+  function openRegister() { setShowLogin(false); setShowRegister(true) }
 
   function handleAuthSuccess() {
-    setShowAuth(false)
+    setShowLogin(false)
+    setShowRegister(false)
     navigate('/app')
   }
 
@@ -128,7 +130,7 @@ export default function LandingPage() {
 
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.05] mb-6">
             Your Radio Station.{' '}
-            <span className="bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
+            <span className="bg-linear-to-r from-purple-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
               Live to the World.
             </span>
           </h1>
@@ -141,7 +143,7 @@ export default function LandingPage() {
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
               onClick={openRegister}
-              className="px-7 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold text-sm transition-all shadow-lg shadow-purple-900/40 hover:shadow-purple-900/60"
+              className="px-7 py-3 rounded-xl bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold text-sm transition-all shadow-lg shadow-purple-900/40 hover:shadow-purple-900/60"
             >
               Start Broadcasting Free
             </button>
@@ -185,7 +187,7 @@ export default function LandingPage() {
           <p className="text-gray-500 text-sm mb-8">Create your account in seconds. No credit card required.</p>
           <button
             onClick={openRegister}
-            className="px-8 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold text-sm transition-all shadow-lg shadow-purple-900/40"
+            className="px-8 py-3 rounded-xl bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold text-sm transition-all shadow-lg shadow-purple-900/40"
           >
             Create Free Account
           </button>
@@ -200,12 +202,19 @@ export default function LandingPage() {
         </div>
       </footer>
 
-      {/* ── Auth Modal ── */}
-      {showAuth && (
-        <AuthModal
-          initialMode={authMode}
+      {/* ── Auth Modals ── */}
+      {showLogin && (
+        <LoginModal
           onSuccess={handleAuthSuccess}
-          onClose={() => setShowAuth(false)}
+          onClose={() => setShowLogin(false)}
+          onSwitchToRegister={openRegister}
+        />
+      )}
+      {showRegister && (
+        <RegisterModal
+          onSuccess={handleAuthSuccess}
+          onClose={() => setShowRegister(false)}
+          onSwitchToLogin={openLogin}
         />
       )}
     </div>
