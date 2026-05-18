@@ -610,7 +610,7 @@ function BrowserStreamer({ audioKey }) {
 
 /* ─── Icecast / Shoutcast browser encoder ────────────────────── */
 
-function IcecastEncoder({ defaultHost = '', defaultMount = '/radio' }) {
+function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl = '' }) {
   const { token } = useAuth()
   const { getStreamTrack, getMasterAnalyser, resume } = useAudioEngine()
 
@@ -949,6 +949,21 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio' }) {
           </div>
         </div>
 
+        {/* Listener share link — hub mode only */}
+        {broadcastMode === 'hub' && listenUrl && (
+          <div className={`rounded-lg border px-4 py-3 ${isLive ? 'border-orange-700/50 bg-orange-900/10' : 'border-gray-700/50 bg-gray-800/30'}`}>
+            <p className={`text-[10px] font-semibold uppercase tracking-wider mb-2 ${isLive ? 'text-orange-400' : 'text-gray-500'}`}>
+              {isLive ? '🔴 Share with listeners' : 'Listener link'}
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-sm text-green-400 font-mono truncate select-all bg-gray-950 border border-gray-800 rounded px-2 py-1">
+                {window.location.origin + listenUrl}
+              </code>
+              <CopyButton text={window.location.origin + listenUrl} />
+            </div>
+          </div>
+        )}
+
         {/* Go Live / Stop */}
         {canStart ? (
           <button onClick={goLive}
@@ -980,12 +995,12 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio' }) {
 
 /* ─── Audio encoder tab ───────────────────────────────────────── */
 
-function AudioEncoderTab({ audioKey, host }) {
+function AudioEncoderTab({ audioKey, host, listenUrl }) {
   const mount = '/' + audioKey
   return (
     <div className="space-y-5">
       <IcecastCard host={host} audioKey={audioKey} />
-      <IcecastEncoder defaultHost={host} defaultMount={mount} />
+      <IcecastEncoder defaultHost={host} defaultMount={mount} listenUrl={listenUrl} />
     </div>
   )
 }
@@ -1531,7 +1546,7 @@ export default function StreamSetup() {
           viewers={viewers}
         />
       )}
-      {tab === 'audio' && <AudioEncoderTab audioKey={audioKey} host={host} />}
+      {tab === 'audio' && <AudioEncoderTab audioKey={audioKey} host={host} listenUrl={creds?.listen_url} />}
       {tab === 'video' && <VideoEncoderTab />}
       {tab === 'channel' && <ChannelTab host={host} audioKey={audioKey} videoKey={videoKey} />}
     </div>
