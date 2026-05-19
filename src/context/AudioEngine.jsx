@@ -37,6 +37,9 @@ export function AudioEngineProvider({ children }) {
   // current duck state (true = mics on-air, line channels at 10%)
   const isDuckedRef = useRef(false)
 
+  // channelId → { on, mute, fader } — cached so setMicOnAir can act without Mixer mounted
+  const channelStateRef = useRef({})
+
   // ── Lazy AudioContext init ────────────────────────────────────────────────
   const getAC = useCallback(() => {
     if (!acRef.current) {
@@ -143,6 +146,8 @@ export function AudioEngineProvider({ children }) {
 
   // ── Gate the fader (called when on/mute/fader changes) ───────────────────
   const setChannelActive = useCallback((channelId, on, mute, fader) => {
+    // Cache state so setMicOnAir can act without Mixer mounted
+    channelStateRef.current[channelId] = { on, mute, fader }
     const nodes = channelNodes.current[channelId]
     if (!nodes || !acRef.current) return
     const target = (on && !mute) ? fader * fader : 0
@@ -349,9 +354,12 @@ export function AudioEngineProvider({ children }) {
       const next = { ...prev, [channelId]: bool }
       const anyMicOn = Object.values(next).some(v => v)
       duckLineChannels(anyMicOn)
+      // Directly open/close the fader — works even when Mixer is not mounted
+      const state = channelStateRef.current[channelId] ?? { mute: false, fader: 0.8 }
+      setChannelActive(channelId, bool, state.mute, bool ? state.fader : state.fader)
       return next
     })
-  }, [duckLineChannels])
+  }, [duckLineChannels, setChannelActive])
 
   return (
     <AudioEngineCtx.Provider value={{

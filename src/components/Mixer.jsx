@@ -920,7 +920,8 @@ export default function Mixer({ config }) {
     })
   }, [audioEngine])
 
-  // Sync mic channel on/off when NowPlaying button changes micOnAirMap
+  // Sync mic channel visual on/off state when NowPlaying button changes micOnAirMap
+  // (AudioEngine already fired setChannelActive directly, so we only update UI state here)
   useEffect(() => {
     if (!audioEngine?.micOnAirMap) return
     const map = audioEngine.micOnAirMap
@@ -929,7 +930,6 @@ export default function Mixer({ config }) {
       const next = prev.map(ch => {
         if (!ch.isMic || map[ch.id] === undefined || map[ch.id] === ch.on) return ch
         changed = true
-        audioEngine.setChannelActive(ch.id, map[ch.id], ch.mute, ch.fader)
         return { ...ch, on: map[ch.id] }
       })
       return changed ? next : prev
