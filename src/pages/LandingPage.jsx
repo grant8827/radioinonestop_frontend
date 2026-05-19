@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import LoginModal from '../components/LoginModal'
 import RegisterModal from '../components/RegisterModal'
+import StationModal from '../components/StationModal'
 
 const FEATURES = [
   {
@@ -78,10 +79,50 @@ const FEATURES = [
   },
 ]
 
+const DEMO_STATIONS = [
+  {
+    slug: 'demo-sunset-fm',
+    name: 'Sunset FM',
+    logo_url: '',
+    is_live: true,
+    listeners: 42,
+    genre: 'Chillout',
+    description: 'Smooth evening vibes, deep house and ambient sounds to wind down your day.',
+  },
+  {
+    slug: 'demo-bass-nation',
+    name: 'Bass Nation',
+    logo_url: '',
+    is_live: false,
+    listeners: 0,
+    genre: 'Drum & Bass',
+    description: 'The hardest drum and bass, jungle, and neurofunk — 24/7 rolling.',
+  },
+]
+
 export default function LandingPage() {
   const [showLogin, setShowLogin] = useState(false)
   const [showRegister, setShowRegister] = useState(false)
+  const [selectedStation, setSelectedStation] = useState(null)
+  const [stations, setStations] = useState(DEMO_STATIONS)
+  const [showAllStations, setShowAllStations] = useState(false)
   const navigate = useNavigate()
+
+  // Fetch stations on mount, refresh every 30s
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const r = await fetch('/api/stations')
+        if (r.ok) {
+          const data = await r.json()
+          if (data && data.length > 0) setStations(data)
+        }
+      } catch { /* ignore */ }
+    }
+    load()
+    const id = setInterval(load, 30_000)
+    return () => clearInterval(id)
+  }, [])
 
   function openLogin() { setShowRegister(false); setShowLogin(true) }
   function openRegister() { setShowLogin(false); setShowRegister(true) }
@@ -157,6 +198,94 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── Stations Grid ── */}
+      {stations.length > 0 && (
+        <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
+          <div className="flex items-end justify-between mb-8">
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-1">Stations on the Air</h2>
+              <p className="text-gray-500 text-sm">{stations.length} station{stations.length !== 1 ? 's' : ''} registered — click any to tune in.</p>
+            </div>
+            {stations.length > 8 && (
+              <button
+                onClick={() => setShowAllStations(v => !v)}
+                className="shrink-0 text-sm font-semibold text-purple-400 hover:text-purple-300 transition-colors"
+              >
+                {showAllStations ? 'Show Less ↑' : `Browse All ${stations.length} →`}
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {(showAllStations ? stations : stations.slice(0, 8)).map(station => (
+              <div
+                key={station.slug}
+                className="group relative rounded-xl border border-white/5 bg-white/3 hover:border-purple-800/60 hover:bg-white/5 transition-all duration-200 overflow-hidden cursor-pointer"
+                onClick={() => setSelectedStation(station)}
+              >
+                {/* Card body */}
+                <div className="p-5 flex items-start gap-4">
+                  {/* Logo / avatar */}
+                  <div className="shrink-0 w-14 h-14 rounded-xl overflow-hidden bg-[#1a1a2e] border border-white/10 flex items-center justify-center">
+                    {station.logo_url ? (
+                      <img src={station.logo_url} alt={station.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-2xl font-black text-purple-400">
+                        {station.name?.[0]?.toUpperCase() ?? '♫'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <h3 className="font-bold text-sm text-white truncate">{station.name}</h3>
+                      {station.is_live && (
+                        <span className="shrink-0 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-red-400 bg-red-900/20 border border-red-900/40 rounded-full px-2 py-0.5">
+                          <span className="w-1 h-1 rounded-full bg-red-400 animate-pulse" />
+                          Live
+                        </span>
+                      )}
+                    </div>
+                    {station.genre && (
+                      <p className="text-[10px] text-purple-400 font-semibold mb-1">{station.genre}</p>
+                    )}
+                    {station.description && (
+                      <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">{station.description}</p>
+                    )}
+                    <div className="flex items-center gap-3 mt-2">
+                      <span className="text-[10px] text-gray-600">
+                        {station.listeners} listener{station.listeners !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Hover overlay */}
+                <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-xl">
+                  <span className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-linear-to-r from-purple-600 to-blue-600 text-white text-sm font-bold shadow-lg">
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z"/>
+                    </svg>
+                    Listen Now
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+          {!showAllStations && stations.length > 8 && (
+            <div className="mt-8 text-center">
+              <button
+                onClick={() => setShowAllStations(true)}
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl border border-white/10 hover:border-purple-800/60 text-gray-300 hover:text-white text-sm font-semibold transition-all hover:bg-white/5"
+              >
+                Browse All {stations.length} Stations
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+
       {/* ── Features ── */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
         <div className="text-center mb-14">
@@ -201,6 +330,13 @@ export default function LandingPage() {
           <span className="text-xs text-gray-700">Built with Go + React</span>
         </div>
       </footer>
+
+      {selectedStation && (
+        <StationModal
+          station={selectedStation}
+          onClose={() => setSelectedStation(null)}
+        />
+      )}
 
       {/* ── Auth Modals ── */}
       {showLogin && (
