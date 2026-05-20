@@ -62,12 +62,13 @@ function MuteButton() {
 }
 
 // ── Leave button ───────────────────────────────────────────────────────────────
-function LeaveButton() {
+function LeaveButton({ onLeave }) {
   const room = useRoomContext()
   const handleLeave = useCallback(async () => {
     await room.disconnect()
-    window.location.href = '/'
-  }, [room])
+    if (onLeave) onLeave()
+    else window.location.href = '/'
+  }, [room, onLeave])
 
   return (
     <button
@@ -83,9 +84,9 @@ function LeaveButton() {
 }
 
 // ── Settings tab — invite link ─────────────────────────────────────────────────
-function SettingsPanel() {
+function SettingsPanel({ inviteUrl }) {
   const [copied, setCopied] = useState(false)
-  const url = window.location.href
+  const url = inviteUrl || window.location.href
 
   const handleCopy = useCallback(async () => {
     try { await navigator.clipboard.writeText(url) } catch {}
@@ -222,7 +223,7 @@ function GroupTab() {
 }
 
 // ── Main room view ─────────────────────────────────────────────────────────────
-function RoomView() {
+function RoomView({ onLeave, inviteUrl }) {
   const [tab, setTab] = useState('group')
   const participants = useParticipants()
 
@@ -236,7 +237,7 @@ function RoomView() {
         </div>
         <div className="flex items-center gap-2">
           <MuteButton />
-          <LeaveButton />
+          <LeaveButton onLeave={onLeave} />
         </div>
       </header>
 
@@ -279,7 +280,7 @@ function RoomView() {
       {/* Tab content */}
       <main className="flex-1 overflow-y-auto">
         {tab === 'group' && <GroupTab />}
-        {tab === 'settings' && <SettingsPanel />}
+        {tab === 'settings' && <SettingsPanel inviteUrl={inviteUrl} />}
       </main>
 
       {/* Pulls all remote audio tracks to speakers */}
@@ -323,8 +324,12 @@ function UsernameForm({ onSubmit }) {
 }
 
 // ── Page entry point ───────────────────────────────────────────────────────────
-export default function ConferenceRoom() {
-  const { roomId } = useParams()
+// roomId + onLeave props are used when rendered inline inside the app.
+// When loaded via the /conference/:roomId route (guest link), useParams() provides the roomId.
+export default function ConferenceRoom({ roomId: propRoomId, onLeave }) {
+  const { roomId: routeRoomId } = useParams()
+  const roomId = propRoomId ?? routeRoomId
+  const inviteUrl = `${window.location.origin}/conference/${roomId}`
   const { user } = useAuth()
   // If logged in, skip the name form and use their account name
   const [username, setUsername] = useState(() => nameFromEmail(user?.email))
@@ -383,9 +388,9 @@ export default function ConferenceRoom() {
       audio={true}
       video={false}
       connect={true}
-      onDisconnected={() => { window.location.href = '/' }}
+      onDisconnected={() => { if (onLeave) onLeave(); else window.location.href = '/' }}
     >
-      <RoomView />
+      <RoomView onLeave={onLeave} inviteUrl={inviteUrl} />
     </LiveKitRoom>
   )
 }

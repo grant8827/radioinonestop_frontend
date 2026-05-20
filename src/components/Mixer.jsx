@@ -844,7 +844,16 @@ function loadSavedMaster() {
 }
 
 // ─── Mixer page ───────────────────────────────────────────────────────────────
-export default function Mixer({ config }) {
+function loadSavedConference() {
+  const defaults = { gain: 0.5, fader: 0.8, mute: false, on: false }
+  try {
+    const saved = JSON.parse(localStorage.getItem('mixer_conference') || 'null')
+    if (!saved) return defaults
+    return { ...defaults, ...saved }
+  } catch { return defaults }
+}
+
+export default function Mixer({ config, onOpenConference }) {
   const audioEngine = useAudioEngine()
   const [channels, setChannels] = useState(loadSavedChannels)
   const [master, setMaster] = useState(loadSavedMaster)

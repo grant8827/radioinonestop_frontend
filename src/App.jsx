@@ -30,6 +30,7 @@ function MainApp() {
   const [trackB, setTrackB] = useState(null)
   const [queue,          setQueue]          = useState([])
   const [repeatPlaylist, setRepeatPlaylist] = useState(false)
+  const [conferenceRoomId, setConferenceRoomId] = useState(null)
 
   useEffect(() => {
     fetch('/api/config')
@@ -47,6 +48,7 @@ function MainApp() {
   const handleModeChange = (m) => {
     setMode(m)
     if (m === 'radio' || m === 'video') setPlayerMode(m)
+    if (m !== 'conference') setConferenceRoomId(null)
   }
 
   if (!config) {
@@ -85,7 +87,12 @@ function MainApp() {
             <StreamSetup />
           </div>
           {mode === 'mixer' && <Mixer config={config} onOpenConference={() => handleModeChange('conference')} />}
-          {mode === 'conference' && <ConferenceHome />}
+          {mode === 'conference' && !conferenceRoomId && (
+            <ConferenceHome onJoin={(id) => setConferenceRoomId(id)} />
+          )}
+          {mode === 'conference' && conferenceRoomId && (
+            <ConferenceRoom roomId={conferenceRoomId} onLeave={() => setConferenceRoomId(null)} />
+          )}
 
           {/* Player + NowPlaying + Chat — always mounted so audio elements survive
               mode switches. Hidden (display:none) when not in radio/video mode. */}
