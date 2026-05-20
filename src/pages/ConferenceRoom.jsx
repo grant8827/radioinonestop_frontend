@@ -2,11 +2,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   LiveKitRoom,
-  AudioConference,
   RoomAudioRenderer,
   useLocalParticipant,
   useRoomContext,
   useParticipants,
+  useIsSpeaking,
 } from '@livekit/components-react'
 import '@livekit/components-styles'
 
@@ -139,6 +139,76 @@ function SettingsPanel() {
   )
 }
 
+// ── Single participant tile ──────────────────────────────────────────────────
+function ParticipantTile({ participant, isLocal }) {
+  const isSpeaking = useIsSpeaking(participant)
+  const micEnabled = participant.isMicrophoneEnabled
+  const name = participant.name || participant.identity || 'Guest'
+  const initials = name
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
+
+  return (
+    <div className="flex flex-col items-center gap-2 p-3">
+      <div
+        className={`relative w-16 h-16 rounded-full bg-gradient-to-br from-purple-600 to-indigo-700 flex items-center justify-center transition-all ${
+          isSpeaking ? 'ring-4 ring-green-400 ring-offset-2 ring-offset-gray-950' : 'ring-2 ring-gray-800'
+        }`}
+      >
+        <span className="text-xl font-bold text-white select-none">{initials}</span>
+        {!micEnabled && (
+          <div className="absolute -bottom-1 -right-1 bg-red-600 rounded-full p-1 border-2 border-gray-950">
+            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z" />
+            </svg>
+          </div>
+        )}
+      </div>
+      <div className="text-center">
+        <p className="text-sm font-semibold text-white truncate max-w-[90px]">{name}</p>
+        {isLocal && <p className="text-xs text-purple-400">You</p>}
+        {isSpeaking && !isLocal && <p className="text-xs text-green-400">Speaking…</p>}
+      </div>
+    </div>
+  )
+}
+
+// ── Participant grid ───────────────────────────────────────────────────────────
+function GroupTab() {
+  const { localParticipant } = useLocalParticipant()
+  const remoteParticipants = useParticipants()
+
+  const tiles = [
+    ...(localParticipant ? [{ p: localParticipant, isLocal: true }] : []),
+    ...remoteParticipants
+      .filter((p) => !localParticipant || p.identity !== localParticipant.identity)
+      .map((p) => ({ p, isLocal: false })),
+  ]
+
+  if (tiles.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-16 text-gray-600">
+        <svg className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="1.2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+        </svg>
+        <p className="text-sm">No one else is here yet</p>
+        <p className="text-xs text-gray-700">Share the link to invite others</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 p-2">
+      {tiles.map(({ p, isLocal }) => (
+        <ParticipantTile key={p.identity} participant={p} isLocal={isLocal} />
+      ))}
+    </div>
+  )
+}
+
 // ── Main room view ─────────────────────────────────────────────────────────────
 function RoomView() {
   const [tab, setTab] = useState('group')
@@ -196,11 +266,7 @@ function RoomView() {
 
       {/* Tab content */}
       <main className="flex-1 overflow-y-auto">
-        {tab === 'group' && (
-          <div className="p-4">
-            <AudioConference />
-          </div>
-        )}
+        {tab === 'group' && <GroupTab />}
         {tab === 'settings' && <SettingsPanel />}
       </main>
 
