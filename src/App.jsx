@@ -9,6 +9,8 @@ import StreamSetup from './components/StreamSetup'
 import Mixer from './components/Mixer'
 import SocialLive from './components/SocialLive'
 import TrackLibrary from './components/TrackLibrary'
+import ConferenceHome from './components/ConferenceHome'
+import ConferenceRoom from './pages/ConferenceRoom'
 import LandingPage from './pages/LandingPage'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AudioEngineProvider } from './context/AudioEngine'
@@ -83,6 +85,7 @@ function MainApp() {
             <StreamSetup />
           </div>
           {mode === 'mixer' && <Mixer config={config} />}
+          {mode === 'conference' && <ConferenceHome />}
 
           {/* Player + NowPlaying + Chat — always mounted so audio elements survive
               mode switches. Hidden (display:none) when not in radio/video mode. */}
@@ -116,6 +119,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<LandingPage />} />
+          <Route path="/conference/:roomId" element={<ConferenceRoom />} />
           <Route
             path="/app"
             element={
