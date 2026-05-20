@@ -669,6 +669,7 @@ function CenterMixer({
   boothVol, onBoothVolChange,
   playing, playingB = false,
   levelA = 0, levelB = 0, levelMasterL = 0, levelMasterR = 0,
+  autoDJ = false, onAutoDJToggle, autoDJToast = '',
 }) {
   return (
     <div
@@ -764,12 +765,33 @@ function CenterMixer({
         <Knob value={masterVol} onChange={onMasterVolChange} size={30} color="#d1d5db" label="MASTER" />
         <Knob value={boothVol}  onChange={onBoothVolChange}  size={30} color="#9ca3af" label="BOOTH" />
       </div>
+
+      {/* Auto DJ toggle */}
+      <div className="flex flex-col gap-1 mt-1">
+        <button
+          onClick={onAutoDJToggle}
+          className="w-full h-7 rounded text-[7px] font-black tracking-wider transition-all"
+          style={{
+            backgroundColor: autoDJ ? '#6d28d922' : '#1a1d24',
+            color:            autoDJ ? '#a78bfa'   : '#4b5563',
+            border:           `1px solid ${autoDJ ? '#6d28d960' : '#2d3340'}`,
+            boxShadow:        autoDJ ? '0 0 8px #6d28d930' : 'none',
+          }}
+        >
+          ⚡ AUTO DJ {autoDJ ? 'ON' : 'OFF'}
+        </button>
+        {autoDJToast && (
+          <p className="text-[8px] text-orange-400 text-center font-bold leading-tight px-1">
+            {autoDJToast}
+          </p>
+        )}
+      </div>
     </div>
   )
 }
 
 // ── Main Player ────────────────────────────────────────────────────────────────
-export default function Player({ mode, config, trackA, trackB }) {
+export default function Player({ mode, config, trackA, trackB, queue = [], onQueuePop }) {
   const mediaRef = useRef(null)
   const mediaRefB = useRef(null)
   const hlsRef   = useRef(null)
@@ -819,9 +841,53 @@ export default function Player({ mode, config, trackA, trackB }) {
       if (!isFinite(media.duration) || media.duration === 0) return
       setProgressA(media.currentTime / media.duration)
     }
-    const onEnded = () => {
+    const onEnded = async () => {
       setPlaying(false)
       setProgressA(0)
+      if (!autoDJRef.current) return
+      const q = queueRef.current
+      if (!q.length) {
+        setAutoDJToast('Queue empty \u2014 Auto DJ paused')
+        setAutoDJ(false)
+        return
+      }
+      const next = q[0]
+      onQueuePopRef.current?.()
+      // Load next track onto Deck B and start playback
+      const mb = mediaRefB.current
+      if (mb) {
+        mb.pause()
+        mb.src = next.url
+        mb.load()
+        setPlayingB(false)
+        setProgressB(0)
+        await new Promise((r) => {
+          const h = () => { mb.removeEventListener('canplay', h); r() }
+          mb.addEventListener('canplay', h)
+          setTimeout(r, 4000) // fallback
+        })
+        try { await audioEngineRef.current?.resume(); await mb.play(); setPlayingB(true) } catch { /**/ }
+      }
+      // Sweep crossfader toward B (1.0) over 3 s
+      const x0 = crossfaderRef.current
+      if (sweepRAFRef.current) cancelAnimationFrame(sweepRAFRef.current)
+      const t0 = performance.now()
+      const sweep = (now) => {
+        const p = Math.min(1, (now - t0) / 3000)
+        const v = x0 + (1 - x0) * p
+        crossfaderRef.current = v
+        setCrossfader(v)
+        if (p < 1) {
+          sweepRAFRef.current = requestAnimationFrame(sweep)
+        } else {
+          sweepRAFRef.current = null
+          const ma = mediaRef.current
+          if (ma) { ma.pause(); ma.currentTime = 0 }
+          setPlaying(false)
+          setProgressA(0)
+        }
+      }
+      sweepRAFRef.current = requestAnimationFrame(sweep)
     }
     media.addEventListener('timeupdate', onTime)
     media.addEventListener('ended', onEnded)
@@ -839,9 +905,58 @@ export default function Player({ mode, config, trackA, trackB }) {
       if (!isFinite(media.duration) || media.duration === 0) return
       setProgressB(media.currentTime / media.duration)
     }
-    const onEnded = () => {
+    const onEnded = async () => {
       setPlayingB(false)
       setProgressB(0)
+      if (!autoDJRef.current) return
+      const q = queueRef.current
+      if (!q.length) {
+        setAutoDJToast('Queue empty \u2014 Auto DJ paused')
+        setAutoDJ(false)
+        return
+      }
+      const next = q[0]
+      onQueuePopRef.current?.()
+      // Tear down HLS and load next track onto Deck A
+      clearTimeout(retryTimer.current)
+      if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
+      const ma = mediaRef.current
+      if (ma) {
+        if (prevLocalUrlRef.current) URL.revokeObjectURL(prevLocalUrlRef.current)
+        prevLocalUrlRef.current = next.url
+        ma.pause()
+        ma.src = next.url
+        ma.load()
+        setPlaying(false)
+        setProgressA(0)
+        setStreamLive(false)
+        await new Promise((r) => {
+          const h = () => { ma.removeEventListener('canplay', h); r() }
+          ma.addEventListener('canplay', h)
+          setTimeout(r, 4000) // fallback
+        })
+        try { await audioEngineRef.current?.resume(); await ma.play(); setPlaying(true) } catch { /**/ }
+      }
+      // Sweep crossfader toward A (0.0) over 3 s
+      const x0 = crossfaderRef.current
+      if (sweepRAFRef.current) cancelAnimationFrame(sweepRAFRef.current)
+      const t0 = performance.now()
+      const sweep = (now) => {
+        const p = Math.min(1, (now - t0) / 3000)
+        const v = x0 * (1 - p)
+        crossfaderRef.current = v
+        setCrossfader(v)
+        if (p < 1) {
+          sweepRAFRef.current = requestAnimationFrame(sweep)
+        } else {
+          sweepRAFRef.current = null
+          const mb = mediaRefB.current
+          if (mb) { mb.pause(); mb.currentTime = 0 }
+          setPlayingB(false)
+          setProgressB(0)
+        }
+      }
+      sweepRAFRef.current = requestAnimationFrame(sweep)
     }
     media.addEventListener('timeupdate', onTime)
     media.addEventListener('ended', onEnded)
@@ -860,6 +975,17 @@ export default function Player({ mode, config, trackA, trackB }) {
   const [pflA, setPflA] = useState(false)
   const [pflB, setPflB] = useState(false)
   const [crossfader, setCrossfader] = useState(0.5)
+  const crossfaderRef = useRef(0.5)
+  const sweepRAFRef   = useRef(null)
+
+  // ── Auto DJ ─────────────────────────────────────────────────────────────────
+  const [autoDJ,      setAutoDJ]      = useState(false)
+  const [autoDJToast, setAutoDJToast] = useState('')
+  const autoDJRef      = useRef(false)
+  const queueRef       = useRef([])
+  const audioEngineRef = useRef(null)
+  const onQueuePopRef  = useRef(null)
+
   const [masterVol,  setMasterVol]  = useState(0.85)
   const [boothVol,   setBoothVol]   = useState(0.7)
 
@@ -890,6 +1016,24 @@ export default function Player({ mode, config, trackA, trackB }) {
     audioEngine.updateDeckEq('dj-b', 'mid', eqB.mid)
     audioEngine.updateDeckEq('dj-b', 'lo',  eqB.lo)
   }, [eqB, audioEngine])
+
+  // ── Sync Auto DJ refs with latest values ──────────────────────────────────────
+  useEffect(() => { audioEngineRef.current  = audioEngine },  [audioEngine])
+  useEffect(() => { onQueuePopRef.current   = onQueuePop  },  [onQueuePop])
+  useEffect(() => { autoDJRef.current       = autoDJ      },  [autoDJ])
+  useEffect(() => { queueRef.current        = queue       },  [queue])
+
+  // ── Pitch → playbackRate ───────────────────────────────────────────────────────
+  useEffect(() => {
+    if (mediaRef.current)  mediaRef.current.playbackRate  = Math.max(0.5, Math.min(2, 1 + pitchA * 0.08))
+  }, [pitchA])
+
+  useEffect(() => {
+    if (mediaRefB.current) mediaRefB.current.playbackRate = Math.max(0.5, Math.min(2, 1 + pitchB * 0.08))
+  }, [pitchB])
+
+  // ── Cancel sweep RAF on unmount ────────────────────────────────────────────────
+  useEffect(() => () => { if (sweepRAFRef.current) cancelAnimationFrame(sweepRAFRef.current) }, [])
 
   // ── Real-time VU levels for the Player CenterMixer strips ─────────────────
   const [deckLevels, setDeckLevels] = useState({ a: 0, b: 0, masterL: 0, masterR: 0 })
@@ -1029,6 +1173,13 @@ export default function Player({ mode, config, trackA, trackB }) {
       media.pause()
     }
   }, [streamUrl, setupHls])
+
+  // ── Crossfader change — cancels any in-progress sweep ─────────────────────────
+  const handleCrossfaderChange = (v) => {
+    if (sweepRAFRef.current) { cancelAnimationFrame(sweepRAFRef.current); sweepRAFRef.current = null }
+    crossfaderRef.current = v
+    setCrossfader(v)
+  }
 
   const togglePlay = async () => {
     const media = mediaRef.current
@@ -1241,7 +1392,7 @@ export default function Player({ mode, config, trackA, trackB }) {
               gainB={gainB} onGainBChange={setGainB}
               faderB={faderB} onFaderBChange={setFaderB}
               pflB={pflB} onPflBToggle={() => setPflB((v) => !v)}
-              crossfader={crossfader} onCrossfaderChange={setCrossfader}
+              crossfader={crossfader} onCrossfaderChange={handleCrossfaderChange}
               masterVol={masterVol} onMasterVolChange={setMasterVol}
               boothVol={boothVol}  onBoothVolChange={setBoothVol}
               playing={playing}
@@ -1250,6 +1401,14 @@ export default function Player({ mode, config, trackA, trackB }) {
               levelB={deckLevels.b}
               levelMasterL={deckLevels.masterL}
               levelMasterR={deckLevels.masterR}
+              autoDJ={autoDJ}
+              onAutoDJToggle={() => {
+                const next = !autoDJ
+                setAutoDJ(next)
+                autoDJRef.current = next
+                if (next) setAutoDJToast('')
+              }}
+              autoDJToast={autoDJToast}
             />
 
             <DeckUnit

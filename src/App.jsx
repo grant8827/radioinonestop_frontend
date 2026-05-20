@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Player from './components/Player'
-import Chat from './components/Chat'
 import ViewerCount from './components/ViewerCount'
 import AdminPanel from './components/AdminPanel'
 import NowPlaying from './components/NowPlaying'
@@ -9,6 +8,7 @@ import Sidebar from './components/Sidebar'
 import StreamSetup from './components/StreamSetup'
 import Mixer from './components/Mixer'
 import SocialLive from './components/SocialLive'
+import TrackLibrary from './components/TrackLibrary'
 import LandingPage from './pages/LandingPage'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AudioEngineProvider } from './context/AudioEngine'
@@ -25,6 +25,7 @@ function MainApp() {
   const [showAdmin, setShowAdmin] = useState(false)
   const [trackA, setTrackA] = useState(null)
   const [trackB, setTrackB] = useState(null)
+  const [queue,  setQueue]  = useState([])
 
   useEffect(() => {
     fetch('/api/config')
@@ -87,12 +88,14 @@ function MainApp() {
             mode !== 'radio' && mode !== 'video' ? ' hidden' : ''
           }`}>
             <div className="flex-1 flex flex-col gap-4 min-w-0">
-              <Player mode={playerMode} config={config} trackA={trackA} trackB={trackB} />
-              <NowPlaying config={config} mode={mode} onTrackLoadA={setTrackA} onTrackLoadB={setTrackB} />
+              <Player mode={playerMode} config={config} trackA={trackA} trackB={trackB} queue={queue} onQueuePop={() => setQueue((q) => q.slice(1))} />
+              <NowPlaying config={config} mode={mode} />
             </div>
-            <div className="lg:w-80 xl:w-96 flex-shrink-0 flex flex-col gap-3">
+            <div className="lg:w-80 xl:w-96 shrink-0 flex flex-col gap-3 min-h-0">
               <SocialLive />
-              <Chat />
+              <div className="flex-1 min-h-0">
+                <TrackLibrary onTrackLoadA={setTrackA} onTrackLoadB={setTrackB} queue={queue} onQueueChange={setQueue} />
+              </div>
             </div>
           </div>
         </main>
