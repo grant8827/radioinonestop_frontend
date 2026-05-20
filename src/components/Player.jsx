@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import Hls from 'hls.js'
 import { useAudioEngine } from '../context/AudioEngine'
+import { useStream } from '../context/StreamContext'
 
 // ── LL-HLS config ──────────────────────────────────────────────────────────────
 const HLS_CONFIG = {
@@ -560,7 +561,7 @@ function DeckUnit({
           <span className="text-[8px] font-mono text-gray-700">&#8734;:&#8734;&#8734;</span>
         </div>
         <p className="text-xs font-bold text-white truncate leading-tight">
-          {active ? (stationName ?? 'Radio In One Stop') : '\u2500\u2500\u2500\u2500 NO TRACK \u2500\u2500\u2500\u2500'}
+          {stationName ?? (active ? 'Radio In One Stop' : '\u2500\u2500\u2500\u2500 NO TRACK \u2500\u2500\u2500\u2500')}
         </p>
         <div className="flex items-center justify-between mt-1">
           <span className="text-[9px] font-mono font-bold" style={{ color }}>
@@ -790,8 +791,36 @@ function CenterMixer({
   )
 }
 
+// ── Go Live Video button (video mode) ─────────────────────────────────────────
+function VideoGoLiveButton({ streamKey }) {
+  const { videoStatus, startVideo, stopVideo } = useStream()
+  const videoLive = videoStatus === 'live'
+  const videoConnecting = videoStatus === 'connecting'
+  return (
+    <button
+      onClick={videoLive ? stopVideo : () => startVideo(streamKey)}
+      disabled={videoConnecting}
+      title={videoLive ? 'Stop video broadcast' : 'Go Live Video — share your screen'}
+      className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-bold text-xs uppercase tracking-widest transition-all duration-150 shrink-0 ${
+        videoLive
+          ? 'bg-purple-600 text-white shadow-[0_0_14px_#7c3aed55] animate-pulse'
+          : videoConnecting
+          ? 'bg-gray-700 text-gray-400 cursor-wait border border-gray-600'
+          : videoStatus === 'error'
+          ? 'bg-red-900 text-red-300 border border-red-700 hover:border-red-500 hover:text-white'
+          : 'bg-gray-800 text-gray-400 border border-gray-700 hover:border-purple-500 hover:text-purple-400'
+      }`}
+    >
+      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z" />
+      </svg>
+      {videoLive ? '● LIVE VIDEO' : videoConnecting ? 'CONNECTING…' : videoStatus === 'error' ? 'RETRY VIDEO' : 'GO LIVE VIDEO'}
+    </button>
+  )
+}
+
 // ── Main Player ────────────────────────────────────────────────────────────────
-export default function Player({ mode, config, trackA, trackB, queue = [], onQueuePop }) {
+export default function Player({ mode, config, trackA, trackB, queue = [], onQueuePop, onLoadTrackA, onLoadTrackB }) {
   const mediaRef = useRef(null)
   const mediaRefB = useRef(null)
   const hlsRef   = useRef(null)
@@ -845,29 +874,46 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
       setPlaying(false)
       setProgressA(0)
       if (!autoDJRef.current) return
-      const q = queueRef.current
-      if (!q.length) {
-        setAutoDJToast('Queue empty \u2014 Auto DJ paused')
-        setAutoDJ(false)
-        return
+
+      if (preloadedDeckRef.current === 'B') {
+        // Standby Deck B is pre-loaded — wait for ready state then play
+        preloadedDeckRef.current = null
+        const mb = mediaRefB.current
+        if (mb) {
+          if (mb.readyState < 2) {
+            await new Promise((r) => {
+              const h = () => { mb.removeEventListener('canplay', h); r() }
+              mb.addEventListener('canplay', h)
+              setTimeout(r, 5000)
+            })
+          }
+          try { await audioEngineRef.current?.resume(); await mb.play(); setPlayingB(true) } catch { /**/ }
+        }
+      } else {
+        // Load from queue
+        const q = queueRef.current
+        if (!q.length) {
+          setAutoDJToast('Queue empty \u2014 Auto DJ paused')
+          setAutoDJ(false); autoDJRef.current = false
+          return
+        }
+        const next = q[0]
+        onQueuePopRef.current?.()
+        const mb = mediaRefB.current
+        if (mb) {
+          // Register canplay before triggering load so we don't miss the event
+          const readyPromise = new Promise((r) => {
+            const h = () => { mb.removeEventListener('canplay', h); r() }
+            mb.addEventListener('canplay', h)
+            setTimeout(r, 4000)
+          })
+          onLoadTrackBRef.current?.({ ...next })  // updates UI + triggers audio load via useEffect
+          setPlayingB(false); setProgressB(0)
+          await readyPromise
+          try { await audioEngineRef.current?.resume(); await mb.play(); setPlayingB(true) } catch { /**/ }
+        }
       }
-      const next = q[0]
-      onQueuePopRef.current?.()
-      // Load next track onto Deck B and start playback
-      const mb = mediaRefB.current
-      if (mb) {
-        mb.pause()
-        mb.src = next.url
-        mb.load()
-        setPlayingB(false)
-        setProgressB(0)
-        await new Promise((r) => {
-          const h = () => { mb.removeEventListener('canplay', h); r() }
-          mb.addEventListener('canplay', h)
-          setTimeout(r, 4000) // fallback
-        })
-        try { await audioEngineRef.current?.resume(); await mb.play(); setPlayingB(true) } catch { /**/ }
-      }
+
       // Sweep crossfader toward B (1.0) over 3 s
       const x0 = crossfaderRef.current
       if (sweepRAFRef.current) cancelAnimationFrame(sweepRAFRef.current)
@@ -875,16 +921,21 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
       const sweep = (now) => {
         const p = Math.min(1, (now - t0) / 3000)
         const v = x0 + (1 - x0) * p
-        crossfaderRef.current = v
-        setCrossfader(v)
+        crossfaderRef.current = v; setCrossfader(v)
         if (p < 1) {
           sweepRAFRef.current = requestAnimationFrame(sweep)
         } else {
           sweepRAFRef.current = null
           const ma = mediaRef.current
           if (ma) { ma.pause(); ma.currentTime = 0 }
-          setPlaying(false)
-          setProgressA(0)
+          setPlaying(false); setProgressA(0)
+          // Daisy-chain: pre-load the next queued track onto freed Deck A
+          if (autoDJRef.current && queueRef.current.length) {
+            const upcoming = queueRef.current[0]
+            onQueuePopRef.current?.()
+            onLoadTrackARef.current?.({ ...upcoming })
+            preloadedDeckRef.current = 'A'
+          }
         }
       }
       sweepRAFRef.current = requestAnimationFrame(sweep)
@@ -909,34 +960,46 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
       setPlayingB(false)
       setProgressB(0)
       if (!autoDJRef.current) return
-      const q = queueRef.current
-      if (!q.length) {
-        setAutoDJToast('Queue empty \u2014 Auto DJ paused')
-        setAutoDJ(false)
-        return
+
+      if (preloadedDeckRef.current === 'A') {
+        // Standby Deck A is pre-loaded — wait for ready state then play
+        preloadedDeckRef.current = null
+        const ma = mediaRef.current
+        if (ma) {
+          if (ma.readyState < 2) {
+            await new Promise((r) => {
+              const h = () => { ma.removeEventListener('canplay', h); r() }
+              ma.addEventListener('canplay', h)
+              setTimeout(r, 5000)
+            })
+          }
+          try { await audioEngineRef.current?.resume(); await ma.play(); setPlaying(true) } catch { /**/ }
+        }
+      } else {
+        // Load from queue
+        const q = queueRef.current
+        if (!q.length) {
+          setAutoDJToast('Queue empty \u2014 Auto DJ paused')
+          setAutoDJ(false); autoDJRef.current = false
+          return
+        }
+        const next = q[0]
+        onQueuePopRef.current?.()
+        const ma = mediaRef.current
+        if (ma) {
+          // Register canplay before triggering load so we don't miss the event
+          const readyPromise = new Promise((r) => {
+            const h = () => { ma.removeEventListener('canplay', h); r() }
+            ma.addEventListener('canplay', h)
+            setTimeout(r, 4000)
+          })
+          onLoadTrackARef.current?.({ ...next })  // updates UI + triggers audio load via useEffect
+          setPlaying(false); setProgressA(0)
+          await readyPromise
+          try { await audioEngineRef.current?.resume(); await ma.play(); setPlaying(true) } catch { /**/ }
+        }
       }
-      const next = q[0]
-      onQueuePopRef.current?.()
-      // Tear down HLS and load next track onto Deck A
-      clearTimeout(retryTimer.current)
-      if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
-      const ma = mediaRef.current
-      if (ma) {
-        if (prevLocalUrlRef.current) URL.revokeObjectURL(prevLocalUrlRef.current)
-        prevLocalUrlRef.current = next.url
-        ma.pause()
-        ma.src = next.url
-        ma.load()
-        setPlaying(false)
-        setProgressA(0)
-        setStreamLive(false)
-        await new Promise((r) => {
-          const h = () => { ma.removeEventListener('canplay', h); r() }
-          ma.addEventListener('canplay', h)
-          setTimeout(r, 4000) // fallback
-        })
-        try { await audioEngineRef.current?.resume(); await ma.play(); setPlaying(true) } catch { /**/ }
-      }
+
       // Sweep crossfader toward A (0.0) over 3 s
       const x0 = crossfaderRef.current
       if (sweepRAFRef.current) cancelAnimationFrame(sweepRAFRef.current)
@@ -944,16 +1007,21 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
       const sweep = (now) => {
         const p = Math.min(1, (now - t0) / 3000)
         const v = x0 * (1 - p)
-        crossfaderRef.current = v
-        setCrossfader(v)
+        crossfaderRef.current = v; setCrossfader(v)
         if (p < 1) {
           sweepRAFRef.current = requestAnimationFrame(sweep)
         } else {
           sweepRAFRef.current = null
           const mb = mediaRefB.current
           if (mb) { mb.pause(); mb.currentTime = 0 }
-          setPlayingB(false)
-          setProgressB(0)
+          setPlayingB(false); setProgressB(0)
+          // Daisy-chain: pre-load the next queued track onto freed Deck B
+          if (autoDJRef.current && queueRef.current.length) {
+            const upcoming = queueRef.current[0]
+            onQueuePopRef.current?.()
+            onLoadTrackBRef.current?.({ ...upcoming })
+            preloadedDeckRef.current = 'B'
+          }
         }
       }
       sweepRAFRef.current = requestAnimationFrame(sweep)
@@ -981,10 +1049,13 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
   // ── Auto DJ ─────────────────────────────────────────────────────────────────
   const [autoDJ,      setAutoDJ]      = useState(false)
   const [autoDJToast, setAutoDJToast] = useState('')
-  const autoDJRef      = useRef(false)
-  const queueRef       = useRef([])
-  const audioEngineRef = useRef(null)
-  const onQueuePopRef  = useRef(null)
+  const autoDJRef        = useRef(false)
+  const queueRef         = useRef([])
+  const audioEngineRef   = useRef(null)
+  const onQueuePopRef    = useRef(null)
+  const onLoadTrackARef  = useRef(null)
+  const onLoadTrackBRef  = useRef(null)
+  const preloadedDeckRef = useRef(null) // 'A' | 'B' | null — standby deck pre-loaded for next transition
 
   const [masterVol,  setMasterVol]  = useState(0.85)
   const [boothVol,   setBoothVol]   = useState(0.7)
@@ -1018,10 +1089,12 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
   }, [eqB, audioEngine])
 
   // ── Sync Auto DJ refs with latest values ──────────────────────────────────────
-  useEffect(() => { audioEngineRef.current  = audioEngine },  [audioEngine])
-  useEffect(() => { onQueuePopRef.current   = onQueuePop  },  [onQueuePop])
-  useEffect(() => { autoDJRef.current       = autoDJ      },  [autoDJ])
-  useEffect(() => { queueRef.current        = queue       },  [queue])
+  useEffect(() => { audioEngineRef.current  = audioEngine  }, [audioEngine])
+  useEffect(() => { onQueuePopRef.current   = onQueuePop   }, [onQueuePop])
+  useEffect(() => { onLoadTrackARef.current = onLoadTrackA }, [onLoadTrackA])
+  useEffect(() => { onLoadTrackBRef.current = onLoadTrackB }, [onLoadTrackB])
+  useEffect(() => { autoDJRef.current       = autoDJ       }, [autoDJ])
+  useEffect(() => { queueRef.current        = queue        }, [queue])
 
   // ── Pitch → playbackRate ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -1079,8 +1152,8 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
     // Tear down HLS
     clearTimeout(retryTimer.current)
     if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
-    // Revoke previous object URL to free memory
-    if (prevLocalUrlRef.current) URL.revokeObjectURL(prevLocalUrlRef.current)
+    // Revoke previous object URL to free memory (skip if same URL — repeat mode reuses the same blob)
+    if (prevLocalUrlRef.current && prevLocalUrlRef.current !== trackA.url) URL.revokeObjectURL(prevLocalUrlRef.current)
     prevLocalUrlRef.current = trackA.url
     media.pause()
     media.src = trackA.url
@@ -1095,7 +1168,7 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
     if (!trackB) return
     const media = mediaRefB.current
     if (!media) return
-    if (prevLocalUrlRefB.current) URL.revokeObjectURL(prevLocalUrlRefB.current)
+    if (prevLocalUrlRefB.current && prevLocalUrlRefB.current !== trackB.url) URL.revokeObjectURL(prevLocalUrlRefB.current)
     prevLocalUrlRefB.current = trackB.url
     media.pause()
     media.src = trackB.url
@@ -1179,6 +1252,46 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
     if (sweepRAFRef.current) { cancelAnimationFrame(sweepRAFRef.current); sweepRAFRef.current = null }
     crossfaderRef.current = v
     setCrossfader(v)
+  }
+
+  // ── Auto DJ toggle — snaps crossfader + pre-loads standby deck on enable ──────
+  const handleAutoDJToggle = () => {
+    const next = !autoDJ
+    setAutoDJ(next)
+    autoDJRef.current = next
+    setAutoDJToast('')
+
+    if (!next) {
+      if (sweepRAFRef.current) { cancelAnimationFrame(sweepRAFRef.current); sweepRAFRef.current = null }
+      preloadedDeckRef.current = null
+      return
+    }
+
+    // Snap crossfader fully to the side of the currently playing deck
+    if (playing) {
+      crossfaderRef.current = 0; setCrossfader(0)
+    } else if (playingB) {
+      crossfaderRef.current = 1; setCrossfader(1)
+    }
+
+    // Pre-load the first queued track onto the standby deck
+    const q = queueRef.current
+    if (!q.length) {
+      setAutoDJToast('Queue empty \u2014 add tracks to Auto Playlist first')
+      return
+    }
+    const nextTrack = q[0]
+    onQueuePopRef.current?.()
+
+    if (!playingB) {
+      // Standby = Deck B — load via App state so the UI updates
+      onLoadTrackBRef.current?.({ ...nextTrack })
+      preloadedDeckRef.current = 'B'
+    } else {
+      // Standby = Deck A — load via App state so the UI updates
+      onLoadTrackARef.current?.({ ...nextTrack })
+      preloadedDeckRef.current = 'A'
+    }
   }
 
   const togglePlay = async () => {
@@ -1301,6 +1414,7 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
                 <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
               </svg>
             </button>
+            <VideoGoLiveButton streamKey={streamKey} />
             <span
               className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 font-medium ${
                 streamLive ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-700 text-gray-400'
@@ -1402,19 +1516,14 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
               levelMasterL={deckLevels.masterL}
               levelMasterR={deckLevels.masterR}
               autoDJ={autoDJ}
-              onAutoDJToggle={() => {
-                const next = !autoDJ
-                setAutoDJ(next)
-                autoDJRef.current = next
-                if (next) setAutoDJToast('')
-              }}
+              onAutoDJToggle={handleAutoDJToggle}
               autoDJToast={autoDJToast}
             />
 
             <DeckUnit
               side="B" color="#fbbf24"
               active={!!trackB} playing={playingB} onTogglePlay={togglePlayB}
-              streamLive={false} stationName={trackB?.name ?? 'Deck B'}
+              streamLive={false} stationName={trackB?.name ?? config?.stationName}
               waveData={WAVE_B} progress={progressB}
               pitch={pitchB} onPitchChange={setPitchB}
               hotCues={hotCuesB}

@@ -12,6 +12,7 @@ import TrackLibrary from './components/TrackLibrary'
 import LandingPage from './pages/LandingPage'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AudioEngineProvider } from './context/AudioEngine'
+import { StreamProvider } from './context/StreamContext'
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth()
@@ -25,7 +26,8 @@ function MainApp() {
   const [showAdmin, setShowAdmin] = useState(false)
   const [trackA, setTrackA] = useState(null)
   const [trackB, setTrackB] = useState(null)
-  const [queue,  setQueue]  = useState([])
+  const [queue,          setQueue]          = useState([])
+  const [repeatPlaylist, setRepeatPlaylist] = useState(false)
 
   useEffect(() => {
     fetch('/api/config')
@@ -88,13 +90,13 @@ function MainApp() {
             mode !== 'radio' && mode !== 'video' ? ' hidden' : ''
           }`}>
             <div className="flex-1 flex flex-col gap-4 min-w-0">
-              <Player mode={playerMode} config={config} trackA={trackA} trackB={trackB} queue={queue} onQueuePop={() => setQueue((q) => q.slice(1))} />
+              <Player mode={playerMode} config={config} trackA={trackA} trackB={trackB} queue={queue} onQueuePop={repeatPlaylist ? () => setQueue((q) => q.length > 0 ? [...q.slice(1), q[0]] : q) : () => setQueue((q) => q.slice(1))} onLoadTrackA={setTrackA} onLoadTrackB={setTrackB} />
               <NowPlaying config={config} mode={mode} />
             </div>
             <div className="lg:w-80 xl:w-96 shrink-0 flex flex-col gap-3 min-h-0">
               <SocialLive />
               <div className="flex-1 min-h-0">
-                <TrackLibrary onTrackLoadA={setTrackA} onTrackLoadB={setTrackB} queue={queue} onQueueChange={setQueue} />
+                <TrackLibrary onTrackLoadA={setTrackA} onTrackLoadB={setTrackB} queue={queue} onQueueChange={setQueue} repeatPlaylist={repeatPlaylist} onRepeatChange={setRepeatPlaylist} />
               </div>
             </div>
           </div>
@@ -119,7 +121,9 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <AudioEngineProvider>
-                  <MainApp />
+                  <StreamProvider>
+                    <MainApp />
+                  </StreamProvider>
                 </AudioEngineProvider>
               </ProtectedRoute>
             }

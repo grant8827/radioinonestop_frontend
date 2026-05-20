@@ -52,6 +52,8 @@ export default function TrackLibrary({
   onTrackLoadB,
   queue = [],
   onQueueChange,
+  repeatPlaylist = false,
+  onRepeatChange,
 }) {
   const [tab, setTab] = useState('library')
   const [library, setLibrary] = useState([])
@@ -251,20 +253,40 @@ export default function TrackLibrary({
       {/* ══ AUTO PLAYLIST TAB ════════════════════════════════════════════════════ */}
       {tab === 'playlist' && (
         <>
-          {/* Queue info / clear */}
-          {queue.length > 0 && (
-            <div className="flex items-center justify-between px-3 py-2 border-b border-gray-800 shrink-0">
-              <span className="text-[9px] text-gray-600 font-mono">
-                {queue.length} track{queue.length !== 1 ? 's' : ''} queued
-              </span>
+          {/* Controls bar — always visible */}
+          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-800 shrink-0">
+            <span className="text-[9px] text-gray-600 font-mono">
+              {queue.length > 0
+                ? `${queue.length} track${queue.length !== 1 ? 's' : ''} queued`
+                : 'No tracks queued'}
+            </span>
+            <div className="flex items-center gap-2">
+              {/* Repeat toggle */}
               <button
-                onClick={clearQueue}
-                className="text-[9px] font-bold uppercase tracking-wider text-red-700 hover:text-red-500 transition-colors"
+                onClick={() => onRepeatChange?.(!repeatPlaylist)}
+                title={repeatPlaylist ? 'Repeat on — click to turn off' : 'Repeat off — click to loop playlist'}
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest transition-colors border"
+                style={{
+                  color:      repeatPlaylist ? '#a78bfa' : '#4b5563',
+                  background: repeatPlaylist ? '#a78bfa18' : 'transparent',
+                  borderColor: repeatPlaylist ? '#a78bfa40' : '#374151',
+                }}
               >
-                Clear all
+                <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z" />
+                </svg>
+                Repeat
               </button>
+              {queue.length > 0 && (
+                <button
+                  onClick={clearQueue}
+                  className="text-[9px] font-bold uppercase tracking-wider text-red-700 hover:text-red-500 transition-colors"
+                >
+                  Clear all
+                </button>
+              )}
             </div>
-          )}
+          </div>
 
           {/* Column headers */}
           {queue.length > 0 && (

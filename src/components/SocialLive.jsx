@@ -1,14 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
 
-function CameraIcon() {
-  return (
-    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round"
-        d="M15 10l4.553-2.277A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M4 8h11a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z" />
-    </svg>
-  )
-}
-
 function CameraOffIcon({ large }) {
   return (
     <svg
@@ -30,7 +21,6 @@ export default function SocialLive() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
       streamRef.current = stream
-      if (videoRef.current) videoRef.current.srcObject = stream
       setActive(true)
     } catch {
       // permission denied or no camera
@@ -46,23 +36,33 @@ export default function SocialLive() {
     setActive(false)
   }
 
-  // Cleanup on unmount
-  useEffect(() => stopCamera, [])
+  // Assign srcObject after video element is visible so autoPlay fires reliably
+  useEffect(() => {
+    if (active && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current
+      videoRef.current.play().catch(() => {})
+    }
+  }, [active])
+
+  useEffect(() => () => { stopCamera() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="bg-gray-900 rounded-2xl overflow-hidden flex-shrink-0">
       {/* Header */}
-      <div className="px-4 py-2.5 border-b border-gray-800 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-300">Social Preview</h2>
+      <div className="px-4 py-2.5 border-b border-gray-800 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-gray-300 shrink-0">Social Preview</h2>
         <button
           onClick={active ? stopCamera : startCamera}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wide transition-all shrink-0 ${
             active
-              ? 'bg-red-600 hover:bg-red-700 text-white'
-              : 'bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white'
+              ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse'
+              : 'bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-purple-400 border border-gray-700 hover:border-purple-500'
           }`}
         >
-          {active ? <><CameraOffIcon />Off</> : <><CameraIcon />Preview</>}
+          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z" />
+          </svg>
+          {active ? '● Live Preview' : 'Go Live'}
         </button>
       </div>
 

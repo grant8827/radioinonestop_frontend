@@ -1,4 +1,4 @@
-import { createContext, useContext, useRef, useCallback, useState } from 'react'
+import { createContext, useContext, useRef, useCallback, useState, useEffect } from 'react'
 
 const AudioEngineCtx = createContext(null)
 
@@ -185,6 +185,7 @@ export function AudioEngineProvider({ children }) {
     ) {
       const channelId = pendingDjChannel.current
       pendingDjChannel.current = null
+      setDjConnected(true)
       const nodes = channelNodes.current[channelId]
       if (nodes) {
         const ac = getAC()
@@ -220,6 +221,27 @@ export function AudioEngineProvider({ children }) {
       }
     }
   }, [getAC])
+
+  // ── Auto-restore saved mixer config on mount ────────────────────────────
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('mixer_channels') || '{}')
+      Object.entries(saved).forEach(([idStr, ch]) => {
+        if (!ch) return
+        const id = parseInt(idStr)
+        if (!isFinite(id)) return
+        setupChannelNodes(id, ch)
+        channelStateRef.current[id] = { on: ch.on ?? false, mute: ch.mute ?? false, fader: ch.fader ?? 0 }
+        // Queue the DJ player connection — wiring completes in registerMediaElement once
+        // both dj-a and dj-b elements are registered by Player
+        const isMic = id <= 3
+        if (!isMic && (ch.sourceType === 'dj' || ch.sourceType === 'podcast')) {
+          pendingDjChannel.current = id
+          setDjConnected(true)
+        }
+      })
+    } catch { /* ignore */ }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Connect a DJ deck source to a mixer channel ───────────────────────────
   const connectSourceToChannel = useCallback((sourceType, channelId) => {

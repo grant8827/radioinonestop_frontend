@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useAudioEngine } from '../context/AudioEngine'
+import { useStream } from '../context/StreamContext'
 
 /* ─── Shared helpers ──────────────────────────────────────────── */
 
@@ -616,6 +617,7 @@ function BrowserStreamer({ audioKey }) {
 function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl = '' }) {
   const { token } = useAuth()
   const { getStreamTrack, getMasterAnalyser, resume } = useAudioEngine()
+  const { radioStatus, startRadio, stopRadio } = useStream()
 
   // 'hub' = broadcast directly to this server's fan-out hub (no Icecast needed)
   // 'icecast' = legacy path: server transcodes via ffmpeg and pushes to Icecast
@@ -652,7 +654,10 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
     }
   }, [defaultMount])
 
-  const [status, setStatus] = useState('idle') // idle | requesting | connecting | live | stopped | error
+  // For hub mode the source-of-truth lives in StreamContext (shared with NowPlaying button).
+  // For icecast mode we use local state as before.
+  const [localStatus, setLocalStatus] = useState('idle') // idle | requesting | connecting | live | stopped | error
+  const status = broadcastMode === 'hub' ? radioStatus : localStatus
   const [logs, setLogs] = useState([])
 
   const wsRef = useRef(null)
@@ -664,7 +669,15 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
   const statusRef = useRef('idle')
   const logsEndRef = useRef(null)
 
-  function setStatusBoth(s) { setStatus(s); statusRef.current = s }
+  function setStatusBoth(s) {
+    if (broadcastMode === 'hub') {
+      // hub state lives in StreamContext; only keep statusRef in sync for local guards
+      statusRef.current = s
+    } else {
+      setLocalStatus(s)
+      statusRef.current = s
+    }
+  }
 
   function addLog(msg) {
     const t = new Date().toLocaleTimeString('en-US', { hour12: false })
@@ -676,6 +689,22 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
 
   // Cleanup on unmount
   useEffect(() => () => doCleanup(), []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When hub broadcast goes live from NowPlaying button, start spectrum here too
+  useEffect(() => {
+    if (broadcastMode !== 'hub') return
+    statusRef.current = radioStatus
+    if (radioStatus === 'live') {
+      const masterAnalyser = getMasterAnalyser()
+      if (masterAnalyser) { analyserRef.current = masterAnalyser; drawSpectrum() }
+      addLog('🔴 Hub broadcast active')
+    } else if (radioStatus === 'idle' || radioStatus === 'stopped') {
+      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
+      analyserRef.current = null
+      const canvas = canvasRef.current
+      if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height)
+    }
+  }, [radioStatus, broadcastMode]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Frequency spectrum canvas ──────────────────────────────────────────
   function drawSpectrum() {
@@ -969,14 +998,17 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
 
         {/* Go Live / Stop */}
         {canStart ? (
-          <button onClick={goLive}
+          <button
+            onClick={broadcastMode === 'hub' ? startRadio : goLive}
             disabled={isBusy || !token || (broadcastMode === 'icecast' && !cfg.host)}
             className="w-full flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold text-sm rounded-lg px-4 py-2.5 transition-colors shadow-lg shadow-orange-900/20">
             <span className="w-2 h-2 rounded-full bg-white inline-block" />
             {broadcastMode === 'hub' ? 'Go Live → Station Hub' : 'Go Live → Icecast / Shoutcast'}
           </button>
         ) : (
-          <button onClick={stopStream} disabled={isBusy}
+          <button
+            onClick={broadcastMode === 'hub' ? stopRadio : stopStream}
+            disabled={isBusy}
             className="w-full flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white font-semibold text-sm rounded-lg px-4 py-2.5 transition-colors">
             ■ Stop Broadcast
           </button>
