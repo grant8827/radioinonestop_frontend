@@ -10,13 +10,15 @@ export function StreamProvider({ children }) {
 
   // ── Radio stream ──────────────────────────────────────────────────────────
   const [radioStatus, setRadioStatus] = useState('idle') // idle | connecting | live | stopped | error
-  const radioWsRef       = useRef(null)
-  const radioRecorderRef = useRef(null)
-  const radioStatusRef   = useRef('idle')
+  const radioWsRef         = useRef(null)
+  const radioRecorderRef   = useRef(null)
+  const radioKeepaliveRef  = useRef(null)
+  const radioStatusRef     = useRef('idle')
 
   function setRadioStatusBoth(s) { setRadioStatus(s); radioStatusRef.current = s }
 
   function radioCleanup() {
+    if (radioKeepaliveRef.current) { clearInterval(radioKeepaliveRef.current); radioKeepaliveRef.current = null }
     if (radioRecorderRef.current) { try { radioRecorderRef.current.stop() } catch {} radioRecorderRef.current = null }
     if (radioWsRef.current) { try { radioWsRef.current.close() } catch {} radioWsRef.current = null }
   }
@@ -55,6 +57,12 @@ export function StreamProvider({ children }) {
               if (ev.data.size > 0 && ws.readyState === WebSocket.OPEN) ws.send(ev.data)
             }
             recorder.start(250)
+            // Keepalive: server drops the WS if no frame arrives within 15s.
+            // During silence the recorder may not produce data, so send a ping
+            // every 10s that the server ignores but which resets its read deadline.
+            radioKeepaliveRef.current = setInterval(() => {
+              if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ action: 'ping' }))
+            }, 10_000)
           } else if (msg.status === 'stopped') {
             setRadioStatusBoth('stopped')
             radioCleanup()
