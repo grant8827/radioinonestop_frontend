@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 // Simple UUID v4 without external dep — uses crypto.randomUUID when available
 function generateRoomId() {
@@ -13,6 +14,7 @@ function generateRoomId() {
 }
 
 export default function ConferenceHome() {
+  const navigate = useNavigate()
   const [copied, setCopied] = useState(false)
   const [roomId] = useState(() => generateRoomId())
 
@@ -47,7 +49,7 @@ export default function ConferenceHome() {
   }, [roomUrl, handleCopy])
 
   const handleJoin = () => {
-    window.open(roomUrl, '_blank', 'noopener')
+    navigate(`/conference/${roomId}`)
   }
 
   return (

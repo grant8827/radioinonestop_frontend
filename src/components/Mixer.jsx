@@ -848,6 +848,15 @@ export default function Mixer({ config }) {
   const audioEngine = useAudioEngine()
   const [channels, setChannels] = useState(loadSavedChannels)
   const [master, setMaster] = useState(loadSavedMaster)
+  const [confState, setConfState] = useState(loadSavedConference)
+
+  const updateConf = useCallback((k, v) => {
+    setConfState(prev => {
+      const next = { ...prev, [k]: v }
+      try { localStorage.setItem('mixer_conference', JSON.stringify(next)) } catch {}
+      return next
+    })
+  }, [])
 
   // Set up AudioEngine channel nodes once on mount, then restore saved sources
   useEffect(() => {
@@ -1053,6 +1062,10 @@ export default function Mixer({ config }) {
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#38bdf8', display: 'inline-block' }} />
               Line Inputs
             </span>
+            <span style={{ fontSize: 9, fontWeight: 800, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#a78bfa', display: 'inline-block' }} />
+              Conference
+            </span>
           </div>
           <span style={{ fontSize: 8, color: T.faint, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             {config?.stationName ?? 'Radio In One Stop'} · Console v2
@@ -1088,6 +1101,20 @@ export default function Mixer({ config }) {
                 {lineChs.map(ch => (
                   <ChannelStrip key={ch.id} ch={ch} onUpdate={(k, v) => updateChannel(ch.id, k, v)} level={levels[ch.id] ?? 0} />
                 ))}
+              </div>
+            </div>
+
+            {/* Group divider */}
+            <div style={{
+              flexShrink: 0, width: 1, alignSelf: 'stretch', margin: '0 16px',
+              background: `linear-gradient(to bottom, transparent, ${T.border} 15%, ${T.border} 85%, transparent)`,
+            }} />
+
+            {/* Conference group */}
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              <GroupHeader label="Conference" color="#a78bfa" count={1} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <ConferenceStrip conf={confState} onUpdate={updateConf} onOpenConference={onOpenConference} />
               </div>
             </div>
           </div>
@@ -1126,6 +1153,16 @@ export default function Mixer({ config }) {
                 </div>
               )
             })}
+            {/* Conference indicator */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{
+                width: 5, height: 5, borderRadius: '50%',
+                background: confState.on && !confState.mute ? '#a78bfa' : T.faint,
+                boxShadow: confState.on && !confState.mute ? '0 0 6px #a78bfa' : 'none',
+                transition: 'all 0.2s',
+              }} />
+              <span style={{ fontSize: 8, color: confState.on && !confState.mute ? '#94a3b8' : T.faint, fontWeight: 600 }}>CONF</span>
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
             <span style={{ fontSize: 8, color: T.faint, fontFamily: 'monospace' }}>

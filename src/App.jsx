@@ -84,7 +84,7 @@ function MainApp() {
           <div className={mode !== 'stream' ? 'hidden' : 'contents'}>
             <StreamSetup />
           </div>
-          {mode === 'mixer' && <Mixer config={config} />}
+          {mode === 'mixer' && <Mixer config={config} onOpenConference={() => handleModeChange('conference')} />}
           {mode === 'conference' && <ConferenceHome />}
 
           {/* Player + NowPlaying + Chat — always mounted so audio elements survive

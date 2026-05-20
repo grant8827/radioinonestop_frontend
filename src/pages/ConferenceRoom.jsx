@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import {
   LiveKitRoom,
   RoomAudioRenderer,
@@ -9,6 +10,17 @@ import {
   useIsSpeaking,
 } from '@livekit/components-react'
 import '@livekit/components-styles'
+
+// Derive a display name from an email address
+function nameFromEmail(email) {
+  if (!email) return null
+  return email
+    .split('@')[0]
+    .replace(/[._-]/g, ' ')
+    .split(' ')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
+}
 
 // ── Mute / unmute control ──────────────────────────────────────────────────────
 function MuteButton() {
@@ -313,7 +325,9 @@ function UsernameForm({ onSubmit }) {
 // ── Page entry point ───────────────────────────────────────────────────────────
 export default function ConferenceRoom() {
   const { roomId } = useParams()
-  const [username, setUsername] = useState(null)
+  const { user } = useAuth()
+  // If logged in, skip the name form and use their account name
+  const [username, setUsername] = useState(() => nameFromEmail(user?.email))
   const [token, setToken] = useState(null)
   const [livekitUrl, setLivekitUrl] = useState(null)
   const [error, setError] = useState(null)
