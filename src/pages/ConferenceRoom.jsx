@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useAudioEngine } from '../context/AudioEngine'
+import { RoomEvent, Track } from 'livekit-client'
 import {
   LiveKitRoom,
   RoomAudioRenderer,
@@ -222,10 +224,57 @@ function GroupTab() {
   )
 }
 
+// ── Route remote audio tracks through AudioEngine so CONF can go on air ────────
+// Must be mounted inside <LiveKitRoom> so it can use room hooks.
+function ConferenceAudioBridge() {
+  const audioEngine = useAudioEngine()
+  const room = useRoomContext()
+  const trackMapRef = useRef(new Map()) // track.sid → MediaStreamTrack
+
+  useEffect(() => {
+    if (!audioEngine || !room) return
+    audioEngine.resume()
+    audioEngine.setupConferenceChannel?.()
+
+    const connect = (track) => {
+      if (track.kind !== Track.Kind.Audio) return
+      if (track.mediaStreamTrack) {
+        audioEngine.connectConferenceStream(track.sid, track.mediaStreamTrack)
+        trackMapRef.current.set(track.sid, track.mediaStreamTrack)
+      }
+    }
+    const disconnect = (track) => {
+      if (track.kind !== Track.Kind.Audio) return
+      audioEngine.disconnectConferenceStream(track.sid)
+      trackMapRef.current.delete(track.sid)
+    }
+
+    // Connect tracks already subscribed before this component mounted
+    for (const participant of room.remoteParticipants.values()) {
+      for (const pub of participant.audioTrackPublications.values()) {
+        if (pub.track) connect(pub.track)
+      }
+    }
+
+    room.on(RoomEvent.TrackSubscribed, connect)
+    room.on(RoomEvent.TrackUnsubscribed, disconnect)
+
+    return () => {
+      room.off(RoomEvent.TrackSubscribed, connect)
+      room.off(RoomEvent.TrackUnsubscribed, disconnect)
+      audioEngine.disconnectAllConferenceStreams()
+      trackMapRef.current.clear()
+    }
+  }, [audioEngine, room])
+
+  return null
+}
+
 // ── Main room view ─────────────────────────────────────────────────────────────
 function RoomView({ onLeave, inviteUrl }) {
   const [tab, setTab] = useState('group')
   const participants = useParticipants()
+  const audioEngine = useAudioEngine()
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
@@ -283,8 +332,10 @@ function RoomView({ onLeave, inviteUrl }) {
         {tab === 'settings' && <SettingsPanel inviteUrl={inviteUrl} />}
       </main>
 
-      {/* Pulls all remote audio tracks to speakers */}
-      <RoomAudioRenderer />
+      {/* ConferenceAudioBridge routes remote audio through the AudioEngine mix bus.
+          When inside the app (host), AudioEngine plays audio to speakers + broadcast.
+          For guests (no AudioEngine), fall back to RoomAudioRenderer. */}
+      {audioEngine ? <ConferenceAudioBridge /> : <RoomAudioRenderer />}
     </div>
   )
 }

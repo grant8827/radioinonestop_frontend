@@ -28,6 +28,11 @@ export function AudioEngineProvider({ children }) {
   // channelId → { stream: MediaStream, sourceNode: MediaStreamSourceNode }
   const micStreams     = useRef({})
 
+  // Conference audio bus: gain → fader → analyser → master
+  const confChainRef   = useRef(null)
+  // track.sid → { stream: MediaStream, sourceNode: MediaStreamSourceNode }
+  const confSourcesRef = useRef(new Map())
+
   // channelId to connect once both dj-a and dj-b elements are registered
   const pendingDjChannel = useRef(null)
 
@@ -337,6 +342,70 @@ export function AudioEngineProvider({ children }) {
   // connectLineInToChannel is the same as connectMicToChannel
   const connectLineInToChannel = connectMicToChannel
 
+  // ── Conference channel setup ──────────────────────────────────────────────
+  const setupConferenceChannel = useCallback(() => {
+    if (confChainRef.current) return
+    const ac = getAC()
+    const gainNode = ac.createGain()
+    gainNode.gain.value = 1.0
+    const faderNode = ac.createGain()
+    faderNode.gain.value = 0.64  // 0.8 * 0.8 default
+    const analyserNode = ac.createAnalyser()
+    analyserNode.fftSize = 256
+    analyserNode.smoothingTimeConstant = 0.8
+    gainNode.connect(faderNode)
+    faderNode.connect(analyserNode)
+    analyserNode.connect(masterRef.current)
+    confChainRef.current = { gainNode, faderNode, analyserNode }
+  }, [getAC])
+
+  // Connect one remote participant stream (keyed by track.sid to prevent duplicates)
+  const connectConferenceStream = useCallback((sid, mediaStreamTrack) => {
+    if (!sid || !mediaStreamTrack) return
+    if (confSourcesRef.current.has(sid)) return  // already connected
+    const ac = getAC()
+    if (!confChainRef.current) setupConferenceChannel()
+    const stream = new MediaStream([mediaStreamTrack])
+    const sourceNode = ac.createMediaStreamSource(stream)
+    sourceNode.connect(confChainRef.current.gainNode)
+    confSourcesRef.current.set(sid, { stream, sourceNode })
+  }, [getAC, setupConferenceChannel])
+
+  // Disconnect one stream by track.sid
+  const disconnectConferenceStream = useCallback((sid) => {
+    const entry = confSourcesRef.current.get(sid)
+    if (!entry) return
+    try { entry.sourceNode.disconnect() } catch {}
+    confSourcesRef.current.delete(sid)
+  }, [])
+
+  // Disconnect all (on conference leave)
+  const disconnectAllConferenceStreams = useCallback(() => {
+    confSourcesRef.current.forEach(({ sourceNode }) => {
+      try { sourceNode.disconnect() } catch {}
+    })
+    confSourcesRef.current.clear()
+  }, [])
+
+  // Gate the conference fader (on/mute/fader changes from Mixer)
+  const setConferenceActive = useCallback((on, mute, fader) => {
+    if (!confChainRef.current) setupConferenceChannel()
+    if (!acRef.current) return
+    const target = (on && !mute) ? fader * fader : 0
+    confChainRef.current.faderNode.gain.setTargetAtTime(target, acRef.current.currentTime, 0.02)
+  }, [setupConferenceChannel])
+
+  // Update conference gain knob
+  const updateConferenceGain = useCallback((gain) => {
+    if (!confChainRef.current || !acRef.current) return
+    confChainRef.current.gainNode.gain.setTargetAtTime(gain * 2, acRef.current.currentTime, 0.01)
+  }, [])
+
+  // Return conference analyser for VU metering
+  const getConferenceAnalyser = useCallback(() => {
+    return confChainRef.current?.analyserNode ?? null
+  }, [])
+
   // ── Analyser getters ─────────────────────────────────────────────────────
   const getAnalyser = useCallback((channelId) => {
     return channelNodes.current[channelId]?.analyserNode ?? null
@@ -403,6 +472,14 @@ export function AudioEngineProvider({ children }) {
       setDjActive,
       micOnAirMap,
       setMicOnAir,
+      // Conference
+      setupConferenceChannel,
+      connectConferenceStream,
+      disconnectConferenceStream,
+      disconnectAllConferenceStreams,
+      setConferenceActive,
+      updateConferenceGain,
+      getConferenceAnalyser,
     }}>
       {children}
     </AudioEngineCtx.Provider>

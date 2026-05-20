@@ -843,9 +843,52 @@ function loadSavedMaster() {
   } catch { return defaults }
 }
 
+// ─── Conference channel strip ─────────────────────────────────────────────────
+function ConferenceStrip({ conf, onUpdate, onOpenConference, level = 0 }) {
+  const color = '#a78bfa'
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+      background: T.surface,
+      border: `1px solid ${T.border}`,
+      borderTop: `3px solid ${conf.on && !conf.mute ? color : T.faint}`,
+      borderRadius: '0 0 12px 12px',
+      padding: '12px 10px 14px',
+      width: 110,
+      boxShadow: conf.on && !conf.mute ? `0 0 20px ${color}0d` : 'none',
+      transition: 'border-color 0.2s, box-shadow 0.2s',
+    }}>
+      <div style={{ textAlign: 'center', lineHeight: 1.2 }}>
+        <div style={{ fontSize: 10, fontWeight: 900, color, letterSpacing: '0.06em', textTransform: 'uppercase' }}>CONF</div>
+        <div style={{ fontSize: 8, color: T.muted, marginTop: 2 }}>Conference</div>
+      </div>
+
+      {/* Open button */}
+      <button onClick={() => onOpenConference?.()}
+        style={{
+          width: '100%', padding: '4px 0', borderRadius: 6, fontSize: 8, fontWeight: 700,
+          textTransform: 'uppercase', letterSpacing: '0.06em',
+          background: `${color}22`, border: `1px solid ${color}60`, color,
+          cursor: 'pointer',
+        }}>
+        Open
+      </button>
+
+      <Knob value={conf.gain} onChange={(v) => onUpdate('gain', v)} size={32} color={color} label="Gain" />
+      <VuMeter level={level} segments={22} width={8} active={conf.on && !conf.mute} />
+      <VFader value={conf.fader} onChange={(v) => onUpdate('fader', v)} height={130} color={color} />
+
+      <div style={{ display: 'flex', gap: 4, width: '100%' }}>
+        <Pill on={conf.mute} onToggle={() => onUpdate('mute', !conf.mute)} label="M" color="#ef4444" width="50%" />
+        <Pill on={conf.on}   onToggle={() => onUpdate('on',   !conf.on)}   label="ON" color="#22c55e" width="50%" />
+      </div>
+    </div>
+  )
+}
+
 // ─── Mixer page ───────────────────────────────────────────────────────────────
 function loadSavedConference() {
-  const defaults = { gain: 0.5, fader: 0.8, mute: false, on: false }
+  const defaults = { gain: 0.5, fader: 0.8, mute: false, on: true }
   try {
     const saved = JSON.parse(localStorage.getItem('mixer_conference') || 'null')
     if (!saved) return defaults
@@ -866,6 +909,19 @@ export default function Mixer({ config, onOpenConference }) {
       return next
     })
   }, [])
+
+  // ── Sync conference state → AudioEngine ──────────────────────────────────
+  useEffect(() => {
+    audioEngine?.setupConferenceChannel?.()
+  }, [audioEngine])
+
+  useEffect(() => {
+    audioEngine?.setConferenceActive?.(confState.on, confState.mute, confState.fader)
+  }, [audioEngine, confState.on, confState.mute, confState.fader])
+
+  useEffect(() => {
+    audioEngine?.updateConferenceGain?.(confState.gain)
+  }, [audioEngine, confState.gain])
 
   // Set up AudioEngine channel nodes once on mount, then restore saved sources
   useEffect(() => {
@@ -969,6 +1025,7 @@ export default function Mixer({ config, onOpenConference }) {
   // ─── Real-time VU meters via AnalyserNode RAF loop ───────────────────────
   const [levels, setLevels] = useState({})
   const [masterLevels, setMasterLevels] = useState({ L: 0, R: 0 })
+  const [confLevel, setConfLevel] = useState(0)
   const analyserBufsRef = useRef({})
   const vuRafRef = useRef(null)
 
@@ -1000,6 +1057,8 @@ export default function Mixer({ config, onOpenConference }) {
 
       const mRms = readRms(audioEngine.getMasterAnalyser?.(), 'master')
       setMasterLevels({ L: mRms, R: mRms * 0.97 })
+
+      setConfLevel(readRms(audioEngine.getConferenceAnalyser?.(), 'conf'))
 
       vuRafRef.current = requestAnimationFrame(tick)
     }
@@ -1123,7 +1182,7 @@ export default function Mixer({ config, onOpenConference }) {
             <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
               <GroupHeader label="Conference" color="#a78bfa" count={1} />
               <div style={{ display: 'flex', gap: 8 }}>
-                <ConferenceStrip conf={confState} onUpdate={updateConf} onOpenConference={onOpenConference} />
+                <ConferenceStrip conf={confState} onUpdate={updateConf} onOpenConference={onOpenConference} level={confLevel} />
               </div>
             </div>
           </div>
