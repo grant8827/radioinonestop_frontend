@@ -22,10 +22,11 @@ function ProtectedRoute({ children }) {
 }
 
 function MainApp() {
-  const { user } = useAuth()
+  const { user, token } = useAuth()
   const [mode, setMode] = useState('radio')
   const [playerMode, setPlayerMode] = useState('radio')  // sticky: only updates on radio/video
   const [config, setConfig] = useState(null)
+  const [stationName, setStationName] = useState('')
   const [showAdmin, setShowAdmin] = useState(false)
   const [trackA, setTrackA] = useState(null)
   const [trackB, setTrackB] = useState(null)
@@ -43,6 +44,15 @@ function MainApp() {
         })
       )
   }, [])
+
+  // Always fetch station name from DB — don't rely on potentially stale JWT
+  useEffect(() => {
+    if (!token) return
+    fetch('/api/user/profile', { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((d) => { if (d.station_name) setStationName(d.station_name) })
+      .catch(() => {})
+  }, [token])
 
   const handleModeChange = (m) => {
     setMode(m)
@@ -71,7 +81,7 @@ function MainApp() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <header className="bg-gray-900 border-b border-gray-800 px-4 lg:px-6 py-3 flex items-center justify-between">
-          <h1 className="text-base font-semibold tracking-tight truncate">{user?.stationName || config.stationName}</h1>
+          <h1 className="text-base font-semibold tracking-tight truncate">{stationName || user?.stationName || config.stationName}</h1>
           <ViewerCount />
         </header>
 
