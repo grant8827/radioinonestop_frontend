@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react'
 
 const NAV_ITEMS = [
   { id: 'radio', label: 'Radio', icon: RadioIcon },
-  { id: 'conference', label: 'Conference', icon: ConferenceIcon },
   { id: 'mixer', label: 'Mixer', icon: MixerIcon },
   { id: 'stream', label: 'Stream', icon: StreamIcon },
+  { id: 'conference', label: 'Conference', icon: ConferenceIcon },
 ]
 
 function RadioIcon({ className }) {

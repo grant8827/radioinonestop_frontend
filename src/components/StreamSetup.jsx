@@ -158,7 +158,7 @@ function DashboardCard({ label, colorClass, iconPath, stream, viewers }) {
 
 /* ─── Tab content ─────────────────────────────────────────────── */
 
-function StreamSettingsTab({ rtmpBase, audioKey, liveStreams, viewers, host }) {
+function StreamSettingsTab({ rtmpBase, audioKey, liveStreams, viewers, host, sourcePassword }) {
   const audioStream = liveStreams.find(s => s.key === audioKey)
   const anyLive = liveStreams.some(s => s.live)
   const otherStreams = liveStreams.filter(s => s.key !== audioKey)
@@ -235,17 +235,16 @@ function StreamSettingsTab({ rtmpBase, audioKey, liveStreams, viewers, host }) {
       </div>
 
       {/* Icecast / source client settings */}
-      <IcecastCard host={host} audioKey={audioKey} />
+      <IcecastCard host={host} audioKey={audioKey} sourcePassword={sourcePassword} />
     </div>
   )
 }
 
 /* ─── Icecast / Shoutcast source-client card ────────────────── */
 
-function IcecastCard({ host, audioKey = 'radio' }) {
+function IcecastCard({ host, audioKey = 'radio', sourcePassword = '' }) {
   const mount          = '/' + audioKey
   const icecastPort    = '8000'
-  const sourcePassword = 'changeme123'   // matches icecast.xml <source-password>
   const listenUrl      = `https://${host}/icecast${mount}`
   const listenUrlDirect = `http://${host}:8000${mount}`
 
@@ -313,7 +312,6 @@ function IcecastCard({ host, audioKey = 'radio' }) {
         </div>
 
         <ul className="space-y-1.5">
-          <InfoRow icon="⚠" text={`Change the source password in icecast.xml (currently: ${sourcePassword})`} />
           <InfoRow icon="•" text="Source clients connect on port 8000 directly. Listeners use the HTTPS URL above." />
           <InfoRow icon="•" text="Supported formats: MP3, AAC, OGG Vorbis, OGG Opus, FLAC." />
           <InfoRow icon="•" text="Shoutcast v1 also supported — set type to SHOUTcast and use the same port." />
@@ -1511,6 +1509,7 @@ export default function StreamSetup() {
           liveStreams={liveStreams}
           viewers={viewers}
           host={host}
+          sourcePassword={creds?.source_password ?? ''}
         />
       )}
       {tab === 'audio' && <AudioEncoderTab audioKey={audioKey} host={host} listenUrl={creds?.listen_url} />}
