@@ -74,6 +74,7 @@ export default function ProfileSettings() {
   })
   const [profileLoading, setProfileLoading] = useState(false)
   const [profileMsg, setProfileMsg] = useState('')
+  const [listenUrl, setListenUrl] = useState('')
 
   // Password section
   const [pwForm, setPwForm] = useState({ current_password: '', new_password: '', confirm_password: '' })
@@ -136,6 +137,7 @@ export default function ProfileSettings() {
       }
       const data = await res.json()
       if (data.token) login(data.token)
+      if (data.listen_url) setListenUrl(data.listen_url)
       setProfileMsg('Profile updated successfully')
     } catch {
       setProfileMsg('!Network error')
@@ -321,6 +323,12 @@ export default function ProfileSettings() {
 
             <SaveBtn loading={profileLoading} />
             <StatusMsg msg={profileMsg} />
+            {listenUrl && (
+              <div className="mt-3 p-3 bg-gray-800 rounded-lg">
+                <p className="text-xs text-gray-400 mb-1">Your listener URL</p>
+                <p className="text-xs font-mono text-red-400 break-all select-all">{window.location.origin + listenUrl}</p>
+              </div>
+            )}
           </form>
         </Section>
 
