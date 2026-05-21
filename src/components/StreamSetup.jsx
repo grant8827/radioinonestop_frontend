@@ -304,6 +304,7 @@ function IcecastCard({ host, audioKey = 'radio' }) {
   const icecastPort    = '8000'
   const sourcePassword = 'changeme123'   // matches icecast.xml <source-password>
   const listenUrl      = `https://${host}/icecast${mount}`
+  const listenUrlDirect = `http://${host}:8000${mount}`
 
   return (
     <div className="bg-gray-900 border border-orange-900/40 rounded-xl overflow-hidden">
@@ -329,7 +330,8 @@ function IcecastCard({ host, audioKey = 'radio' }) {
           <Field label="Mount Point" value={mount} />
           <Field label="Source Password" value={sourcePassword} />
         </div>
-        <Field label="Listener URL (HTTPS via Nginx)" value={listenUrl} />
+        <Field label="Listener URL — HTTPS (browsers, most players)" value={listenUrl} />
+        <Field label="Listener URL — Direct HTTP (RadioBoss, VLC, WinAmp, iTunes)" value={listenUrlDirect} />
 
         {/* BUTT instructions */}
         <div className="bg-orange-950/20 border border-orange-800/30 rounded-lg p-4">
