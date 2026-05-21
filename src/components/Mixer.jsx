@@ -473,6 +473,7 @@ function ChannelSettings({ anchorRef, ch, onUpdate, onClose }) {
             <option value="dj">DJ Player</option>
             <option value="podcast">Podcast / Video</option>
             <option value="line-in">External Line In / USB</option>
+            <option value="conference">Conference Room</option>
           </select>
           {(ch.sourceType === 'dj') && (
             <p style={{ fontSize: 8, color: '#38bdf8', margin: '4px 0 0', fontStyle: 'italic' }}>
@@ -482,6 +483,11 @@ function ChannelSettings({ anchorRef, ch, onUpdate, onClose }) {
           {(ch.sourceType === 'podcast') && (
             <p style={{ fontSize: 8, color: '#a78bfa', margin: '4px 0 0', fontStyle: 'italic' }}>
               Audio routed from Podcast / Video
+            </p>
+          )}
+          {(ch.sourceType === 'conference') && (
+            <p style={{ fontSize: 8, color: '#a78bfa', margin: '4px 0 0', fontStyle: 'italic' }}>
+              Conference audio routed to this channel
             </p>
           )}
           {ch.sourceType === 'line-in' && (
@@ -638,6 +644,7 @@ function ChannelStrip({ ch, onUpdate, level = 0 }) {
           const srcLabel = ch.sourceType === 'dj' ? 'DJ Player'
             : ch.sourceType === 'podcast' ? 'Podcast'
             : ch.sourceType === 'line-in' ? (ch.deviceLabel || 'Line In')
+            : ch.sourceType === 'conference' ? 'Conference'
             : null
           return srcLabel
             ? <div style={{ fontSize: 7, color: T.muted, width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center', padding: '2px 4px', background: T.bg, borderRadius: 4, border: `1px solid ${T.borderFaint}` }}>{srcLabel}</div>
@@ -934,6 +941,8 @@ export default function Mixer({ config, onOpenConference }) {
       } else if (!ch.isMic) {
         if (ch.sourceType === 'dj' || ch.sourceType === 'podcast') {
           audioEngine.connectSourceToChannel(ch.sourceType, ch.id)
+        } else if (ch.sourceType === 'conference') {
+          audioEngine.connectSourceToChannel('conference', ch.id)
         } else if (ch.sourceType === 'line-in' && ch.deviceId) {
           audioEngine.connectLineInToChannel(ch.id, ch.deviceId)
         }
@@ -961,8 +970,14 @@ export default function Mixer({ config, onOpenConference }) {
           }
           // Source type change (line channels)
           if (key === 'sourceType' && !next.isMic) {
+            // Disconnect conference if switching away from it
+            if (ch.sourceType === 'conference' && value !== 'conference') {
+              audioEngine.disconnectConferenceFromChannel?.(id)
+            }
             if (value === 'dj' || value === 'podcast') {
               audioEngine.connectSourceToChannel(value, id)
+            } else if (value === 'conference') {
+              audioEngine.connectSourceToChannel('conference', id)
             } else {
               // If no other line channel has DJ/podcast source, clear djConnected
               const anyOtherDj = prev.some(ch => ch.id !== id && !ch.isMic && (ch.sourceType === 'dj' || ch.sourceType === 'podcast'))
@@ -1025,7 +1040,6 @@ export default function Mixer({ config, onOpenConference }) {
   // ─── Real-time VU meters via AnalyserNode RAF loop ───────────────────────
   const [levels, setLevels] = useState({})
   const [masterLevels, setMasterLevels] = useState({ L: 0, R: 0 })
-  const [confLevel, setConfLevel] = useState(0)
   const analyserBufsRef = useRef({})
   const vuRafRef = useRef(null)
 
@@ -1057,8 +1071,6 @@ export default function Mixer({ config, onOpenConference }) {
 
       const mRms = readRms(audioEngine.getMasterAnalyser?.(), 'master')
       setMasterLevels({ L: mRms, R: mRms * 0.97 })
-
-      setConfLevel(readRms(audioEngine.getConferenceAnalyser?.(), 'conf'))
 
       vuRafRef.current = requestAnimationFrame(tick)
     }
@@ -1130,10 +1142,6 @@ export default function Mixer({ config, onOpenConference }) {
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#38bdf8', display: 'inline-block' }} />
               Line Inputs
             </span>
-            <span style={{ fontSize: 9, fontWeight: 800, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#a78bfa', display: 'inline-block' }} />
-              Conference
-            </span>
           </div>
           <span style={{ fontSize: 8, color: T.faint, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             {config?.stationName ?? 'Radio In One Stop'} · Console v2
@@ -1169,20 +1177,6 @@ export default function Mixer({ config, onOpenConference }) {
                 {lineChs.map(ch => (
                   <ChannelStrip key={ch.id} ch={ch} onUpdate={(k, v) => updateChannel(ch.id, k, v)} level={levels[ch.id] ?? 0} />
                 ))}
-              </div>
-            </div>
-
-            {/* Group divider */}
-            <div style={{
-              flexShrink: 0, width: 1, alignSelf: 'stretch', margin: '0 16px',
-              background: `linear-gradient(to bottom, transparent, ${T.border} 15%, ${T.border} 85%, transparent)`,
-            }} />
-
-            {/* Conference group */}
-            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-              <GroupHeader label="Conference" color="#a78bfa" count={1} />
-              <div style={{ display: 'flex', gap: 8 }}>
-                <ConferenceStrip conf={confState} onUpdate={updateConf} onOpenConference={onOpenConference} level={confLevel} />
               </div>
             </div>
           </div>
@@ -1221,16 +1215,6 @@ export default function Mixer({ config, onOpenConference }) {
                 </div>
               )
             })}
-            {/* Conference indicator */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <div style={{
-                width: 5, height: 5, borderRadius: '50%',
-                background: confState.on && !confState.mute ? '#a78bfa' : T.faint,
-                boxShadow: confState.on && !confState.mute ? '0 0 6px #a78bfa' : 'none',
-                transition: 'all 0.2s',
-              }} />
-              <span style={{ fontSize: 8, color: confState.on && !confState.mute ? '#94a3b8' : T.faint, fontWeight: 600 }}>CONF</span>
-            </div>
           </div>
           <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
             <span style={{ fontSize: 8, color: T.faint, fontFamily: 'monospace' }}>

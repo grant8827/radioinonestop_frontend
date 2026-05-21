@@ -234,7 +234,6 @@ function ConferenceAudioBridge() {
   useEffect(() => {
     if (!audioEngine || !room) return
     audioEngine.resume()
-    audioEngine.setupConferenceChannel?.()
 
     const connect = (track) => {
       if (track.kind !== Track.Kind.Audio) return
@@ -277,7 +276,7 @@ function RoomView({ onLeave, inviteUrl }) {
   const audioEngine = useAudioEngine()
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col">
+    <div className="h-full bg-gray-950 text-white flex flex-col" style={{ minHeight: '100vh' }}>
       {/* Top bar */}
       <header className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">

@@ -90,9 +90,6 @@ function MainApp() {
           {mode === 'conference' && !conferenceRoomId && (
             <ConferenceHome onJoin={(id) => setConferenceRoomId(id)} />
           )}
-          {mode === 'conference' && conferenceRoomId && (
-            <ConferenceRoom roomId={conferenceRoomId} onLeave={() => setConferenceRoomId(null)} />
-          )}
 
           {/* Player + NowPlaying + Chat — always mounted so audio elements survive
               mode switches. Hidden (display:none) when not in radio/video mode. */}
@@ -115,6 +112,13 @@ function MainApp() {
 
       {showAdmin && (
         <AdminPanel config={config} onSave={setConfig} onClose={() => setShowAdmin(false)} />
+      )}
+
+      {/* Conference room — full-screen overlay when a room is joined */}
+      {mode === 'conference' && conferenceRoomId && (
+        <div className="fixed inset-0 z-50 bg-gray-950">
+          <ConferenceRoom roomId={conferenceRoomId} onLeave={() => setConferenceRoomId(null)} />
+        </div>
       )}
     </div>
   )
