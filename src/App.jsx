@@ -9,8 +9,8 @@ import StreamSetup from './components/StreamSetup'
 import Mixer from './components/Mixer'
 import SocialLive from './components/SocialLive'
 import TrackLibrary from './components/TrackLibrary'
-import ConferenceHome from './components/ConferenceHome'
 import ConferenceRoom from './pages/ConferenceRoom'
+import ProfileSettings from './components/ProfileSettings'
 import LandingPage from './pages/LandingPage'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AudioEngineProvider } from './context/AudioEngine'
@@ -22,6 +22,7 @@ function ProtectedRoute({ children }) {
 }
 
 function MainApp() {
+  const { user } = useAuth()
   const [mode, setMode] = useState('radio')
   const [playerMode, setPlayerMode] = useState('radio')  // sticky: only updates on radio/video
   const [config, setConfig] = useState(null)
@@ -30,8 +31,6 @@ function MainApp() {
   const [trackB, setTrackB] = useState(null)
   const [queue,          setQueue]          = useState([])
   const [repeatPlaylist, setRepeatPlaylist] = useState(false)
-  const [conferenceRoomId, setConferenceRoomId] = useState(null)
-
   useEffect(() => {
     fetch('/api/config')
       .then((r) => r.json())
@@ -48,7 +47,6 @@ function MainApp() {
   const handleModeChange = (m) => {
     setMode(m)
     if (m === 'radio' || m === 'video') setPlayerMode(m)
-    if (m !== 'conference') setConferenceRoomId(null)
   }
 
   if (!config) {
@@ -66,16 +64,14 @@ function MainApp() {
         stationName={config.stationName}
         mode={mode}
         onModeChange={handleModeChange}
-        onSettingsClick={() => handleModeChange('stream')}
+        onSettingsClick={() => handleModeChange('settings')}
       />
 
       {/* Main area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <header className="bg-gray-900 border-b border-gray-800 px-4 lg:px-6 py-3 flex items-center justify-between">
-          {/* Spacer for mobile hamburger */}
-          <div className="w-8 lg:hidden" />
-          <h1 className="text-base font-semibold tracking-tight truncate">{config.stationName}</h1>
+          <h1 className="text-base font-semibold tracking-tight truncate">{user?.stationName || config.stationName}</h1>
           <ViewerCount />
         </header>
 
@@ -87,9 +83,10 @@ function MainApp() {
             <StreamSetup />
           </div>
           {mode === 'mixer' && <Mixer config={config} onOpenConference={() => handleModeChange('conference')} />}
-          {mode === 'conference' && !conferenceRoomId && (
-            <ConferenceHome onJoin={(id) => setConferenceRoomId(id)} />
+          {mode === 'conference' && (
+            <ConferenceRoom roomId="studio" username={user?.stationName} onLeave={() => handleModeChange('radio')} />
           )}
+          {mode === 'settings' && <ProfileSettings />}
 
           {/* Player + NowPlaying + Chat — always mounted so audio elements survive
               mode switches. Hidden (display:none) when not in radio/video mode. */}
@@ -112,13 +109,6 @@ function MainApp() {
 
       {showAdmin && (
         <AdminPanel config={config} onSave={setConfig} onClose={() => setShowAdmin(false)} />
-      )}
-
-      {/* Conference room — full-screen overlay when a room is joined */}
-      {mode === 'conference' && conferenceRoomId && (
-        <div className="fixed inset-0 z-50 bg-gray-950">
-          <ConferenceRoom roomId={conferenceRoomId} onLeave={() => setConferenceRoomId(null)} />
-        </div>
       )}
     </div>
   )

@@ -22,7 +22,7 @@ export default function ViewerCount() {
 
     heartbeat()
     const hbInterval = setInterval(heartbeat, 10_000)
-    const pollInterval = setInterval(poll, 5_000)
+    const pollInterval = setInterval(poll, 2_000)
 
     return () => {
       clearInterval(hbInterval)

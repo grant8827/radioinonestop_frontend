@@ -18,7 +18,7 @@ function loadFromStorage() {
     localStorage.removeItem('rio_token')
     return { token: null, user: null }
   }
-  return { token: t, user: { id: payload.user_id, email: payload.email } }
+  return { token: t, user: { id: payload.user_id, email: payload.email, stationName: payload.station_name || '' } }
 }
 
 export function AuthProvider({ children }) {
@@ -29,7 +29,7 @@ export function AuthProvider({ children }) {
     const payload = parseToken(newToken)
     setAuth({
       token: newToken,
-      user: payload ? { id: payload.user_id, email: payload.email } : null,
+      user: payload ? { id: payload.user_id, email: payload.email, stationName: payload.station_name || '' } : null,
     })
   }, [])
 

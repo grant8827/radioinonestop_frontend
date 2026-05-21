@@ -276,7 +276,7 @@ function RoomView({ onLeave, inviteUrl }) {
   const audioEngine = useAudioEngine()
 
   return (
-    <div className="h-full bg-gray-950 text-white flex flex-col" style={{ minHeight: '100vh' }}>
+    <div className="min-h-screen bg-gray-950 text-white flex flex-col">
       {/* Top bar */}
       <header className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
@@ -338,58 +338,36 @@ function RoomView({ onLeave, inviteUrl }) {
     </div>
   )
 }
-function UsernameForm({ onSubmit }) {
-  const [name, setName] = useState('')
-  return (
-    <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-gray-900 border border-gray-800 rounded-xl p-6 flex flex-col gap-4">
-        <div className="text-center">
-          <span className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse inline-block mb-3" />
-          <h2 className="text-lg font-bold">Join Conference</h2>
-          <p className="text-sm text-gray-400 mt-1">Enter a name so others know who you are</p>
-        </div>
-        <form
-          onSubmit={(e) => { e.preventDefault(); if (name.trim()) onSubmit(name.trim()) }}
-          className="flex flex-col gap-3"
-        >
-          <input
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={40}
-            placeholder="Your name…"
-            className="bg-gray-950 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition-colors"
-          />
-          <button
-            type="submit"
-            disabled={!name.trim()}
-            className="w-full px-4 py-2.5 rounded-lg text-sm font-bold bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-all"
-          >
-            Join Room
-          </button>
-        </form>
-      </div>
-    </div>
-  )
-}
-
 // ── Page entry point ───────────────────────────────────────────────────────────
 // roomId + onLeave props are used when rendered inline inside the app.
 // When loaded via the /conference/:roomId route (guest link), useParams() provides the roomId.
-export default function ConferenceRoom({ roomId: propRoomId, onLeave }) {
+export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: propUsername }) {
   const { roomId: routeRoomId } = useParams()
   const roomId = propRoomId ?? routeRoomId
   const inviteUrl = `${window.location.origin}/conference/${roomId}`
-  const { user } = useAuth()
-  // If logged in, skip the name form and use their account name
-  const [username, setUsername] = useState(() => nameFromEmail(user?.email))
+  const { user, token: authToken } = useAuth()
+
+  // Guests (no auth, no propUsername) must enter a display name before joining
+  const isGuest = !authToken && !propUsername
+  const [guestName, setGuestName] = useState('')
+  const [guestNameSubmitted, setGuestNameSubmitted] = useState(false)
+
+  // Authenticated host uses station name (backend will look it up from DB).
+  // Guest uses the name they entered. Fallback to email-derived or 'Guest'.
+  const username = propUsername || (isGuest ? guestName : null) || nameFromEmail(user?.email) || 'Guest'
+
   const [token, setToken] = useState(null)
   const [livekitUrl, setLivekitUrl] = useState(null)
   const [error, setError] = useState(null)
 
+  // Don't fetch token until guest has submitted their name
+  const readyToJoin = !isGuest || guestNameSubmitted
+
   useEffect(() => {
-    if (!username) return
-    fetch(`/api/conference/token?room=${encodeURIComponent(roomId)}&username=${encodeURIComponent(username)}`)
+    if (!readyToJoin || !username) return
+    const headers = {}
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`
+    fetch(`/api/conference/token?room=${encodeURIComponent(roomId)}&username=${encodeURIComponent(username)}`, { headers })
       .then((r) => {
         if (!r.ok) return r.text().then((t) => { throw new Error(t) })
         return r.json()
@@ -399,9 +377,42 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave }) {
         setLivekitUrl(url)
       })
       .catch((e) => setError(e.message || 'Failed to connect'))
-  }, [username, roomId])
+  }, [username, roomId, readyToJoin])
 
-  if (!username) return <UsernameForm onSubmit={setUsername} />
+  // Guest name entry screen — shown before joining
+  if (isGuest && !guestNameSubmitted) {
+    return (
+      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center p-4">
+        <div className="w-full max-w-sm bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h2 className="text-base font-bold text-white mb-1">Join Studio Room</h2>
+          <p className="text-xs text-gray-500 mb-5">Enter your name so other participants can identify you.</p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (guestName.trim()) setGuestNameSubmitted(true)
+            }}
+          >
+            <input
+              type="text"
+              value={guestName}
+              onChange={(e) => setGuestName(e.target.value)}
+              placeholder="Your name"
+              maxLength={64}
+              autoFocus
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-red-500 transition-colors mb-4"
+            />
+            <button
+              type="submit"
+              disabled={!guestName.trim()}
+              className="w-full py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white text-sm font-semibold rounded-lg transition-colors"
+            >
+              Join Room
+            </button>
+          </form>
+        </div>
+      </div>
+    )
+  }
 
   if (error) {
     return (
