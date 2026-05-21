@@ -158,7 +158,7 @@ function DashboardCard({ label, colorClass, iconPath, stream, viewers }) {
 
 /* ─── Tab content ─────────────────────────────────────────────── */
 
-function StreamSettingsTab({ rtmpBase, audioKey, liveStreams, viewers, host, sourcePassword }) {
+function StreamSettingsTab({ audioKey, liveStreams, viewers, host, sourcePassword }) {
   const audioStream = liveStreams.find(s => s.key === audioKey)
   const anyLive = liveStreams.some(s => s.live)
   const otherStreams = liveStreams.filter(s => s.key !== audioKey)
@@ -195,43 +195,6 @@ function StreamSettingsTab({ rtmpBase, audioKey, liveStreams, viewers, host, sou
             ))}
           </div>
         )}
-      </div>
-
-      {/* Audio Stream card */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-        <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-red-900/40 to-gray-900 border-b border-gray-800">
-          <span className="w-8 h-8 rounded-lg bg-red-600/20 border border-red-500/30 flex items-center justify-center flex-shrink-0">
-            <svg className="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M3.24 6.15C2.51 6.43 2 7.17 2 8v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2H5.02L16.89 2.37 16.26.91 3.24 6.15zM12 18c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm6-8H6V8h12v2z" />
-            </svg>
-          </span>
-          <div>
-            <h3 className="font-semibold text-white text-sm">Audio Stream</h3>
-            <p className="text-xs text-gray-400">Radio / podcast — audio only, AAC 192 kbps</p>
-          </div>
-          <span className="ml-auto text-[10px] font-bold text-red-400 bg-red-900/30 border border-red-700/40 rounded px-2 py-0.5">AUDIO ONLY</span>
-        </div>
-        <div className="px-5 py-4 space-y-4">
-          <div className="grid gap-3">
-            <Field label="RTMP Server URL" value={rtmpBase} />
-            <Field label="Stream Key" value={audioKey} />
-          </div>
-          <Field label="Full Publish URL (combined)" value={`${rtmpBase}/${audioKey}`} />
-          <div className="bg-gray-800/60 rounded-lg p-4">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">OBS Studio Setup</p>
-            <ol className="space-y-1.5 text-sm text-gray-300 list-decimal list-inside">
-              <li>Open OBS → <strong>Settings → Stream</strong></li>
-              <li>Service: <span className="text-green-400 font-mono">Custom</span></li>
-              <li>Server: <span className="text-green-400 font-mono">{rtmpBase}</span></li>
-              <li>Stream Key: <span className="text-green-400 font-mono">{audioKey}</span></li>
-              <li>Click <strong>Apply</strong> → <strong>Start Streaming</strong></li>
-            </ol>
-          </div>
-          <ul className="space-y-1.5">
-            <InfoRow icon="•" text="Recommended: AAC encoder, 192 kbps, 44.1 kHz, stereo." />
-            <InfoRow icon="•" text="For Liquidsoap / Darkice point the output to the Full Publish URL above." />
-          </ul>
-        </div>
       </div>
 
       {/* Icecast / source client settings */}
@@ -1504,7 +1467,6 @@ export default function StreamSetup() {
       {/* Tab content */}
       {tab === 'settings' && (
         <StreamSettingsTab
-          rtmpBase={rtmpBase}
           audioKey={audioKey}
           liveStreams={liveStreams}
           viewers={viewers}
