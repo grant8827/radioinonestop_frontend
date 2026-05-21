@@ -228,7 +228,6 @@ function StreamSettingsTab({ rtmpBase, audioKey, liveStreams, viewers, host }) {
             </ol>
           </div>
           <ul className="space-y-1.5">
-            <InfoRow icon="•" text="Keys containing 'radio' are treated as audio-only (no video encoded)." />
             <InfoRow icon="•" text="Recommended: AAC encoder, 192 kbps, 44.1 kHz, stereo." />
             <InfoRow icon="•" text="For Liquidsoap / Darkice point the output to the Full Publish URL above." />
           </ul>
@@ -976,31 +975,10 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
 
 /* ─── Audio encoder tab ───────────────────────────────────────── */
 
-function AudioEncoderTab({ audioKey, host, listenUrl, rtmpBase }) {
+function AudioEncoderTab({ audioKey, host, listenUrl }) {
   const mount = '/' + audioKey
   return (
     <div className="space-y-5">
-      {/* Stream credentials summary */}
-      {rtmpBase && (
-        <div className="bg-gray-900 border border-red-900/40 rounded-xl overflow-hidden">
-          <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-red-900/30 to-gray-900 border-b border-red-900/30">
-            <span className="w-8 h-8 rounded-lg bg-red-600/20 border border-red-500/30 flex items-center justify-center flex-shrink-0">
-              <svg className="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M3.24 6.15C2.51 6.43 2 7.17 2 8v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2H5.02L16.89 2.37 16.26.91 3.24 6.15zM12 18c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm6-8H6V8h12v2z" />
-              </svg>
-            </span>
-            <div>
-              <h3 className="font-semibold text-white text-sm">Your Stream Credentials</h3>
-              <p className="text-xs text-gray-400">Use these in OBS Studio or any RTMP broadcaster</p>
-            </div>
-          </div>
-          <div className="px-5 py-4 space-y-3">
-            <Field label="RTMP Server URL" value={rtmpBase} />
-            <Field label="Stream Key" value={audioKey} />
-            <Field label="Full Publish URL" value={`${rtmpBase}/${audioKey}`} />
-          </div>
-        </div>
-      )}
       <IcecastEncoder defaultHost={host} defaultMount={mount} listenUrl={listenUrl} />
     </div>
   )
@@ -1535,7 +1513,7 @@ export default function StreamSetup() {
           host={host}
         />
       )}
-      {tab === 'audio' && <AudioEncoderTab audioKey={audioKey} host={host} listenUrl={creds?.listen_url} rtmpBase={rtmpBase} />}
+      {tab === 'audio' && <AudioEncoderTab audioKey={audioKey} host={host} listenUrl={creds?.listen_url} />}
       {tab === 'channel' && <ChannelTab host={host} audioKey={audioKey} />}
     </div>
   )
