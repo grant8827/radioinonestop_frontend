@@ -527,17 +527,22 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
 
   // 'hub' = broadcast directly to this server's fan-out hub (no Icecast needed)
   // 'icecast' = legacy path: server transcodes via ffmpeg and pushes to Icecast
-  const [broadcastMode, setBroadcastMode] = useState('hub')
+  const [broadcastMode, setBroadcastMode] = useState('icecast')
 
-  const [cfg, setCfg] = useState({
-    host: defaultHost,
-    port: '8000',
-    mount: defaultMount,
-    username: 'source',
-    password: '',
-    codec: 'mp3',
-    bitrate: '192k',
+  const [cfg, setCfg] = useState(() => {
+    try {
+      const saved = localStorage.getItem('icecast_encoder_cfg')
+      if (saved) return { host: defaultHost, port: '8000', mount: defaultMount, username: 'source', password: '', codec: 'mp3', bitrate: '192k', ...JSON.parse(saved) }
+    } catch {}
+    return { host: defaultHost, port: '8000', mount: defaultMount, username: 'source', password: '', codec: 'mp3', bitrate: '192k' }
   })
+
+  const [cfgSaved, setCfgSaved] = useState(false)
+  function saveConfig() {
+    try { localStorage.setItem('icecast_encoder_cfg', JSON.stringify(cfg)) } catch {}
+    setCfgSaved(true)
+    setTimeout(() => setCfgSaved(false), 1500)
+  }
 
   // Sync host from prop when it becomes available (e.g. after login)
   const prevDefaultHost = useRef('')
@@ -857,6 +862,18 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
               Mixer Main Output
               <span className="ml-auto text-[10px] text-gray-500 font-mono">master bus</span>
             </div>
+          </div>
+          <div className="col-span-2 flex justify-end">
+            <button
+              onClick={saveConfig}
+              disabled={!canStart}
+              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                cfgSaved
+                  ? 'bg-green-700 text-white'
+                  : 'bg-gray-700 hover:bg-gray-600 text-gray-200 disabled:opacity-40'
+              }`}>
+              {cfgSaved ? '✓ Saved' : 'Save Config'}
+            </button>
           </div>
         </div>
         )}
