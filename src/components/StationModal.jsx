@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import Hls from 'hls.js'
 
 // ─── Canvas Visualizer ────────────────────────────────────────────────────────
 function CanvasVisualizer({ analyser, isPlaying, isLive }) {
@@ -224,18 +223,11 @@ export default function StationModal({ station, onClose }) {
     }
     if (acRef.current.state === 'suspended') acRef.current.resume()
 
-    // Connect HLS
-    if (Hls.isSupported()) {
-      hlsRef.current?.destroy()
-      const hls = new Hls({ lowLatencyMode: true, liveSyncDurationCount: 1 })
-      hls.loadSource(streamUrl)
-      hls.attachMedia(audio)
-      hls.on(Hls.Events.MANIFEST_PARSED, () => audio.play())
-      hlsRef.current = hls
-    } else if (audio.canPlayType('application/vnd.apple.mpegurl')) {
-      audio.src = streamUrl
-      audio.play()
-    }
+    // /listen/{slug} is a raw WebM/Opus stream — play directly, no HLS
+    hlsRef.current?.destroy()
+    hlsRef.current = null
+    audio.src = streamUrl
+    audio.play().catch(() => {})
 
     setPlaying(true)
   }, [streamUrl])

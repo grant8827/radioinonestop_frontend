@@ -92,7 +92,7 @@ export default function ProfileSettings() {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
-      .then((d) =>
+      .then((d) => {
         setProfileForm({
           first_name: d.first_name || '',
           last_name: d.last_name || '',
@@ -102,7 +102,8 @@ export default function ProfileSettings() {
           description: d.description || '',
           logo_url: d.logo_url || '',
         })
-      )
+        if (d.listen_url) setListenUrl(d.listen_url)
+      })
       .catch(() => {})
   }, [token])
 
