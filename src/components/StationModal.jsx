@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import Hls from 'hls.js'
 
 // ─── Canvas Visualizer ────────────────────────────────────────────────────────
 function CanvasVisualizer({ analyser, isPlaying, isLive }) {
@@ -169,7 +170,8 @@ export default function StationModal({ station, onClose }) {
   const srcRef    = useRef(null)
   const pollRef   = useRef(null)
 
-  const streamUrl = `/listen/${info.slug}`
+  const hlsUrl    = `/hls/${info.slug}/index.m3u8`
+  const streamUrl  = `/listen/${info.slug}` // WebM fallback (desktop Chrome/Firefox)
 
   // Animate in
   useEffect(() => {
@@ -210,27 +212,59 @@ export default function StationModal({ station, onClose }) {
     if (!audio) return
 
     // Build AudioContext + analyser for visualizer
-    if (!acRef.current) {
-      const ac       = new AudioContext()
-      const analyserNode = ac.createAnalyser()
-      analyserNode.fftSize = 128
-      analyserNode.smoothingTimeConstant = 0.82
-      acRef.current  = ac
-      srcRef.current = ac.createMediaElementSource(audio)
-      srcRef.current.connect(analyserNode)
-      analyserNode.connect(ac.destination)
-      setAnalyser(analyserNode)
+    // NOTE: iOS requires AudioContext to be created from a user-gesture callback,
+    // which this is (button onClick chain). However, createMediaElementSource is
+    // not supported on iOS Safari with hls.js/native HLS, so we skip the analyser
+    // on iOS and only create it when MSE is available.
+    if (!acRef.current && Hls.isSupported()) {
+      try {
+        const ac           = new AudioContext()
+        const analyserNode = ac.createAnalyser()
+        analyserNode.fftSize = 128
+        analyserNode.smoothingTimeConstant = 0.82
+        acRef.current  = ac
+        srcRef.current = ac.createMediaElementSource(audio)
+        srcRef.current.connect(analyserNode)
+        analyserNode.connect(ac.destination)
+        setAnalyser(analyserNode)
+      } catch (e) {
+        // AudioContext unavailable — visualizer will use idle animation
+      }
     }
-    if (acRef.current.state === 'suspended') acRef.current.resume()
+    if (acRef.current?.state === 'suspended') acRef.current.resume()
 
-    // /listen/{slug} is a raw WebM/Opus stream — play directly, no HLS
-    hlsRef.current?.destroy()
-    hlsRef.current = null
-    audio.src = streamUrl
-    audio.play().catch(() => {})
+    if (Hls.isSupported()) {
+      // Desktop Chrome / Firefox / Android — use hls.js
+      hlsRef.current?.destroy()
+      const hls = new Hls({ lowLatencyMode: false, liveSyncDurationCount: 3 })
+      hls.loadSource(hlsUrl)
+      hls.attachMedia(audio)
+      hls.on(Hls.Events.MANIFEST_PARSED, () => audio.play().catch(() => {}))
+      hls.on(Hls.Events.ERROR, (_e, data) => {
+        if (data.fatal) {
+          // HLS not ready yet (stream just starting) — fall back to raw WebM
+          hls.destroy()
+          hlsRef.current = null
+          audio.src = streamUrl
+          audio.play().catch(() => {})
+        }
+      })
+      hlsRef.current = hls
+    } else if (audio.canPlayType('application/vnd.apple.mpegurl')) {
+      // iOS Safari — native HLS support
+      hlsRef.current = null
+      audio.src = hlsUrl
+      audio.load()
+      audio.play().catch(() => {})
+    } else {
+      // Final fallback: raw WebM stream
+      hlsRef.current = null
+      audio.src = streamUrl
+      audio.play().catch(() => {})
+    }
 
     setPlaying(true)
-  }, [streamUrl])
+  }, [hlsUrl, streamUrl])
 
   const stop = useCallback(() => {
     hlsRef.current?.destroy()
