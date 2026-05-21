@@ -158,11 +158,10 @@ function DashboardCard({ label, colorClass, iconPath, stream, viewers }) {
 
 /* ─── Tab content ─────────────────────────────────────────────── */
 
-function StreamSettingsTab({ rtmpBase, audioKey, videoKey, liveStreams, viewers, host }) {
+function StreamSettingsTab({ rtmpBase, audioKey, liveStreams, viewers, host }) {
   const audioStream = liveStreams.find(s => s.key === audioKey)
-  const videoStream = liveStreams.find(s => s.key === videoKey)
   const anyLive = liveStreams.some(s => s.live)
-  const otherStreams = liveStreams.filter(s => s.key !== audioKey && s.key !== videoKey)
+  const otherStreams = liveStreams.filter(s => s.key !== audioKey)
 
   return (
     <div className="space-y-6">
@@ -176,19 +175,13 @@ function StreamSettingsTab({ rtmpBase, audioKey, videoKey, liveStreams, viewers,
           </span>
           <span className="ml-auto text-xs text-gray-600">auto-refresh 5s</span>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3">
           <DashboardCard
             label="Audio Stream"
             colorClass="bg-red-600/20 border-red-500/30 text-red-400"
             iconPath="M3.24 6.15C2.51 6.43 2 7.17 2 8v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2H5.02L16.89 2.37 16.26.91 3.24 6.15zM12 18c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm6-8H6V8h12v2z"
             stream={audioStream}
             viewers={viewers}
-          />
-          <DashboardCard
-            label="Video Stream"
-            colorClass="bg-blue-600/20 border-blue-500/30 text-blue-400"
-            iconPath="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"
-            stream={videoStream}
           />
         </div>
         {otherStreams.length > 0 && (
@@ -240,55 +233,6 @@ function StreamSettingsTab({ rtmpBase, audioKey, videoKey, liveStreams, viewers,
             <InfoRow icon="•" text="For Liquidsoap / Darkice point the output to the Full Publish URL above." />
           </ul>
         </div>
-      </div>
-
-      {/* Video Stream card */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-        <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-blue-900/40 to-gray-900 border-b border-gray-800">
-          <span className="w-8 h-8 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center flex-shrink-0">
-            <svg className="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" />
-            </svg>
-          </span>
-          <div>
-            <h3 className="font-semibold text-white text-sm">Video Stream</h3>
-            <p className="text-xs text-gray-400">Live video — H.264 + AAC, LL-HLS output</p>
-          </div>
-          <span className="ml-auto text-[10px] font-bold text-blue-400 bg-blue-900/30 border border-blue-700/40 rounded px-2 py-0.5">VIDEO + AUDIO</span>
-        </div>
-        <div className="px-5 py-4 space-y-4">
-          <div className="grid gap-3">
-            <Field label="RTMP Server URL" value={rtmpBase} />
-            <Field label="Stream Key" value={videoKey} />
-          </div>
-          <Field label="Full Publish URL (combined)" value={`${rtmpBase}/${videoKey}`} />
-          <div className="bg-gray-800/60 rounded-lg p-4">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">OBS Studio Setup</p>
-            <ol className="space-y-1.5 text-sm text-gray-300 list-decimal list-inside">
-              <li>Open OBS → <strong>Settings → Stream</strong></li>
-              <li>Service: <span className="text-green-400 font-mono">Custom</span></li>
-              <li>Server: <span className="text-green-400 font-mono">{rtmpBase}</span></li>
-              <li>Stream Key: <span className="text-green-400 font-mono">{videoKey}</span></li>
-              <li>Click <strong>Apply</strong> → <strong>Start Streaming</strong></li>
-            </ol>
-          </div>
-          <ul className="space-y-1.5">
-            <InfoRow icon="•" text="Keys without 'radio' produce full H.264 + AAC streams." />
-            <InfoRow icon="•" text="Set keyframe interval to 1 second for best low-latency HLS performance." />
-            <InfoRow icon="•" text="Custom keys are supported — e.g. 'studio', 'cam1'. Each creates its own HLS endpoint." />
-          </ul>
-        </div>
-      </div>
-
-      {/* Custom key note */}
-      <div className="bg-gray-800/40 border border-gray-700/50 rounded-xl px-5 py-4">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Custom Stream Keys</p>
-        <p className="text-sm text-gray-400">
-          You can use any key you like. The server auto-creates an HLS endpoint at{' '}
-          <code className="text-green-400 font-mono text-xs">/hls/&lt;your-key&gt;/index.m3u8</code>.
-          Keys containing <code className="text-green-400 font-mono text-xs">radio</code> produce audio-only streams;
-          all others produce full audio + video streams.
-        </p>
       </div>
 
       {/* Icecast / source client settings */}
@@ -1032,10 +976,31 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
 
 /* ─── Audio encoder tab ───────────────────────────────────────── */
 
-function AudioEncoderTab({ audioKey, host, listenUrl }) {
+function AudioEncoderTab({ audioKey, host, listenUrl, rtmpBase }) {
   const mount = '/' + audioKey
   return (
     <div className="space-y-5">
+      {/* Stream credentials summary */}
+      {rtmpBase && (
+        <div className="bg-gray-900 border border-red-900/40 rounded-xl overflow-hidden">
+          <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-red-900/30 to-gray-900 border-b border-red-900/30">
+            <span className="w-8 h-8 rounded-lg bg-red-600/20 border border-red-500/30 flex items-center justify-center flex-shrink-0">
+              <svg className="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M3.24 6.15C2.51 6.43 2 7.17 2 8v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2H5.02L16.89 2.37 16.26.91 3.24 6.15zM12 18c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm6-8H6V8h12v2z" />
+              </svg>
+            </span>
+            <div>
+              <h3 className="font-semibold text-white text-sm">Your Stream Credentials</h3>
+              <p className="text-xs text-gray-400">Use these in OBS Studio or any RTMP broadcaster</p>
+            </div>
+          </div>
+          <div className="px-5 py-4 space-y-3">
+            <Field label="RTMP Server URL" value={rtmpBase} />
+            <Field label="Stream Key" value={audioKey} />
+            <Field label="Full Publish URL" value={`${rtmpBase}/${audioKey}`} />
+          </div>
+        </div>
+      )}
       <IcecastEncoder defaultHost={host} defaultMount={mount} listenUrl={listenUrl} />
     </div>
   )
@@ -1254,7 +1219,7 @@ function LiveListenerPlayer({ listenPath }) {
   )
 }
 
-function ChannelTab({ host, audioKey, videoKey }) {
+function ChannelTab({ host, audioKey }) {
   const { token } = useAuth()
   const [creds, setCreds] = useState(null)
   const [credsLoading, setCredsLoading] = useState(false)
@@ -1317,7 +1282,6 @@ function ChannelTab({ host, audioKey, videoKey }) {
   const myRtmpBase = creds ? creds.rtmp_ingest_base : `rtmp://${host}:1935/live`
   const myStreamKey = creds ? creds.stream_key : audioKey
   const hlsAudio = `https://${host}/hls/${myStreamKey}/index.m3u8`
-  const hlsVideo = `https://${host}/hls/${videoKey}/index.m3u8`
 
   return (
     <div className="space-y-6">
@@ -1448,7 +1412,6 @@ function ChannelTab({ host, audioKey, videoKey }) {
         </div>
         <div className="px-5 py-4 space-y-4">
           <Field label="Audio Stream (HLS)" value={hlsAudio} />
-          <Field label="Video Stream (HLS)" value={hlsVideo} />
           {creds?.listen_url && (
             <LiveListenerPlayer listenPath={creds.listen_url} />
           )}
@@ -1496,15 +1459,6 @@ const TABS = [
     ),
   },
   {
-    id: 'video',
-    label: 'Video Encoder',
-    icon: () => (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
-      </svg>
-    ),
-  },
-  {
     id: 'channel',
     label: 'Channel',
     icon: () => (
@@ -1521,7 +1475,6 @@ export default function StreamSetup() {
   const host = window.location.hostname
   const fallbackRtmpBase = `rtmp://${host}:1935/live`
   const fallbackAudioKey = 'radio'
-  const videoKey = 'live'
 
   const { token } = useAuth()
   const [creds, setCreds] = useState(null)
@@ -1577,15 +1530,13 @@ export default function StreamSetup() {
         <StreamSettingsTab
           rtmpBase={rtmpBase}
           audioKey={audioKey}
-          videoKey={videoKey}
           liveStreams={liveStreams}
           viewers={viewers}
           host={host}
         />
       )}
-      {tab === 'audio' && <AudioEncoderTab audioKey={audioKey} host={host} listenUrl={creds?.listen_url} />}
-      {tab === 'video' && <VideoEncoderTab />}
-      {tab === 'channel' && <ChannelTab host={host} audioKey={audioKey} videoKey={videoKey} />}
+      {tab === 'audio' && <AudioEncoderTab audioKey={audioKey} host={host} listenUrl={creds?.listen_url} rtmpBase={rtmpBase} />}
+      {tab === 'channel' && <ChannelTab host={host} audioKey={audioKey} />}
     </div>
   )
 }
