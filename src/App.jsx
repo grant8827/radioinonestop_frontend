@@ -71,7 +71,7 @@ function MainApp() {
     <div className="min-h-screen bg-gray-950 text-white flex">
       {/* Sidebar */}
       <Sidebar
-        stationName={config.stationName}
+        stationName={stationName || user?.stationName || config.stationName}
         mode={mode}
         onModeChange={handleModeChange}
         onSettingsClick={() => handleModeChange('settings')}
