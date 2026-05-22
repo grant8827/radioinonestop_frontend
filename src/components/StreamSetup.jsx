@@ -1031,93 +1031,67 @@ function VideoEncoderTab() {
 const SOCIAL_PLATFORMS = [
   {
     id: 'youtube',
-    name: 'YouTube',
+    name: 'YouTube Live',
+    defaultUrl: 'rtmps://a.rtmp.youtube.com/live2',
+    badge: 'RTMPS',
+    keyUrl: 'https://studio.youtube.com',
+    keyNote: 'YouTube Studio → Go Live → Stream → copy Stream Key',
     colorBorder: 'border-red-900/40',
     colorFrom: 'from-red-900/30',
     colorIcon: 'bg-red-600/20 border-red-500/30 text-red-400',
     colorBadge: 'text-red-400 bg-red-900/30 border-red-700/40',
-    colorObs: 'bg-red-950/20 border-red-800/30',
-    colorObsTitle: 'text-red-400',
-    colorObsVal: 'text-red-300',
-    badge: 'RTMP',
-    rtmpServer: 'rtmp://a.rtmp.youtube.com/live2',
-    keyNote: 'YouTube Studio → Go Live → Stream → copy Stream Key',
-    keyUrl: 'https://studio.youtube.com',
-    steps: [
-      'Go to studio.youtube.com → Create → Go Live',
-      'Click the "Stream" tab and copy your Stream Key',
-      'In OBS: Settings → Stream → Service: YouTube – RTMP',
-      'Or use Custom: Server above + your copied stream key',
-      'Click Apply → Start Streaming',
-    ],
   },
   {
     id: 'facebook',
-    name: 'Facebook',
+    name: 'Facebook Live',
+    defaultUrl: 'rtmps://live-api-s.facebook.com:443/rtmp/',
+    badge: 'RTMPS',
+    keyUrl: 'https://www.facebook.com/live/producer',
+    keyNote: 'Facebook → Create → Live Video → Streaming Software',
     colorBorder: 'border-blue-900/40',
     colorFrom: 'from-blue-900/30',
     colorIcon: 'bg-blue-600/20 border-blue-500/30 text-blue-400',
     colorBadge: 'text-blue-400 bg-blue-900/30 border-blue-700/40',
-    colorObs: 'bg-blue-950/20 border-blue-800/30',
-    colorObsTitle: 'text-blue-400',
-    colorObsVal: 'text-blue-300',
-    badge: 'RTMPS',
-    rtmpServer: 'rtmps://live-api-s.facebook.com:443/rtmp/',
-    keyNote: 'Facebook → Create → Live Video → Streaming Software',
-    keyUrl: 'https://www.facebook.com/live/producer',
-    steps: [
-      'Go to facebook.com/live/producer → Create Live Video',
-      'Select "Streaming software"',
-      'Copy the Server URL and Stream Key shown on screen',
-      'In OBS: Settings → Stream → Custom → paste Server URL',
-      'Paste stream key in the Stream Key field → Start Streaming',
-    ],
   },
   {
-    id: 'tiktok',
-    name: 'TikTok',
-    colorBorder: 'border-pink-900/40',
-    colorFrom: 'from-pink-900/30',
-    colorIcon: 'bg-pink-600/20 border-pink-500/30 text-pink-400',
-    colorBadge: 'text-pink-400 bg-pink-900/30 border-pink-700/40',
-    colorObs: 'bg-pink-950/20 border-pink-800/30',
-    colorObsTitle: 'text-pink-400',
-    colorObsVal: 'text-pink-300',
+    id: 'twitch',
+    name: 'Twitch TV',
+    defaultUrl: 'rtmp://live.twitch.tv/app/',
     badge: 'RTMP',
-    rtmpServer: 'rtmp://push.tiktok.live/live/',
-    keyNote: 'TikTok Live Studio → Go Live → copy Stream Key',
-    keyUrl: 'https://www.tiktok.com/live/creators',
-    steps: [
-      'Download TikTok Live Studio (desktop) or use the app (1,000+ followers required)',
-      'In Live Studio: click Go Live → copy the Server URL and Stream Key',
-      'In OBS: Settings → Stream → Custom → paste Server URL above',
-      'Paste your TikTok Stream Key → click Start Streaming',
-      'Start the broadcast inside TikTok Live Studio / app',
-    ],
-  },
-  {
-    id: 'instagram',
-    name: 'Instagram',
+    keyUrl: 'https://dashboard.twitch.tv/settings/stream',
+    keyNote: 'Twitch Dashboard → Settings → Stream → copy Stream Key',
     colorBorder: 'border-purple-900/40',
     colorFrom: 'from-purple-900/30',
     colorIcon: 'bg-purple-600/20 border-purple-500/30 text-purple-400',
     colorBadge: 'text-purple-400 bg-purple-900/30 border-purple-700/40',
-    colorObs: 'bg-purple-950/20 border-purple-800/30',
-    colorObsTitle: 'text-purple-400',
-    colorObsVal: 'text-purple-300',
-    badge: 'RTMPS',
-    rtmpServer: 'rtmps://live-upload.instagram.com:443/rtmp/',
-    keyNote: 'Instagram app → + → Live → ⚙ icon → copy Server & Key',
-    keyUrl: 'https://www.instagram.com',
-    steps: [
-      'Open Instagram app → tap + → tap Live',
-      'Tap the ⚙ settings icon → enable "Use streaming software"',
-      'Copy the Server URL and Stream Key shown',
-      'In OBS: Settings → Stream → Custom → paste Server URL above',
-      'Paste your Instagram Stream Key → Start Streaming → tap Go Live in the app',
-    ],
+  },
+  {
+    id: 'custom',
+    name: 'Custom RTMP',
+    defaultUrl: '',
+    badge: 'RTMP',
+    keyUrl: null,
+    keyNote: 'Enter any RTMP server URL and stream key',
+    colorBorder: 'border-indigo-900/40',
+    colorFrom: 'from-indigo-900/30',
+    colorIcon: 'bg-indigo-600/20 border-indigo-500/30 text-indigo-400',
+    colorBadge: 'text-indigo-400 bg-indigo-900/30 border-indigo-700/40',
   },
 ]
+
+// Migrate old format { platform, stream_key, enabled } → new format { id, platform, label, serverUrl, streamKey, active }
+function migrateChannel(d) {
+  if (d.streamKey !== undefined) return d // already new format
+  const p = SOCIAL_PLATFORMS.find((pl) => pl.id === d.platform)
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    platform: d.platform || 'custom',
+    label: d.label || p?.name || d.platform || 'Channel',
+    serverUrl: d.serverUrl || p?.defaultUrl || '',
+    streamKey: d.stream_key || '',
+    active: d.active ?? d.enabled ?? false,
+  }
+}
 
 /* ─── Inline listen player ────────────────────────────────────── */
 function LiveListenerPlayer({ listenPath }) {
@@ -1186,17 +1160,41 @@ function LiveListenerPlayer({ listenPath }) {
 
 function ChannelTab({ host, audioKey }) {
   const { token } = useAuth()
+  const { broadcastMode, icecastStatus, radioStatus } = useStream()
+
+  // Disable editing while a broadcast is live
+  const liveStatus = broadcastMode === 'icecast' ? icecastStatus : radioStatus
+  const isLive = liveStatus === 'live'
+
+  // ── Credentials ────────────────────────────────────────────────────────────
   const [creds, setCreds] = useState(null)
   const [credsLoading, setCredsLoading] = useState(false)
-  const [destKeys, setDestKeys] = useState(() =>
-    Object.fromEntries(SOCIAL_PLATFORMS.map((p) => [p.id, '']))
-  )
-  const [destEnabled, setDestEnabled] = useState(() =>
-    Object.fromEntries(SOCIAL_PLATFORMS.map((p) => [p.id, false]))
-  )
-  const [saving, setSaving] = useState(false)
-  const [saveMsg, setSaveMsg] = useState('')
 
+  // ── Channels list ──────────────────────────────────────────────────────────
+  const [channels, setChannels] = useState([])
+  const [showKeys, setShowKeys] = useState({}) // id → bool (per-card key reveal)
+
+  // ── Add-channel form ───────────────────────────────────────────────────────
+  const [formPlatform, setFormPlatform] = useState('youtube')
+  const [formLabel,    setFormLabel]    = useState('')
+  const [formUrl,      setFormUrl]      = useState(SOCIAL_PLATFORMS[0].defaultUrl)
+  const [formKey,      setFormKey]      = useState('')
+  const [showFormKey,  setShowFormKey]  = useState(false)
+  const [formError,    setFormError]    = useState('')
+
+  // ── Save feedback ──────────────────────────────────────────────────────────
+  const [saving,   setSaving]   = useState(false)
+  const [saveMsg,  setSaveMsg]  = useState('')
+
+  // Update server URL when platform dropdown changes
+  function handlePlatformChange(id) {
+    setFormPlatform(id)
+    const p = SOCIAL_PLATFORMS.find((pl) => pl.id === id)
+    setFormUrl(p?.id !== 'custom' ? (p?.defaultUrl || '') : '')
+    setFormError('')
+  }
+
+  // ── Load credentials + saved channels on mount ─────────────────────────────
   useEffect(() => {
     if (!token) return
     setCredsLoading(true)
@@ -1205,35 +1203,30 @@ function ChannelTab({ host, audioKey }) {
     })
       .then((r) => r.json())
       .then((data) => {
-        setCreds({ stream_key: data.stream_key, rtmp_ingest_base: data.rtmp_ingest_base, station_slug: data.station_slug, listen_url: data.listen_url })
+        setCreds({
+          stream_key:      data.stream_key,
+          rtmp_ingest_base: data.rtmp_ingest_base,
+          station_slug:    data.station_slug,
+          listen_url:      data.listen_url,
+        })
         if (Array.isArray(data.destinations)) {
-          const keys = {}
-          const enabled = {}
-          data.destinations.forEach((d) => {
-            keys[d.platform] = d.stream_key || ''
-            enabled[d.platform] = d.enabled || false
-          })
-          setDestKeys((prev) => ({ ...prev, ...keys }))
-          setDestEnabled((prev) => ({ ...prev, ...enabled }))
+          setChannels(data.destinations.map(migrateChannel))
         }
       })
       .catch(() => {})
       .finally(() => setCredsLoading(false))
   }, [token])
 
-  async function saveDests() {
+  // ── Persist channels to backend ────────────────────────────────────────────
+  async function saveChannels(updated) {
+    if (!token) return
     setSaving(true)
     setSaveMsg('')
-    const destinations = SOCIAL_PLATFORMS.map((p) => ({
-      platform: p.id,
-      stream_key: destKeys[p.id] || '',
-      enabled: destEnabled[p.id] || false,
-    }))
     try {
       const r = await fetch('/api/user/stream-credentials', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ destinations }),
+        body: JSON.stringify({ destinations: updated }),
       })
       setSaveMsg(r.ok ? 'Saved!' : 'Save failed — try again')
     } catch {
@@ -1244,6 +1237,51 @@ function ChannelTab({ host, audioKey }) {
     setTimeout(() => setSaveMsg(''), 3000)
   }
 
+  // ── Add channel ────────────────────────────────────────────────────────────
+  function addChannel() {
+    if (isLive) return
+    const key = formKey.trim()
+    const url = formUrl.trim()
+    if (!key) { setFormError('Stream key is required'); return }
+    if (!url) { setFormError('Server URL is required'); return }
+    if (!/^rtmps?:\/\//i.test(url)) { setFormError('Server URL must start with rtmp:// or rtmps://'); return }
+    const p = SOCIAL_PLATFORMS.find((pl) => pl.id === formPlatform)
+    const label = formLabel.trim() || p?.name || formPlatform
+    const channel = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      platform: formPlatform,
+      label,
+      serverUrl: url,
+      streamKey: key,
+      active: false,
+    }
+    const updated = [...channels, channel]
+    setChannels(updated)
+    saveChannels(updated)
+    // Reset form (keep platform selection)
+    setFormLabel('')
+    setFormKey('')
+    setShowFormKey(false)
+    setFormError('')
+  }
+
+  // ── Delete channel ─────────────────────────────────────────────────────────
+  function deleteChannel(id) {
+    if (isLive) return
+    const updated = channels.filter((c) => c.id !== id)
+    setChannels(updated)
+    saveChannels(updated)
+  }
+
+  // ── Toggle Staged / Muted ──────────────────────────────────────────────────
+  function toggleActive(id) {
+    if (isLive) return
+    const updated = channels.map((c) => (c.id === id ? { ...c, active: !c.active } : c))
+    setChannels(updated)
+    saveChannels(updated)
+  }
+
+  const selectedPlatform = SOCIAL_PLATFORMS.find((p) => p.id === formPlatform) || SOCIAL_PLATFORMS[0]
   const myRtmpBase = creds ? creds.rtmp_ingest_base : `rtmp://${host}:1935/live`
   const myStreamKey = creds ? creds.stream_key : audioKey
   const hlsAudio = `https://${host}/hls/${myStreamKey}/index.m3u8`
@@ -1286,78 +1324,239 @@ function ChannelTab({ host, audioKey }) {
       </div>
 
       {/* ── Multistream Destinations ── */}
-      <div>
-        <div className="flex items-center gap-2 mb-4">
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Multistream Destinations</span>
-          <span className="text-xs text-gray-600">— auto-forward to social platforms</span>
-        </div>
-        <div className="space-y-4">
-          {SOCIAL_PLATFORMS.map((p) => (
-            <div key={p.id} className={`bg-gray-900 border ${p.colorBorder} rounded-xl overflow-hidden`}>
-              <div className={`flex items-center gap-3 px-5 py-4 bg-gradient-to-r ${p.colorFrom} to-gray-900 border-b ${p.colorBorder}`}>
-                <span className={`w-8 h-8 rounded-lg border flex items-center justify-center flex-shrink-0 font-bold text-sm ${p.colorIcon}`}>
-                  {p.name[0]}
-                </span>
-                <div>
-                  <h3 className="font-semibold text-white text-sm">{p.name}</h3>
-                  <p className="text-xs text-gray-400">{p.keyNote}</p>
-                </div>
-                <div className="ml-auto flex items-center gap-3">
-                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={destEnabled[p.id] || false}
-                      onChange={(e) => setDestEnabled((prev) => ({ ...prev, [p.id]: e.target.checked }))}
-                      className="w-3.5 h-3.5 rounded accent-purple-500"
-                    />
-                    <span className="text-[10px] font-semibold text-gray-400">Auto-forward</span>
-                  </label>
-                  <span className={`text-[10px] font-bold border rounded px-2 py-0.5 ${p.colorBadge}`}>{p.badge}</span>
-                </div>
-              </div>
-              <div className="px-5 py-4 space-y-4">
-                <Field label="RTMP Server URL" value={p.rtmpServer} />
-                <MaskedField
-                  label={`Your ${p.name} Stream Key`}
-                  value={destKeys[p.id] || ''}
-                  onChange={(v) => setDestKeys((prev) => ({ ...prev, [p.id]: v }))}
-                  placeholder={`Paste your ${p.name} stream key here`}
-                />
-                <div className="bg-gray-800/50 border border-gray-700/40 rounded-lg px-4 py-3">
-                  <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Get Stream Key</p>
-                  <a
-                    href={p.keyUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`inline-flex items-center gap-1.5 text-xs font-semibold border rounded-md px-3 py-1.5 transition-opacity hover:opacity-80 ${p.colorBadge}`}
-                  >
-                    Open {p.name} Dashboard ↗
-                  </a>
-                </div>
-                <div className={`border rounded-lg p-4 ${p.colorObs}`}>
-                  <p className={`text-xs font-semibold uppercase tracking-wider mb-3 ${p.colorObsTitle}`}>OBS Setup (manual)</p>
-                  <ol className="space-y-1.5 text-sm text-gray-300 list-decimal list-inside">
-                    {p.steps.map((s, i) => <li key={i}>{s}</li>)}
-                  </ol>
-                </div>
-              </div>
-            </div>
-          ))}
+      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+
+        {/* Section header */}
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-800">
+          <span className="w-8 h-8 rounded-lg bg-gray-700/40 border border-gray-700 flex items-center justify-center shrink-0">
+            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+            </svg>
+          </span>
+          <div>
+            <h3 className="font-semibold text-white text-sm">Multistream Destinations</h3>
+            <p className="text-xs text-gray-400">Auto-forward your stream to social platforms</p>
+          </div>
+          {isLive && (
+            <span className="ml-auto text-[10px] font-bold text-red-400 bg-red-900/30 border border-red-700/40 rounded px-2 py-0.5">● LIVE — editing locked</span>
+          )}
         </div>
 
-        {/* Save button */}
-        <div className="mt-4 flex items-center gap-3">
+        {/* ── Add channel form ── */}
+        <div className="px-5 py-5 space-y-4 border-b border-gray-800/60">
+          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Add Streaming Destination</p>
+
+          {/* Platform dropdown */}
+          <div>
+            <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-1.5 block">Platform</label>
+            <select
+              value={formPlatform}
+              onChange={(e) => handlePlatformChange(e.target.value)}
+              disabled={isLive}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-purple-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed appearance-none cursor-pointer"
+            >
+              {SOCIAL_PLATFORMS.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Label + Server URL row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-1.5 block">
+                Channel Label
+              </label>
+              <input
+                type="text"
+                value={formLabel}
+                onChange={(e) => setFormLabel(e.target.value)}
+                disabled={isLive}
+                placeholder={selectedPlatform?.name || 'My channel'}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-purple-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-1.5 block">
+                Server Ingest URL
+              </label>
+              <input
+                type="text"
+                value={formUrl}
+                onChange={(e) => setFormUrl(e.target.value)}
+                disabled={isLive || formPlatform !== 'custom'}
+                placeholder="rtmp://"
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-purple-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed font-mono text-xs"
+              />
+            </div>
+          </div>
+
+          {/* Stream Key */}
+          <div>
+            <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-1.5 block">
+              Stream Key
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type={showFormKey ? 'text' : 'password'}
+                value={formKey}
+                onChange={(e) => setFormKey(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') addChannel() }}
+                disabled={isLive}
+                placeholder={`Paste your ${selectedPlatform?.name || ''} stream key`}
+                className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-purple-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed font-mono"
+              />
+              <button
+                type="button"
+                onClick={() => setShowFormKey((v) => !v)}
+                disabled={isLive}
+                className="p-2 text-gray-600 hover:text-gray-300 transition-colors disabled:opacity-50"
+                title={showFormKey ? 'Hide' : 'Show'}
+              >
+                {showFormKey ? (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Documentation link */}
+          {selectedPlatform?.keyUrl && (
+            <a
+              href={selectedPlatform.keyUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`inline-flex items-center gap-1.5 text-xs font-semibold border rounded-md px-3 py-1.5 transition-opacity hover:opacity-80 ${selectedPlatform.colorBadge}`}
+            >
+              Get {selectedPlatform.name} Stream Key ↗
+            </a>
+          )}
+
+          {/* Validation error */}
+          {formError && (
+            <p className="text-xs text-red-400 font-medium flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+              </svg>
+              {formError}
+            </p>
+          )}
+
+          {/* Add button */}
           <button
-            onClick={saveDests}
-            disabled={saving || !token}
-            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm transition-all shadow-lg shadow-purple-900/30"
+            onClick={addChannel}
+            disabled={isLive}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 border border-purple-600/30 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {saving ? 'Saving…' : 'Save Destinations'}
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            {saving ? 'Saving…' : 'Add / Link Channel'}
           </button>
+        </div>
+
+        {/* ── Connected channels list ── */}
+        <div className="px-5 py-5">
+          {channels.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 gap-2">
+              <svg className="w-8 h-8 text-gray-800" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+              </svg>
+              <p className="text-gray-600 text-xs uppercase tracking-widest">No destinations configured</p>
+              <p className="text-gray-700 text-[11px]">Add a platform above to start multicasting</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mb-3">
+                Connected Destinations ({channels.length})
+              </p>
+              {channels.map((channel) => {
+                const p = SOCIAL_PLATFORMS.find((pl) => pl.id === channel.platform) || SOCIAL_PLATFORMS[SOCIAL_PLATFORMS.length - 1]
+                const keyVisible = showKeys[channel.id] || false
+                return (
+                  <div key={channel.id} className={`border ${p.colorBorder} rounded-xl overflow-hidden`}>
+                    {/* Card header */}
+                    <div className={`flex items-center gap-3 px-4 py-3 bg-gradient-to-r ${p.colorFrom} to-transparent border-b ${p.colorBorder}`}>
+                      <span className={`w-7 h-7 rounded-md border flex items-center justify-center shrink-0 font-bold text-xs ${p.colorIcon}`}>
+                        {channel.label[0]?.toUpperCase() || '?'}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-white truncate leading-tight">{channel.label}</p>
+                        <p className="text-[10px] text-gray-600 truncate font-mono">{channel.serverUrl}</p>
+                      </div>
+                      <span className={`text-[10px] font-bold border rounded px-2 py-0.5 shrink-0 ${p.colorBadge}`}>{p.badge}</span>
+
+                      {/* Staged / Muted toggle */}
+                      <button
+                        type="button"
+                        onClick={() => toggleActive(channel.id)}
+                        disabled={isLive}
+                        title={channel.active ? 'Click to mute this destination' : 'Click to stage this destination'}
+                        className={`flex items-center gap-1.5 shrink-0 ${isLive ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                      >
+                        <div className={`relative w-9 h-5 rounded-full transition-colors ${channel.active ? 'bg-green-600' : 'bg-gray-700'}`}>
+                          <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${channel.active ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                        </div>
+                        <span className={`text-[10px] font-bold uppercase w-10 ${channel.active ? 'text-green-400' : 'text-gray-600'}`}>
+                          {channel.active ? 'Staged' : 'Muted'}
+                        </span>
+                      </button>
+
+                      {/* Delete */}
+                      <button
+                        onClick={() => deleteChannel(channel.id)}
+                        disabled={isLive}
+                        className="text-gray-700 hover:text-red-500 transition-colors ml-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                        title="Remove this destination"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    {/* Stream key row */}
+                    <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-900/60">
+                      <span className="text-[10px] text-gray-600 uppercase tracking-wider shrink-0 w-20">Stream Key</span>
+                      <code className="flex-1 text-xs font-mono text-gray-400 truncate">
+                        {keyVisible ? channel.streamKey : '•'.repeat(Math.min(channel.streamKey.length, 28))}
+                      </code>
+                      <button
+                        onClick={() => setShowKeys((prev) => ({ ...prev, [channel.id]: !prev[channel.id] }))}
+                        className="text-gray-600 hover:text-gray-400 transition-colors"
+                        title={keyVisible ? 'Hide stream key' : 'Show stream key'}
+                      >
+                        {keyVisible ? (
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+                          </svg>
+                        ) : (
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                        )}
+                      </button>
+                      <CopyButton text={channel.streamKey} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Save feedback */}
           {saveMsg && (
-            <span className={`text-sm font-medium ${saveMsg.startsWith('Saved') ? 'text-green-400' : 'text-red-400'}`}>
+            <p className={`mt-3 text-xs font-medium ${saveMsg === 'Saved!' ? 'text-green-400' : 'text-red-400'}`}>
               {saveMsg}
-            </span>
+            </p>
           )}
         </div>
       </div>
