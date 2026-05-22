@@ -15,6 +15,12 @@ export function StreamProvider({ children }) {
   const radioKeepaliveRef  = useRef(null)
   const radioStatusRef     = useRef('idle')
 
+  // ── Icecast encoder shared state (consumed by NowPlaying button) ──────────
+  const [broadcastMode, setBroadcastMode] = useState('icecast') // 'hub' | 'icecast'
+  const [icecastStatus, setIcecastStatus] = useState('idle')
+  const icecastStartRef = useRef(null) // set by IcecastEncoder on mount
+  const icecastStopRef  = useRef(null) // set by IcecastEncoder on mount
+
   function setRadioStatusBoth(s) { setRadioStatus(s); radioStatusRef.current = s }
 
   function radioCleanup() {
@@ -196,7 +202,13 @@ export function StreamProvider({ children }) {
   useEffect(() => () => { radioCleanup(); videoCleanup() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <StreamCtx.Provider value={{ radioStatus, startRadio, stopRadio, videoStatus, startVideo, stopVideo }}>
+    <StreamCtx.Provider value={{
+      radioStatus, startRadio, stopRadio,
+      videoStatus, startVideo, stopVideo,
+      broadcastMode, setBroadcastMode,
+      icecastStatus, setIcecastStatus,
+      icecastStartRef, icecastStopRef,
+    }}>
       {children}
     </StreamCtx.Provider>
   )

@@ -209,7 +209,6 @@ function IcecastCard({ host, audioKey = 'radio', sourcePassword = '' }) {
   const mount          = '/' + audioKey
   const icecastPort    = '8000'
   const listenUrl      = `https://${host}/icecast${mount}`
-  const listenUrlDirect = `http://${host}:8000${mount}`
 
   return (
     <div className="bg-gray-900 border border-orange-900/40 rounded-xl overflow-hidden">
@@ -235,8 +234,7 @@ function IcecastCard({ host, audioKey = 'radio', sourcePassword = '' }) {
           <Field label="Mount Point" value={mount} />
           <Field label="Source Password" value={sourcePassword} />
         </div>
-        <Field label="Listener URL — HTTPS (browsers, most players)" value={listenUrl} />
-        <Field label="Listener URL — Direct HTTP (RadioBoss, VLC, WinAmp, iTunes)" value={listenUrlDirect} />
+        <Field label="Listener URL (HTTPS — works while stream is active)" value={listenUrl} />
 
         {/* BUTT instructions */}
         <div className="bg-orange-950/20 border border-orange-800/30 rounded-lg p-4">
@@ -275,9 +273,9 @@ function IcecastCard({ host, audioKey = 'radio', sourcePassword = '' }) {
         </div>
 
         <ul className="space-y-1.5">
-          <InfoRow icon="•" text="Source clients connect on port 8000 directly. Listeners use the HTTPS URL above." />
+          <InfoRow icon="•" text="The listener URL only works while you are actively streaming — Icecast drops the mount when the source disconnects." />
+          <InfoRow icon="•" text="For external source clients (BUTT, Mixxx) on Railway: use your Icecast service's own public URL from the Railway dashboard as the host, not this domain." />
           <InfoRow icon="•" text="Supported formats: MP3, AAC, OGG Vorbis, OGG Opus, FLAC." />
-          <InfoRow icon="•" text="Shoutcast v1 also supported — set type to SHOUTcast and use the same port." />
         </ul>
       </div>
     </div>
@@ -523,11 +521,13 @@ function BrowserStreamer({ audioKey }) {
 function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl = '' }) {
   const { token } = useAuth()
   const { getStreamTrack, getMasterAnalyser, resume } = useAudioEngine()
-  const { radioStatus, startRadio, stopRadio } = useStream()
+  const { radioStatus, startRadio, stopRadio,
+          broadcastMode, setBroadcastMode,
+          setIcecastStatus, icecastStartRef, icecastStopRef } = useStream()
 
   // 'hub' = broadcast directly to this server's fan-out hub (no Icecast needed)
   // 'icecast' = legacy path: server transcodes via ffmpeg and pushes to Icecast
-  const [broadcastMode, setBroadcastMode] = useState('icecast')
+  // broadcastMode is shared via StreamContext so NowPlaying's GO LIVE button can trigger it.
 
   const [cfg, setCfg] = useState(() => {
     try {
@@ -586,6 +586,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
       statusRef.current = s
     } else {
       setLocalStatus(s)
+      setIcecastStatus(s) // sync to context so NowPlaying can reflect it
       statusRef.current = s
     }
   }
@@ -600,6 +601,14 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
 
   // Cleanup on unmount
   useEffect(() => () => doCleanup(), []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Register start/stop handlers into context so NowPlaying's GO LIVE button works.
+  // No deps: runs every render so the refs always point to the latest closures.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (icecastStartRef) icecastStartRef.current = () => { if (broadcastMode === 'icecast') goLive() }
+    if (icecastStopRef)  icecastStopRef.current  = () => stopStream()
+  })
 
   // When hub broadcast goes live from NowPlaying button, start spectrum here too
   useEffect(() => {
@@ -1481,8 +1490,8 @@ export default function StreamSetup() {
         ))}
       </div>
 
-      {/* Tab content */}
-      {tab === 'settings' && (
+      {/* Tab content — all tabs stay mounted; CSS hides inactive ones so streams survive tab switches */}
+      <div style={{ display: tab === 'settings' ? undefined : 'none' }}>
         <StreamSettingsTab
           audioKey={audioKey}
           liveStreams={liveStreams}
@@ -1490,9 +1499,13 @@ export default function StreamSetup() {
           host={host}
           sourcePassword={creds?.source_password ?? ''}
         />
-      )}
-      {tab === 'audio' && <AudioEncoderTab audioKey={audioKey} host={host} listenUrl={creds?.listen_url} />}
-      {tab === 'channel' && <ChannelTab host={host} audioKey={audioKey} />}
+      </div>
+      <div style={{ display: tab === 'audio' ? undefined : 'none' }}>
+        <AudioEncoderTab audioKey={audioKey} host={host} listenUrl={creds?.listen_url} />
+      </div>
+      <div style={{ display: tab === 'channel' ? undefined : 'none' }}>
+        <ChannelTab host={host} audioKey={audioKey} />
+      </div>
     </div>
   )
 }
