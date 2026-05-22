@@ -158,7 +158,7 @@ function DashboardCard({ label, colorClass, iconPath, stream, viewers }) {
 
 /* ─── Tab content ─────────────────────────────────────────────── */
 
-function StreamSettingsTab({ audioKey, liveStreams, viewers, host, sourcePassword }) {
+function StreamSettingsTab({ audioKey, liveStreams, viewers, host, sourcePassword, creds }) {
   const audioStream = liveStreams.find(s => s.key === audioKey)
   const anyLive = liveStreams.some(s => s.live)
   const otherStreams = liveStreams.filter(s => s.key !== audioKey)
@@ -199,6 +199,78 @@ function StreamSettingsTab({ audioKey, liveStreams, viewers, host, sourcePasswor
 
       {/* Icecast / source client settings */}
       <IcecastCard host={host} audioKey={audioKey} sourcePassword={sourcePassword} />
+
+      {/* ── Your RTMP Credentials ── */}
+      <div className="bg-gray-900 border border-purple-900/40 rounded-xl overflow-hidden">
+        <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-purple-900/20 to-transparent border-b border-purple-900/30">
+          <span className="w-8 h-8 rounded-lg bg-purple-600/20 border border-purple-500/30 flex items-center justify-center shrink-0">
+            <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+          </span>
+          <div>
+            <h3 className="font-semibold text-white text-sm">Your RTMP Credentials</h3>
+            <p className="text-xs text-gray-400">Use these in OBS Studio or any RTMP broadcaster</p>
+          </div>
+          <span className="ml-auto text-[10px] font-bold text-purple-400 bg-purple-900/30 border border-purple-700/40 rounded px-2 py-0.5">PERSONAL</span>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          {creds ? (
+            <>
+              <Field label="RTMP Server URL" value={creds.rtmp_ingest_base} />
+              <MaskedField label="Stream Key" value={creds.stream_key} />
+              <Field label="Full Publish URL" value={`${creds.rtmp_ingest_base}/${creds.stream_key}`} />
+              {creds.station_slug && <Field label="Station ID" value={creds.station_slug} />}
+            </>
+          ) : (
+            <p className="text-xs text-gray-500 py-2">Sign in to view your credentials</p>
+          )}
+        </div>
+      </div>
+
+      {/* ── Channel Playback URLs ── */}
+      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+        <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-gray-800/60 to-gray-900 border-b border-gray-800">
+          <span className="w-8 h-8 rounded-lg bg-purple-600/20 border border-purple-500/30 flex items-center justify-center flex-shrink-0">
+            <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12 20.25h.008v.008H12v-.008z" />
+            </svg>
+          </span>
+          <div>
+            <h3 className="font-semibold text-white text-sm">Channel Playback URLs</h3>
+            <p className="text-xs text-gray-400">Share these links so listeners and viewers can tune in</p>
+          </div>
+        </div>
+        <div className="px-5 py-4 space-y-4">
+          {creds && (
+            <>
+              <Field label="Audio Stream (HLS)" value={`https://${host}/hls/${creds.stream_key}/index.m3u8`} />
+              {creds.listen_url && <LiveListenerPlayer listenPath={creds.listen_url} />}
+            </>
+          )}
+          <div className="bg-gray-800/40 border border-gray-700/50 rounded-lg px-4 py-3 text-sm text-gray-400">
+            These HLS URLs work in VLC, any browser with HLS support, and can be embedded with an HLS.js player.
+            They go live automatically when you start streaming.
+          </div>
+        </div>
+      </div>
+
+      {/* ── RTMP Ingest ── */}
+      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-800">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">RTMP Ingest (This Server)</p>
+        </div>
+        <div className="px-5 py-4 space-y-4">
+          {creds ? (
+            <>
+              <Field label="RTMP Server URL" value={creds.rtmp_ingest_base} />
+              <MaskedField label="Your Stream Key" value={creds.stream_key} />
+            </>
+          ) : (
+            <p className="text-xs text-gray-500 py-2">Sign in to view your RTMP details</p>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -1201,13 +1273,14 @@ function idbDeleteSlate() {
 }
 
 // ── Video Preview component ────────────────────────────────────────────────
-function VideoPreview({ isLive }) {
+function VideoPreview({ isLive, liveStatus, onGoLive, onStop }) {
   const videoRef = useRef(null)
   const streamRef = useRef(null)
   const fileInputRef = useRef(null)
   const [slateUrl, setSlateUrl] = useState(null)
   const [camError, setCamError] = useState(null)
   const [camReady, setCamReady] = useState(false)
+  const [camEnabled, setCamEnabled] = useState(false)
 
   // Load slate from IDB on mount
   useEffect(() => {
@@ -1216,10 +1289,9 @@ function VideoPreview({ isLive }) {
       .catch(() => {})
   }, [])
 
-  // Manage camera based on whether slate is active
+  // Start/stop camera based on camEnabled + slate
   useEffect(() => {
-    if (slateUrl) {
-      // Slate showing — stop camera
+    if (!camEnabled || slateUrl) {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop())
         streamRef.current = null
@@ -1228,7 +1300,6 @@ function VideoPreview({ isLive }) {
       }
       return
     }
-    // No slate — start camera
     let cancelled = false
     navigator.mediaDevices
       .getUserMedia({ video: { facingMode: 'user' }, audio: false })
@@ -1240,8 +1311,10 @@ function VideoPreview({ isLive }) {
         setCamError(null)
       })
       .catch((err) => {
-        if (!cancelled)
+        if (!cancelled) {
           setCamError(err.name === 'NotAllowedError' ? 'Camera access denied' : 'No camera found')
+          setCamEnabled(false)
+        }
       })
     return () => {
       cancelled = true
@@ -1250,7 +1323,7 @@ function VideoPreview({ isLive }) {
         streamRef.current = null
       }
     }
-  }, [slateUrl])
+  }, [slateUrl, camEnabled])
 
   function handleFileChange(e) {
     const file = e.target.files?.[0]
@@ -1293,10 +1366,7 @@ function VideoPreview({ isLive }) {
             <svg className="w-12 h-12 text-gray-800" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
             </svg>
-            <p className="text-gray-600 text-sm">{camError || 'Waiting for camera…'}</p>
-            {camError && (
-              <p className="text-gray-700 text-xs">Upload a slate image using the button below</p>
-            )}
+            <p className="text-gray-600 text-sm">{camError || 'Camera is off — click Camera On below'}</p>
           </div>
         )}
         {/* LIVE badge */}
@@ -1314,17 +1384,17 @@ function VideoPreview({ isLive }) {
         )}
       </div>
       {/* Controls bar */}
-      <div className="flex items-center gap-3 px-4 py-3 bg-gray-900 border-t border-gray-800">
-        <div className="flex-1 min-w-0">
+      <div className="flex flex-wrap items-center gap-2 px-4 py-3 bg-gray-900 border-t border-gray-800">
+        <div className="flex-1 min-w-[8rem]">
           {slateUrl ? (
-            <p className="text-xs text-gray-400 truncate">Displaying slate image — viewers will see this still</p>
+            <p className="text-xs text-gray-400 truncate">Slate active — viewers see this still</p>
           ) : camReady ? (
             <p className="text-xs text-gray-400 truncate">
               <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block mr-1.5 align-middle" />
-              Camera live — broadcast preview
+              Camera live
             </p>
           ) : (
-            <p className="text-xs text-gray-600 truncate">{camError || 'Requesting camera access…'}</p>
+            <p className="text-xs text-gray-600 truncate">{camError || 'Camera off'}</p>
           )}
         </div>
         {slateUrl && (
@@ -1347,13 +1417,43 @@ function VideoPreview({ isLive }) {
           </svg>
           {slateUrl ? 'Change Image' : 'Add Slate Image'}
         </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleFileChange}
-        />
+        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+        {/* Camera On / Off toggle */}
+        <button
+          onClick={() => setCamEnabled((v) => !v)}
+          disabled={!!slateUrl}
+          title={slateUrl ? 'Remove slate to use camera' : camEnabled ? 'Turn camera off' : 'Turn camera on'}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
+            camEnabled
+              ? 'bg-green-600/20 hover:bg-green-600/30 text-green-400 border-green-600/40'
+              : 'bg-gray-800 hover:bg-gray-700 text-gray-300 border-gray-700'
+          }`}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+          </svg>
+          {camEnabled ? 'Camera On' : 'Camera Off'}
+        </button>
+        {/* Go Live / Stop */}
+        {onGoLive && (
+          <button
+            onClick={liveStatus === 'live' ? onStop : onGoLive}
+            disabled={liveStatus === 'connecting'}
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold border transition-all shrink-0 disabled:cursor-wait ${
+              liveStatus === 'live'
+                ? 'bg-red-600/20 hover:bg-red-600/30 text-red-400 border-red-600/40'
+                : liveStatus === 'connecting'
+                ? 'bg-yellow-900/20 text-yellow-500 border-yellow-700/40'
+                : 'bg-green-600/20 hover:bg-green-600/30 text-green-400 border-green-600/40'
+            }`}
+          >
+            {liveStatus === 'live' ? (
+              <><span className="w-2 h-2 rounded-sm bg-red-400 inline-block" /> Stop</>
+            ) : liveStatus === 'connecting' ? 'Connecting…' : (
+              <><span className="w-2 h-2 rounded-full bg-green-400 animate-pulse inline-block" /> Go Live</>
+            )}
+          </button>
+        )}
       </div>
     </div>
   )
@@ -1361,15 +1461,11 @@ function VideoPreview({ isLive }) {
 
 function ChannelTab({ host, audioKey }) {
   const { token } = useAuth()
-  const { broadcastMode, icecastStatus, radioStatus } = useStream()
+  const { broadcastMode, icecastStatus, radioStatus, icecastStartRef, icecastStopRef, startRadio, stopRadio } = useStream()
 
   // Disable editing while a broadcast is live
   const liveStatus = broadcastMode === 'icecast' ? icecastStatus : radioStatus
   const isLive = liveStatus === 'live'
-
-  // ── Credentials ────────────────────────────────────────────────────────────
-  const [creds, setCreds] = useState(null)
-  const [credsLoading, setCredsLoading] = useState(false)
 
   // ── Channels list ──────────────────────────────────────────────────────────
   const [channels, setChannels] = useState([])
@@ -1398,24 +1494,16 @@ function ChannelTab({ host, audioKey }) {
   // ── Load credentials + saved channels on mount ─────────────────────────────
   useEffect(() => {
     if (!token) return
-    setCredsLoading(true)
     fetch('/api/user/stream-credentials', {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
       .then((data) => {
-        setCreds({
-          stream_key:      data.stream_key,
-          rtmp_ingest_base: data.rtmp_ingest_base,
-          station_slug:    data.station_slug,
-          listen_url:      data.listen_url,
-        })
         if (Array.isArray(data.destinations)) {
           setChannels(data.destinations.map(migrateChannel))
         }
       })
       .catch(() => {})
-      .finally(() => setCredsLoading(false))
   }, [token])
 
   // ── Persist channels to backend ────────────────────────────────────────────
@@ -1483,15 +1571,21 @@ function ChannelTab({ host, audioKey }) {
   }
 
   const selectedPlatform = SOCIAL_PLATFORMS.find((p) => p.id === formPlatform) || SOCIAL_PLATFORMS[0]
-  const myRtmpBase = creds ? creds.rtmp_ingest_base : `rtmp://${host}:1935/live`
-  const myStreamKey = creds ? creds.stream_key : audioKey
-  const hlsAudio = `https://${host}/hls/${myStreamKey}/index.m3u8`
+
+  function handleGoLive() {
+    if (broadcastMode === 'icecast') icecastStartRef.current?.()
+    else startRadio()
+  }
+  function handleStop() {
+    if (broadcastMode === 'icecast') icecastStopRef.current?.()
+    else stopRadio()
+  }
 
   return (
     <div className="space-y-6">
 
       {/* ── Video Preview ── */}
-      <VideoPreview isLive={isLive} />
+      <VideoPreview isLive={isLive} liveStatus={liveStatus} onGoLive={handleGoLive} onStop={handleStop} />
 
       {/* ── Multistream Destinations ── */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
@@ -1901,6 +1995,7 @@ export default function StreamSetup() {
           viewers={viewers}
           host={host}
           sourcePassword={creds?.source_password ?? ''}
+          creds={creds}
         />
       </div>
       <div style={{ display: tab === 'audio' ? undefined : 'none' }}>
