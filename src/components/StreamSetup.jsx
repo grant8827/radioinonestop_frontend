@@ -1158,6 +1158,207 @@ function LiveListenerPlayer({ listenPath }) {
   )
 }
 
+// ── Slate image IndexedDB helpers ────────────────────────────────────────────
+function openSlateDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('radio-slate', 1)
+    req.onupgradeneeded = (e) => {
+      e.target.result.createObjectStore('images', { keyPath: 'key' })
+    }
+    req.onsuccess = (e) => resolve(e.target.result)
+    req.onerror = (e) => reject(e.target.error)
+  })
+}
+function idbSaveSlate(blob) {
+  return openSlateDB().then((db) =>
+    new Promise((resolve, reject) => {
+      const tx = db.transaction('images', 'readwrite')
+      tx.objectStore('images').put({ key: 'slate', blob })
+      tx.oncomplete = () => resolve()
+      tx.onerror = (e) => reject(e.target.error)
+    }),
+  )
+}
+function idbLoadSlate() {
+  return openSlateDB().then((db) =>
+    new Promise((resolve, reject) => {
+      const tx = db.transaction('images', 'readonly')
+      const req = tx.objectStore('images').get('slate')
+      req.onsuccess = (e) => resolve(e.target.result?.blob || null)
+      req.onerror = (e) => reject(e.target.error)
+    }),
+  )
+}
+function idbDeleteSlate() {
+  return openSlateDB().then((db) =>
+    new Promise((resolve, reject) => {
+      const tx = db.transaction('images', 'readwrite')
+      tx.objectStore('images').delete('slate')
+      tx.oncomplete = () => resolve()
+      tx.onerror = (e) => reject(e.target.error)
+    }),
+  )
+}
+
+// ── Video Preview component ────────────────────────────────────────────────
+function VideoPreview({ isLive }) {
+  const videoRef = useRef(null)
+  const streamRef = useRef(null)
+  const fileInputRef = useRef(null)
+  const [slateUrl, setSlateUrl] = useState(null)
+  const [camError, setCamError] = useState(null)
+  const [camReady, setCamReady] = useState(false)
+
+  // Load slate from IDB on mount
+  useEffect(() => {
+    idbLoadSlate()
+      .then((blob) => { if (blob) setSlateUrl(URL.createObjectURL(blob)) })
+      .catch(() => {})
+  }, [])
+
+  // Manage camera based on whether slate is active
+  useEffect(() => {
+    if (slateUrl) {
+      // Slate showing — stop camera
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop())
+        streamRef.current = null
+        if (videoRef.current) videoRef.current.srcObject = null
+        setCamReady(false)
+      }
+      return
+    }
+    // No slate — start camera
+    let cancelled = false
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: 'user' }, audio: false })
+      .then((stream) => {
+        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return }
+        streamRef.current = stream
+        if (videoRef.current) videoRef.current.srcObject = stream
+        setCamReady(true)
+        setCamError(null)
+      })
+      .catch((err) => {
+        if (!cancelled)
+          setCamError(err.name === 'NotAllowedError' ? 'Camera access denied' : 'No camera found')
+      })
+    return () => {
+      cancelled = true
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop())
+        streamRef.current = null
+      }
+    }
+  }, [slateUrl])
+
+  function handleFileChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (slateUrl) URL.revokeObjectURL(slateUrl)
+    setSlateUrl(URL.createObjectURL(file))
+    idbSaveSlate(file).catch(() => {})
+    e.target.value = ''
+  }
+
+  function removeSlate() {
+    if (slateUrl) URL.revokeObjectURL(slateUrl)
+    setSlateUrl(null)
+    idbDeleteSlate().catch(() => {})
+  }
+
+  return (
+    <div className="bg-black border border-gray-800 rounded-xl overflow-hidden">
+      {/* 16:9 preview area */}
+      <div className="relative w-full" style={{ aspectRatio: '16/9', background: '#0a0a0a' }}>
+        {/* Camera feed */}
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          playsInline
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity ${slateUrl ? 'opacity-0' : 'opacity-100'}`}
+        />
+        {/* Slate image */}
+        {slateUrl && (
+          <img
+            src={slateUrl}
+            alt="Broadcast slate"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        )}
+        {/* Placeholder when neither camera nor slate is ready */}
+        {!slateUrl && !camReady && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+            <svg className="w-12 h-12 text-gray-800" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+            <p className="text-gray-600 text-sm">{camError || 'Waiting for camera…'}</p>
+            {camError && (
+              <p className="text-gray-700 text-xs">Upload a slate image using the button below</p>
+            )}
+          </div>
+        )}
+        {/* LIVE badge */}
+        {isLive && (
+          <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-red-600 rounded-md px-2.5 py-1 shadow-lg">
+            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+            <span className="text-[11px] font-bold text-white tracking-wide">LIVE</span>
+          </div>
+        )}
+        {/* Slate badge */}
+        {slateUrl && (
+          <span className="absolute top-3 right-3 text-[10px] font-bold text-gray-300 bg-black/70 border border-gray-700 rounded px-2 py-0.5 backdrop-blur-sm">
+            SLATE IMAGE
+          </span>
+        )}
+      </div>
+      {/* Controls bar */}
+      <div className="flex items-center gap-3 px-4 py-3 bg-gray-900 border-t border-gray-800">
+        <div className="flex-1 min-w-0">
+          {slateUrl ? (
+            <p className="text-xs text-gray-400 truncate">Displaying slate image — viewers will see this still</p>
+          ) : camReady ? (
+            <p className="text-xs text-gray-400 truncate">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block mr-1.5 align-middle" />
+              Camera live — broadcast preview
+            </p>
+          ) : (
+            <p className="text-xs text-gray-600 truncate">{camError || 'Requesting camera access…'}</p>
+          )}
+        </div>
+        {slateUrl && (
+          <button
+            onClick={removeSlate}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-500 hover:text-red-400 border border-gray-700 hover:border-red-700/50 bg-gray-900 hover:bg-red-950/20 transition-all shrink-0"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Remove
+          </button>
+        )}
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-semibold text-gray-300 border border-gray-700 transition-colors shrink-0"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+          </svg>
+          {slateUrl ? 'Change Image' : 'Add Slate Image'}
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+      </div>
+    </div>
+  )
+}
+
 function ChannelTab({ host, audioKey }) {
   const { token } = useAuth()
   const { broadcastMode, icecastStatus, radioStatus } = useStream()
@@ -1289,39 +1490,8 @@ function ChannelTab({ host, audioKey }) {
   return (
     <div className="space-y-6">
 
-      {/* ── Your RTMP Credentials ── */}
-      <div className="bg-gray-900 border border-purple-900/40 rounded-xl overflow-hidden">
-        <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-purple-900/20 to-transparent border-b border-purple-900/30">
-          <span className="w-8 h-8 rounded-lg bg-purple-600/20 border border-purple-500/30 flex items-center justify-center flex-shrink-0">
-            <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-            </svg>
-          </span>
-          <div>
-            <h3 className="font-semibold text-white text-sm">Your RTMP Credentials</h3>
-            <p className="text-xs text-gray-400">Use these in OBS Studio or any RTMP broadcaster</p>
-          </div>
-          <span className="ml-auto text-[10px] font-bold text-purple-400 bg-purple-900/30 border border-purple-700/40 rounded px-2 py-0.5">PERSONAL</span>
-        </div>
-        <div className="px-5 py-4 space-y-3">
-          {credsLoading ? (
-            <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
-              </svg>
-              Loading credentials…
-            </div>
-          ) : (
-            <>
-              <Field label="RTMP Server URL" value={myRtmpBase} />
-              <MaskedField label="Stream Key" value={myStreamKey} />
-              <Field label="Full Publish URL" value={`${myRtmpBase}/${myStreamKey}`} />
-              {creds?.station_slug && <Field label="Station ID" value={creds.station_slug} />}
-            </>
-          )}
-        </div>
-      </div>
+      {/* ── Video Preview ── */}
+      <VideoPreview isLive={isLive} />
 
       {/* ── Multistream Destinations ── */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
@@ -1561,6 +1731,40 @@ function ChannelTab({ host, audioKey }) {
         </div>
       </div>
 
+      {/* ── Your RTMP Credentials ── */}
+      <div className="bg-gray-900 border border-purple-900/40 rounded-xl overflow-hidden">
+        <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-purple-900/20 to-transparent border-b border-purple-900/30">
+          <span className="w-8 h-8 rounded-lg bg-purple-600/20 border border-purple-500/30 flex items-center justify-center shrink-0">
+            <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+          </span>
+          <div>
+            <h3 className="font-semibold text-white text-sm">Your RTMP Credentials</h3>
+            <p className="text-xs text-gray-400">Use these in OBS Studio or any RTMP broadcaster</p>
+          </div>
+          <span className="ml-auto text-[10px] font-bold text-purple-400 bg-purple-900/30 border border-purple-700/40 rounded px-2 py-0.5">PERSONAL</span>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          {credsLoading ? (
+            <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
+              </svg>
+              Loading credentials…
+            </div>
+          ) : (
+            <>
+              <Field label="RTMP Server URL" value={myRtmpBase} />
+              <MaskedField label="Stream Key" value={myStreamKey} />
+              <Field label="Full Publish URL" value={`${myRtmpBase}/${myStreamKey}`} />
+              {creds?.station_slug && <Field label="Station ID" value={creds.station_slug} />}
+            </>
+          )}
+        </div>
+      </div>
+
       {/* ── Playback URLs ── */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
         <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-gray-800/60 to-gray-900 border-b border-gray-800">
@@ -1624,10 +1828,10 @@ const TABS = [
   },
   {
     id: 'channel',
-    label: 'Channel',
+    label: 'Video Stream',
     icon: () => (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12 20.25h.008v.008H12v-.008z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
       </svg>
     ),
   },
