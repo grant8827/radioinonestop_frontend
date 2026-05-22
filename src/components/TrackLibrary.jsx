@@ -1,4 +1,65 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+
+// ── IndexedDB persistence ──────────────────────────────────────────────────────
+const IDB_NAME    = 'radio-track-library'
+const IDB_STORE   = 'tracks'
+const IDB_VERSION = 1
+
+function openTrackDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION)
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE, { keyPath: 'name' })
+      }
+    }
+    req.onsuccess = (e) => resolve(e.target.result)
+    req.onerror   = (e) => reject(e.target.error)
+  })
+}
+
+async function idbSaveTrack(track) {
+  const db = await openTrackDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite')
+    tx.objectStore(IDB_STORE).put({
+      name: track.name, title: track.title,
+      artist: track.artist, duration: track.duration,
+      blob: track.blob,
+    })
+    tx.oncomplete = () => { db.close(); resolve() }
+    tx.onerror    = (e) => { db.close(); reject(e.target.error) }
+  })
+}
+
+async function idbDeleteTrack(name) {
+  const db = await openTrackDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite')
+    tx.objectStore(IDB_STORE).delete(name)
+    tx.oncomplete = () => { db.close(); resolve() }
+    tx.onerror    = (e) => { db.close(); reject(e.target.error) }
+  })
+}
+
+async function idbLoadAllTracks() {
+  const db = await openTrackDB()
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(IDB_STORE, 'readonly')
+    const req = tx.objectStore(IDB_STORE).getAll()
+    req.onsuccess = (e) => {
+      db.close()
+      resolve(
+        e.target.result.map((r) => ({
+          name: r.name, title: r.title, artist: r.artist, duration: r.duration,
+          url: URL.createObjectURL(r.blob),
+        }))
+      )
+    }
+    req.onerror = (e) => { db.close(); reject(e.target.error) }
+  })
+}
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 function parseFilename(filename) {
@@ -41,7 +102,7 @@ async function processFiles(fileList) {
       const url = URL.createObjectURL(file)
       const { artist, title } = parseFilename(file.name)
       const duration = await readDuration(url)
-      return { url, name: file.name, title, artist, duration }
+      return { url, name: file.name, title, artist, duration, blob: file }
     })
   )
 }
@@ -60,11 +121,20 @@ export default function TrackLibrary({
   const fileInputRef = useRef(null)
   const dirInputRef  = useRef(null)
 
+  // ── restore library from IndexedDB on mount ──────────────────────────────────
+  useEffect(() => {
+    idbLoadAllTracks()
+      .then((tracks) => { if (tracks.length > 0) setLibrary(tracks) })
+      .catch(() => {/* IDB unavailable or empty — silently ignore */})
+  }, [])
+
   // ── load handlers ────────────────────────────────────────────────────────────
   const addToLibrary = (newTracks) => {
     setLibrary((prev) => {
       const existing = new Set(prev.map((t) => t.name))
-      return [...prev, ...newTracks.filter((t) => !existing.has(t.name))]
+      const toAdd = newTracks.filter((t) => !existing.has(t.name))
+      toAdd.forEach((t) => { if (t.blob) idbSaveTrack(t).catch(() => {}) })
+      return [...prev, ...toAdd]
     })
   }
 
@@ -91,7 +161,12 @@ export default function TrackLibrary({
   }
 
   const removeFromLibrary = (name) => {
-    setLibrary((prev) => prev.filter((t) => t.name !== name))
+    setLibrary((prev) => {
+      const track = prev.find((t) => t.name === name)
+      if (track?.url?.startsWith('blob:')) URL.revokeObjectURL(track.url)
+      idbDeleteTrack(name).catch(() => {})
+      return prev.filter((t) => t.name !== name)
+    })
   }
 
   // ── queue actions ────────────────────────────────────────────────────────────
