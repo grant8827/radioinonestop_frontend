@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Player from './components/Player'
 import ViewerCount from './components/ViewerCount'
@@ -32,6 +32,10 @@ function MainApp() {
   const [trackB, setTrackB] = useState(null)
   const [queue,          setQueue]          = useState([])
   const [repeatPlaylist, setRepeatPlaylist] = useState(false)
+  const repeatBackupRef = useRef([])
+  useEffect(() => {
+    if (queue.length > 0) repeatBackupRef.current = [...queue]
+  }, [queue])
   useEffect(() => {
     fetch('/api/config')
       .then((r) => r.json())
@@ -104,12 +108,12 @@ function MainApp() {
             mode !== 'radio' && mode !== 'video' ? ' hidden' : ''
           }`}>
             <div className="flex-1 flex flex-col gap-4 min-w-0">
-              <Player mode={playerMode} config={config} trackA={trackA} trackB={trackB} queue={queue} onQueuePop={repeatPlaylist ? () => setQueue((q) => q.length > 0 ? [...q.slice(1), q[0]] : q) : () => setQueue((q) => q.slice(1))} onLoadTrackA={setTrackA} onLoadTrackB={setTrackB} />
+              <Player mode={playerMode} config={config} trackA={trackA} trackB={trackB} queue={queue} onQueuePop={repeatPlaylist ? () => setQueue((q) => q.length > 0 ? [...q.slice(1), q[0]] : [...repeatBackupRef.current]) : () => setQueue((q) => q.slice(1))} onLoadTrackA={setTrackA} onLoadTrackB={setTrackB} />
               <NowPlaying config={config} mode={mode} />
             </div>
             <div className="lg:w-80 xl:w-96 shrink-0 flex flex-col gap-3 min-h-0">
               <SocialLive />
-              <div className="flex-1 min-h-0">
+              <div className="h-80 min-h-0">
                 <TrackLibrary onTrackLoadA={setTrackA} onTrackLoadB={setTrackB} queue={queue} onQueueChange={setQueue} repeatPlaylist={repeatPlaylist} onRepeatChange={setRepeatPlaylist} />
               </div>
             </div>
