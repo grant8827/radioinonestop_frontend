@@ -66,6 +66,13 @@ export function AudioEngineProvider({ children }) {
       master.connect(masterAnalyser)
       masterAnalyser.connect(ac.destination)
       masterAnalyser.connect(streamDest)
+
+      // Auto-resume if the OS suspends the context mid-playback
+      ac.addEventListener('statechange', () => {
+        if (ac.state === 'suspended') {
+          ac.resume().catch(() => {})
+        }
+      })
     }
     return acRef.current
   }, [])
@@ -74,6 +81,32 @@ export function AudioEngineProvider({ children }) {
   const resume = useCallback(async () => {
     if (acRef.current?.state === 'suspended') {
       await acRef.current.resume()
+    }
+  }, [])
+
+  // ── Auto-resume after sleep / tab-hidden / OS audio power events ─────────
+  useEffect(() => {
+    const tryResume = () => {
+      const ac = acRef.current
+      if (ac && ac.state === 'suspended') {
+        ac.resume().catch(() => {})
+      }
+    }
+
+    // When the tab becomes visible again (e.g. wake from sleep, switch back)
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') tryResume()
+    }
+
+    // When the window regains focus
+    const onFocus = () => tryResume()
+
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('focus', onFocus)
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('focus', onFocus)
     }
   }, [])
 
