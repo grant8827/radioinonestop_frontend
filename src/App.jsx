@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Player from './components/Player'
 import ViewerCount from './components/ViewerCount'
@@ -14,7 +14,7 @@ import ProfileSettings from './components/ProfileSettings'
 import LandingPage from './pages/LandingPage'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AudioEngineProvider } from './context/AudioEngine'
-import { StreamProvider } from './context/StreamContext'
+import { StreamProvider, useStream } from './context/StreamContext'
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth()
@@ -23,6 +23,7 @@ function ProtectedRoute({ children }) {
 
 function MainApp() {
   const { user, token } = useAuth()
+  const { reconnectNeeded, doReconnect, dismissReconnect } = useStream()
   const [mode, setMode] = useState('radio')
   const [playerMode, setPlayerMode] = useState('radio')  // sticky: only updates on radio/video
   const [config, setConfig] = useState(null)
@@ -36,6 +37,11 @@ function MainApp() {
   useEffect(() => {
     if (queue.length > 0) repeatBackupRef.current = [...queue]
   }, [queue])
+  const onRepeatReload = useCallback(() => {
+    const backup = [...repeatBackupRef.current]
+    setQueue(backup)
+    return backup
+  }, [])
   useEffect(() => {
     fetch('/api/config')
       .then((r) => r.json())
@@ -73,6 +79,15 @@ function MainApp() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex">
+      {reconnectNeeded && (
+        <div className="fixed top-0 left-0 right-0 z-100 bg-amber-900/95 text-amber-100 text-sm py-2 px-4 flex items-center justify-between gap-2 border-b border-amber-700">
+          <span>Your stream was interrupted. Reconnect to resume broadcasting.</span>
+          <div className="flex gap-2 shrink-0">
+            <button onClick={doReconnect} className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1 rounded text-xs font-bold transition-colors">Reconnect</button>
+            <button onClick={dismissReconnect} className="text-amber-400 hover:text-amber-200 px-1 transition-colors">✕</button>
+          </div>
+        </div>
+      )}
       {/* Sidebar */}
       <Sidebar
         stationName={stationName || user?.stationName || config.stationName}
@@ -108,7 +123,7 @@ function MainApp() {
             mode !== 'radio' && mode !== 'video' ? ' hidden' : ''
           }`}>
             <div className="flex-1 flex flex-col gap-4 min-w-0">
-              <Player mode={playerMode} config={config} trackA={trackA} trackB={trackB} queue={queue} onQueuePop={repeatPlaylist ? () => setQueue((q) => q.length > 0 ? [...q.slice(1), q[0]] : [...repeatBackupRef.current]) : () => setQueue((q) => q.slice(1))} onLoadTrackA={setTrackA} onLoadTrackB={setTrackB} />
+              <Player mode={playerMode} config={config} trackA={trackA} trackB={trackB} queue={queue} onQueuePop={repeatPlaylist ? () => setQueue((q) => q.length > 0 ? [...q.slice(1), q[0]] : [...repeatBackupRef.current]) : () => setQueue((q) => q.slice(1))} onLoadTrackA={setTrackA} onLoadTrackB={setTrackB} repeatPlaylist={repeatPlaylist} onRepeatReload={onRepeatReload} />
               <NowPlaying config={config} mode={mode} />
             </div>
             <div className="lg:w-80 xl:w-96 shrink-0 flex flex-col gap-3 min-h-0">

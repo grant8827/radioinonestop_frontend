@@ -820,7 +820,7 @@ function VideoGoLiveButton({ streamKey }) {
 }
 
 // ── Main Player ────────────────────────────────────────────────────────────────
-export default function Player({ mode, config, trackA, trackB, queue = [], onQueuePop, onLoadTrackA, onLoadTrackB }) {
+export default function Player({ mode, config, trackA, trackB, queue = [], onQueuePop, onLoadTrackA, onLoadTrackB, repeatPlaylist = false, onRepeatReload }) {
   const mediaRef = useRef(null)
   const mediaRefB = useRef(null)
   const hlsRef   = useRef(null)
@@ -891,13 +891,22 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
         }
       } else {
         // Load from queue
-        const q = queueRef.current
-        if (!q.length) {
-          setAutoDJToast('Queue empty \u2014 Auto DJ paused')
-          setAutoDJ(false); autoDJRef.current = false
-          return
+        let effectiveQueue = queueRef.current
+        if (!effectiveQueue.length) {
+          if (!repeatPlaylistRef.current) {
+            setAutoDJToast('Queue empty \u2014 Auto DJ paused')
+            setAutoDJ(false); autoDJRef.current = false
+            return
+          }
+          effectiveQueue = onRepeatReloadRef.current?.() || []
+          if (!effectiveQueue.length) {
+            setAutoDJToast('Queue empty \u2014 Auto DJ paused')
+            setAutoDJ(false); autoDJRef.current = false
+            return
+          }
+          queueRef.current = effectiveQueue
         }
-        const next = q[0]
+        const next = effectiveQueue[0]
         onQueuePopRef.current?.()
         const mb = mediaRefB.current
         if (mb) {
@@ -977,13 +986,22 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
         }
       } else {
         // Load from queue
-        const q = queueRef.current
-        if (!q.length) {
-          setAutoDJToast('Queue empty \u2014 Auto DJ paused')
-          setAutoDJ(false); autoDJRef.current = false
-          return
+        let effectiveQueue = queueRef.current
+        if (!effectiveQueue.length) {
+          if (!repeatPlaylistRef.current) {
+            setAutoDJToast('Queue empty \u2014 Auto DJ paused')
+            setAutoDJ(false); autoDJRef.current = false
+            return
+          }
+          effectiveQueue = onRepeatReloadRef.current?.() || []
+          if (!effectiveQueue.length) {
+            setAutoDJToast('Queue empty \u2014 Auto DJ paused')
+            setAutoDJ(false); autoDJRef.current = false
+            return
+          }
+          queueRef.current = effectiveQueue
         }
-        const next = q[0]
+        const next = effectiveQueue[0]
         onQueuePopRef.current?.()
         const ma = mediaRef.current
         if (ma) {
@@ -1055,7 +1073,9 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
   const onQueuePopRef    = useRef(null)
   const onLoadTrackARef  = useRef(null)
   const onLoadTrackBRef  = useRef(null)
-  const preloadedDeckRef = useRef(null) // 'A' | 'B' | null — standby deck pre-loaded for next transition
+  const preloadedDeckRef    = useRef(null)  // 'A' | 'B' | null — standby deck pre-loaded for next transition
+  const repeatPlaylistRef   = useRef(false)
+  const onRepeatReloadRef   = useRef(null)
 
   const [masterVol,  setMasterVol]  = useState(0.85)
   const [boothVol,   setBoothVol]   = useState(0.7)
@@ -1093,8 +1113,10 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
   useEffect(() => { onQueuePopRef.current   = onQueuePop   }, [onQueuePop])
   useEffect(() => { onLoadTrackARef.current = onLoadTrackA }, [onLoadTrackA])
   useEffect(() => { onLoadTrackBRef.current = onLoadTrackB }, [onLoadTrackB])
-  useEffect(() => { autoDJRef.current       = autoDJ       }, [autoDJ])
-  useEffect(() => { queueRef.current        = queue        }, [queue])
+  useEffect(() => { autoDJRef.current        = autoDJ        }, [autoDJ])
+  useEffect(() => { queueRef.current         = queue         }, [queue])
+  useEffect(() => { repeatPlaylistRef.current = repeatPlaylist }, [repeatPlaylist])
+  useEffect(() => { onRepeatReloadRef.current = onRepeatReload }, [onRepeatReload])
 
   // ── Pitch → playbackRate ───────────────────────────────────────────────────────
   useEffect(() => {

@@ -20,8 +20,20 @@ export function StreamProvider({ children }) {
   const [icecastStatus, setIcecastStatus] = useState('idle')
   const icecastStartRef = useRef(null) // set by IcecastEncoder on mount
   const icecastStopRef  = useRef(null) // set by IcecastEncoder on mount
-
+  // ── Reconnect after refresh ─────────────────────────────────────────────
+  const [reconnectNeeded, setReconnectNeeded] = useState(false)
+  const [reconnectMode,   setReconnectMode]   = useState('icecast')
+  const liveStateRef = useRef({ radio: false, icecast: false, mode: 'icecast' })
   function setRadioStatusBoth(s) { setRadioStatus(s); radioStatusRef.current = s }
+
+  // Keep liveStateRef in sync so the beforeunload handler always reads current values
+  useEffect(() => {
+    liveStateRef.current = {
+      radio:   radioStatus === 'live',
+      icecast: icecastStatus === 'live',
+      mode:    broadcastMode,
+    }
+  }, [radioStatus, icecastStatus, broadcastMode])
 
   function radioCleanup() {
     if (radioKeepaliveRef.current) { clearInterval(radioKeepaliveRef.current); radioKeepaliveRef.current = null }
@@ -201,6 +213,46 @@ export function StreamProvider({ children }) {
   // Cleanup on unmount
   useEffect(() => () => { radioCleanup(); videoCleanup() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Warn before page close/refresh when a stream is live, and save state for auto-reconnect
+  useEffect(() => {
+    const handler = (e) => {
+      const { radio, icecast, mode } = liveStateRef.current
+      if (radio || icecast) {
+        localStorage.setItem('stream_reconnect', JSON.stringify({ radio, icecast, mode }))
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [])
+
+  // On mount (once token is available): check if we need to offer a reconnect
+  useEffect(() => {
+    if (!token) return
+    const saved = localStorage.getItem('stream_reconnect')
+    if (!saved) return
+    localStorage.removeItem('stream_reconnect')
+    try {
+      const { radio, icecast, mode } = JSON.parse(saved)
+      if (radio || icecast) {
+        setReconnectMode(radio ? 'radio' : mode)
+        setReconnectNeeded(true)
+      }
+    } catch {}
+  }, [token])
+
+  const doReconnect = useCallback(async () => {
+    setReconnectNeeded(false)
+    if (reconnectMode === 'radio') {
+      await startRadio()
+    } else {
+      icecastStartRef.current?.()
+    }
+  }, [reconnectMode, startRadio])
+
+  const dismissReconnect = useCallback(() => setReconnectNeeded(false), [])
+
   return (
     <StreamCtx.Provider value={{
       radioStatus, startRadio, stopRadio,
@@ -208,6 +260,7 @@ export function StreamProvider({ children }) {
       broadcastMode, setBroadcastMode,
       icecastStatus, setIcecastStatus,
       icecastStartRef, icecastStopRef,
+      reconnectNeeded, doReconnect, dismissReconnect,
     }}>
       {children}
     </StreamCtx.Provider>
