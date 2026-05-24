@@ -211,14 +211,13 @@ export default function StationModal({ station, onClose }) {
     const audio = audioRef.current
     if (!audio) return
 
-    // Build AudioContext + analyser for visualizer
-    // NOTE: iOS requires AudioContext to be created from a user-gesture callback,
-    // which this is (button onClick chain). However, createMediaElementSource is
-    // not supported on iOS Safari with hls.js/native HLS, so we skip the analyser
-    // on iOS and only create it when MSE is available.
-    if (!acRef.current && Hls.isSupported()) {
+    // Build AudioContext + analyser for visualizer.
+    // Attempted on ALL platforms (including iOS Safari 15+, which does support
+    // createMediaElementSource for audio elements). Wrapped in try/catch so older
+    // iOS devices fall back gracefully to the idle sine-wave animation.
+    if (!acRef.current) {
       try {
-        const ac           = new AudioContext()
+        const ac           = new (window.AudioContext || window.webkitAudioContext)()
         const analyserNode = ac.createAnalyser()
         analyserNode.fftSize = 128
         analyserNode.smoothingTimeConstant = 0.82
@@ -228,10 +227,42 @@ export default function StationModal({ station, onClose }) {
         analyserNode.connect(ac.destination)
         setAnalyser(analyserNode)
       } catch (e) {
-        // AudioContext unavailable — visualizer will use idle animation
+        // createMediaElementSource unsupported on this platform — idle animation only
       }
     }
     if (acRef.current?.state === 'suspended') acRef.current.resume()
+
+    // Media Session API — registers with the OS "Now Playing" widget so audio
+    // keeps playing on the lock screen / when the device sleeps (iOS + Android).
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title:   info.name  || 'Live Radio',
+          artist:  info.genre || 'Radio In One Stop',
+          album:   'Radio In One Stop',
+          artwork: info.logo_url
+            ? [{ src: info.logo_url, sizes: '512x512', type: 'image/jpeg' }]
+            : [],
+        })
+        navigator.mediaSession.setActionHandler('play',  () => {
+          audioRef.current?.play().catch(() => {})
+          if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'
+        })
+        navigator.mediaSession.setActionHandler('pause', () => {
+          hlsRef.current?.destroy(); hlsRef.current = null
+          if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = '' }
+          setPlaying(false)
+          if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused'
+        })
+        navigator.mediaSession.setActionHandler('stop',  () => {
+          hlsRef.current?.destroy(); hlsRef.current = null
+          if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = '' }
+          setPlaying(false)
+          if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none'
+        })
+        navigator.mediaSession.playbackState = 'playing'
+      } catch (e) { /* MediaSession unavailable */ }
+    }
 
     if (Hls.isSupported()) {
       // Desktop Chrome / Firefox / Android — use hls.js
@@ -274,6 +305,9 @@ export default function StationModal({ station, onClose }) {
       audioRef.current.src = ''
     }
     setPlaying(false)
+    if ('mediaSession' in navigator) {
+      try { navigator.mediaSession.playbackState = 'paused' } catch (e) {}
+    }
   }, [])
 
   const close = useCallback(() => {
@@ -476,8 +510,9 @@ export default function StationModal({ station, onClose }) {
         </div>
       </div>
 
-      {/* Hidden audio element */}
-      <audio ref={audioRef} crossOrigin="anonymous" preload="none" />
+      {/* Hidden audio element — playsInline keeps iOS from hijacking to fullscreen,
+          x-webkit-airplay enables AirPlay on iOS Safari */}
+      <audio ref={audioRef} crossOrigin="anonymous" preload="none" playsInline x-webkit-airplay="allow" />
     </>
   )
 }
