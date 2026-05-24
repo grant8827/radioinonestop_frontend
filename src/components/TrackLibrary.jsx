@@ -190,6 +190,9 @@ export default function TrackLibrary({
     onQueueChange?.(next)
   }
 
+  const dragIndexRef              = useRef(null)
+  const [dragOverIdx, setDragOverIdx] = useState(null)
+
   // ── shared button style helper ───────────────────────────────────────────────
   const deckBtn = (color, border) => ({
     background: `${color}15`, color, border: `1px solid ${border}`,
@@ -393,7 +396,22 @@ export default function TrackLibrary({
                 {queue.map((track, idx) => (
                   <li
                     key={`${track.name}-${idx}`}
-                    className="grid items-center px-3 py-2 hover:bg-gray-800/50 group transition-colors"
+                    draggable
+                    onDragStart={() => { dragIndexRef.current = idx }}
+                    onDragOver={(e) => { e.preventDefault(); setDragOverIdx(idx) }}
+                    onDragLeave={() => setDragOverIdx(null)}
+                    onDrop={() => {
+                      setDragOverIdx(null)
+                      const from = dragIndexRef.current
+                      if (from === null || from === idx) return
+                      const next = [...queue]
+                      const [moved] = next.splice(from, 1)
+                      next.splice(idx, 0, moved)
+                      onQueueChange?.(next)
+                      dragIndexRef.current = null
+                    }}
+                    onDragEnd={() => { setDragOverIdx(null); dragIndexRef.current = null }}
+                    className={`grid items-center px-3 py-2 hover:bg-gray-800/50 group transition-colors cursor-grab active:cursor-grabbing${dragOverIdx === idx ? ' border-t-2 border-purple-500' : ''}`}
                     style={{ gridTemplateColumns: '22px 1fr 44px 84px' }}
                   >
                     <span className="text-[10px] font-mono text-purple-500 font-bold">{idx + 1}</span>

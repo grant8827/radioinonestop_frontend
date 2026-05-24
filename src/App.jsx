@@ -113,7 +113,7 @@ function MainApp() {
             </div>
             <div className="lg:w-80 xl:w-96 shrink-0 flex flex-col gap-3 min-h-0">
               <SocialLive />
-              <div className="h-80 min-h-0">
+              <div className="flex-1 min-h-0">
                 <TrackLibrary onTrackLoadA={setTrackA} onTrackLoadB={setTrackB} queue={queue} onQueueChange={setQueue} repeatPlaylist={repeatPlaylist} onRepeatChange={setRepeatPlaylist} />
               </div>
             </div>
