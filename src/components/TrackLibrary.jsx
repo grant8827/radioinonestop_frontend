@@ -115,6 +115,8 @@ export default function TrackLibrary({
   onQueueChange,
   repeatPlaylist = false,
   onRepeatChange,
+  nowPlayingA = null,
+  nowPlayingB = null,
 }) {
   const [tab, setTab] = useState('library')
   const [library, setLibrary] = useState([])
@@ -411,7 +413,11 @@ export default function TrackLibrary({
                       dragIndexRef.current = null
                     }}
                     onDragEnd={() => { setDragOverIdx(null); dragIndexRef.current = null }}
-                    className={`grid items-center px-3 py-2 hover:bg-gray-800/50 group transition-colors cursor-grab active:cursor-grabbing${dragOverIdx === idx ? ' border-t-2 border-purple-500' : ''}`}
+                    className={`grid items-center px-3 py-2 group transition-colors cursor-grab active:cursor-grabbing${
+                        (track.name === nowPlayingA?.name || track.name === nowPlayingB?.name)
+                          ? ' bg-purple-900/40 border-l-2 border-purple-400'
+                          : ' hover:bg-gray-800/50'
+                      }${dragOverIdx === idx ? ' border-t-2 border-purple-500' : ''}`}
                     style={{ gridTemplateColumns: '22px 1fr 44px 84px' }}
                   >
                     <span className="text-[10px] font-mono text-purple-500 font-bold">{idx + 1}</span>
