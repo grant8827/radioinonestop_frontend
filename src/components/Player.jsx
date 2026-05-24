@@ -1174,8 +1174,14 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
     // Tear down HLS
     clearTimeout(retryTimer.current)
     if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
-    // Revoke previous object URL to free memory (skip if same URL — repeat mode reuses the same blob)
-    if (prevLocalUrlRef.current && prevLocalUrlRef.current !== trackA.url) URL.revokeObjectURL(prevLocalUrlRef.current)
+    // Revoke previous object URL to free memory — but only if the URL is no longer
+    // referenced anywhere (queue still holds it in repeat mode, or it may be on Deck B)
+    const oldUrl = prevLocalUrlRef.current
+    if (oldUrl && oldUrl !== trackA.url) {
+      const stillNeeded = oldUrl === trackB?.url ||
+        queueRef.current.some((t) => t.url === oldUrl)
+      if (!stillNeeded) URL.revokeObjectURL(oldUrl)
+    }
     prevLocalUrlRef.current = trackA.url
     media.pause()
     media.src = trackA.url
@@ -1190,7 +1196,12 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
     if (!trackB) return
     const media = mediaRefB.current
     if (!media) return
-    if (prevLocalUrlRefB.current && prevLocalUrlRefB.current !== trackB.url) URL.revokeObjectURL(prevLocalUrlRefB.current)
+    const oldUrl = prevLocalUrlRefB.current
+    if (oldUrl && oldUrl !== trackB.url) {
+      const stillNeeded = oldUrl === trackA?.url ||
+        queueRef.current.some((t) => t.url === oldUrl)
+      if (!stillNeeded) URL.revokeObjectURL(oldUrl)
+    }
     prevLocalUrlRefB.current = trackB.url
     media.pause()
     media.src = trackB.url
