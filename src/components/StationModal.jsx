@@ -514,13 +514,14 @@ export default function StationModal({ station, onClose }) {
               </span>
             </div>
 
-            {/* Stream URL hint */}
+            {/* Stream URL hint — hidden for now
             <div style={{ marginTop: 14, padding: '8px 12px', background: 'rgba(255,255,255,0.03)',
               borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
               <span style={{ fontSize: 9, color: '#374151', fontFamily: 'monospace' }}>
                 Stream: {window.location.origin}/listen/{info.slug}
               </span>
             </div>
+            */}
           </div>
         </div>
       </div>
