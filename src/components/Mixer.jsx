@@ -738,22 +738,8 @@ function MasterSection({ master, onUpdate, vuL = 0, vuR = 0 }) {
       {/* Monitor knobs */}
       <SectionLabel>Monitor</SectionLabel>
       <Knob value={master.monitor} onChange={(v) => onUpdate('monitor', v)} size={36} color="#d1d5db" label="Mon"   />
-      <Knob value={master.booth}   onChange={(v) => onUpdate('booth', v)}   size={30} color="#818cf8" label="HDPH" />
-      <Knob value={master.phones}  onChange={(v) => onUpdate('phones', v)}  size={30} color="#f97316" label="CUE"  />
-
-      <Divider />
-
-      {/* Master EQ */}
-      <SectionLabel color="#fbbf24">Master EQ</SectionLabel>
-      <div style={{
-        display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center',
-        background: '#0a0c10', borderRadius: 10, padding: '8px 10px', width: '100%',
-        border: '1px solid #1a2030',
-      }}>
-        <Knob value={master.masterHi}  onChange={(v) => onUpdate('masterHi',  v)} size={28} color="#fbbf24" label="Hi"  />
-        <Knob value={master.masterMid} onChange={(v) => onUpdate('masterMid', v)} size={28} color="#c084fc" label="Mid" />
-        <Knob value={master.masterLo}  onChange={(v) => onUpdate('masterLo',  v)} size={28} color="#34d399" label="Lo"  />
-      </div>
+      <Knob value={master.booth}   onChange={(v) => onUpdate('booth', v)}   size={30} color="#94a3b8" label="Booth" />
+      <Knob value={master.phones}  onChange={(v) => onUpdate('phones', v)}  size={30} color="#a78bfa" label="Phones"/>
 
       <Divider />
 
@@ -856,8 +842,7 @@ function loadSavedChannels() {
 }
 
 function loadSavedMaster() {
-  const defaults = { fader: 0.8, monitor: 0.75, booth: 0.6, phones: 0.7, aux1: 0.0, aux2: 0.0, fx: [], rec: false, onAir: false,
-    masterHi: 0.5, masterMid: 0.5, masterLo: 0.5 }
+  const defaults = { fader: 0.8, monitor: 0.75, booth: 0.6, phones: 0.7, aux1: 0.0, aux2: 0.0, fx: [], rec: false, onAir: false }
   try {
     const saved = JSON.parse(localStorage.getItem('mixer_master') || 'null')
     if (!saved) return defaults
@@ -1046,13 +1031,7 @@ export default function Mixer({ config, onOpenConference }) {
       try { localStorage.setItem('mixer_master', JSON.stringify(next)) } catch { /* ignore */ }
       return next
     })
-    if (key === 'fader'     && audioEngine) audioEngine.updateMasterFader(value)
-    if (key === 'booth'     && audioEngine) audioEngine.updatePhonesVol?.(value)
-    if (key === 'phones'    && audioEngine) audioEngine.updateCueVol?.(value)
-    if ((key === 'masterHi' || key === 'masterMid' || key === 'masterLo') && audioEngine) {
-      const band = key === 'masterHi' ? 'hi' : key === 'masterMid' ? 'mid' : 'lo'
-      audioEngine.updateMasterEq?.(band, value)
-    }
+    if (key === 'fader' && audioEngine) audioEngine.updateMasterFader(value)
   }, [audioEngine])
 
   const micChs  = channels.filter(ch => ch.isMic)

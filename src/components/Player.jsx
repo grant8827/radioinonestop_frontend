@@ -788,8 +788,9 @@ function CenterMixer({
   eqB, onEqBChange, gainB, onGainBChange, faderB, onFaderBChange, pflB, onPflBToggle,
   crossfader, onCrossfaderChange,
   masterVol, onMasterVolChange,
-  boothVol, onBoothVolChange,
-  cueVol, onCueVolChange,
+  masterEqHi, onMasterEqHiChange,
+  masterEqMid, onMasterEqMidChange,
+  masterEqLo, onMasterEqLoChange,
   playing, playingB = false,
   levelA = 0, levelB = 0, levelMasterL = 0, levelMasterR = 0,
   autoDJ = false, onAutoDJToggle, autoDJToast = '',
@@ -884,10 +885,11 @@ function CenterMixer({
         </div>
       </div>
 
-      <div className="flex gap-2 justify-center mt-1">
-        <Knob value={masterVol} onChange={onMasterVolChange} size={30} color="#d1d5db" label="MASTER" />
-        <Knob value={boothVol}  onChange={onBoothVolChange}  size={30} color="#818cf8" label="HDPH" />
-        <Knob value={cueVol}    onChange={onCueVolChange}    size={28} color="#f97316" label="CUE" />
+      <div className="flex gap-2 justify-center mt-1 flex-wrap">
+        <Knob value={masterVol}   onChange={onMasterVolChange}    size={30} color="#d1d5db" label="MASTER" />
+        <Knob value={masterEqHi}  onChange={onMasterEqHiChange}   size={26} color="#fbbf24" label="HI" />
+        <Knob value={masterEqMid} onChange={onMasterEqMidChange}  size={26} color="#c084fc" label="MID" />
+        <Knob value={masterEqLo}  onChange={onMasterEqLoChange}   size={26} color="#34d399" label="LO" />
       </div>
 
       {/* Auto DJ toggle */}
@@ -1212,6 +1214,9 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
   const [masterVol,  setMasterVol]  = useState(0.85)
   const [boothVol,   setBoothVol]   = useState(0.7)
   const [cueVol,     setCueVol]     = useState(0.8)
+  const [masterEqHi,  setMasterEqHi]  = useState(0.5)
+  const [masterEqMid, setMasterEqMid] = useState(0.5)
+  const [masterEqLo,  setMasterEqLo]  = useState(0.5)
 
   // ── Sync master/phones/cue volume knobs to AudioEngine ────────────────────
   useEffect(() => {
@@ -1225,6 +1230,18 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
   useEffect(() => {
     audioEngine?.updateCueVol?.(cueVol)
   }, [cueVol, audioEngine])
+
+  useEffect(() => {
+    audioEngine?.updateMasterEq?.('hi',  masterEqHi)
+  }, [masterEqHi, audioEngine])
+
+  useEffect(() => {
+    audioEngine?.updateMasterEq?.('mid', masterEqMid)
+  }, [masterEqMid, audioEngine])
+
+  useEffect(() => {
+    audioEngine?.updateMasterEq?.('lo',  masterEqLo)
+  }, [masterEqLo, audioEngine])
 
   // ── Sync deck faders + crossfader to media element volume ───────────────────
   useEffect(() => {
@@ -1820,8 +1837,9 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
               pflB={pflB} onPflBToggle={() => setPflB((v) => !v)}
               crossfader={crossfader} onCrossfaderChange={handleCrossfaderChange}
               masterVol={masterVol} onMasterVolChange={setMasterVol}
-              boothVol={boothVol}  onBoothVolChange={setBoothVol}
-              cueVol={cueVol}      onCueVolChange={setCueVol}
+              masterEqHi={masterEqHi}   onMasterEqHiChange={setMasterEqHi}
+              masterEqMid={masterEqMid} onMasterEqMidChange={setMasterEqMid}
+              masterEqLo={masterEqLo}   onMasterEqLoChange={setMasterEqLo}
               playing={playing}
               playingB={playingB}
               levelA={deckLevels.a}
