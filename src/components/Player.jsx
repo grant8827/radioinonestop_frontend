@@ -629,6 +629,7 @@ function DeckUnit({
   loopActive, loopSizeIdx, onLoopToggle, onLoopResize,
   synced, onSyncToggle,
   keyLock, onKeyLockToggle,
+  pads, onPadLoad, onPadToggle, onPadClear,
 }) {
   const bpm = side === 'A' ? 128.0 : 125.0
   const adjBpm = (bpm * (1 + pitch * 0.08)).toFixed(1)
@@ -788,6 +789,13 @@ function DeckUnit({
           </svg>
         </button>
       </div>
+
+      {pads && (
+        <div className="mt-2">
+          <p className="text-[7px] font-bold text-gray-700 uppercase tracking-widest mb-1">Instant Play</p>
+          <SamplePads slots={pads} color={color} onLoad={onPadLoad} onToggle={onPadToggle} onClear={onPadClear} />
+        </div>
+      )}
     </div>
   )
 }
@@ -1217,6 +1225,13 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
   const queueRef         = useRef([])
   const audioEngineRef   = useRef(null)
   const onQueuePopRef    = useRef(null)
+
+  // ── Sample pads (12 slots) ──────────────────────────────────────────────────
+  const [padTracks,   setPadTracks]   = useState(Array(12).fill(null))
+  const [padPlaying,  setPadPlaying]  = useState(Array(12).fill(false))
+  const [padProgress, setPadProgress] = useState(Array(12).fill(0))
+  const padAudioRefs = useRef(Array.from({ length: 12 }, () => null))
+  const padSrcRefs   = useRef(Array.from({ length: 12 }, () => null))
   const onLoadTrackARef  = useRef(null)
   const onLoadTrackBRef  = useRef(null)
   const preloadedDeckRef    = useRef(null)  // 'A' | 'B' | null — standby deck pre-loaded for next transition
@@ -1293,6 +1308,63 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
   useEffect(() => { queueRef.current         = queue         }, [queue])
   useEffect(() => { repeatPlaylistRef.current = repeatPlaylist }, [repeatPlaylist])
   useEffect(() => { onRepeatReloadRef.current = onRepeatReload }, [onRepeatReload])
+
+  // ── Sample pad handlers ────────────────────────────────────────────────────────
+  const loadPad = useCallback((idx, file) => {
+    const prev = padAudioRefs.current[idx]
+    if (prev) { prev.pause(); prev.src = '' }
+    if (padSrcRefs.current[idx]) {
+      try { padSrcRefs.current[idx].disconnect() } catch { /**/ }
+      padSrcRefs.current[idx] = null
+    }
+    const url = URL.createObjectURL(file)
+    const audio = new Audio(url)
+    audio.addEventListener('timeupdate', () => {
+      if (!audio.duration) return
+      setPadProgress((p) => { const n = [...p]; n[idx] = audio.currentTime / audio.duration; return n })
+    })
+    audio.addEventListener('ended', () => {
+      setPadPlaying((p) => { const n = [...p]; n[idx] = false; return n })
+      setPadProgress((p) => { const n = [...p]; n[idx] = 0; return n })
+    })
+    padAudioRefs.current[idx] = audio
+    setPadTracks((t) => { const n = [...t]; n[idx] = { name: file.name.replace(/\.[^.]+$/, ''), url }; return n })
+    setPadPlaying((p) => { const n = [...p]; n[idx] = false; return n })
+    setPadProgress((p) => { const n = [...p]; n[idx] = 0; return n })
+  }, [])
+
+  const togglePad = useCallback((idx) => {
+    const audio = padAudioRefs.current[idx]
+    if (!audio) return
+    audioEngineRef.current?.resume?.()
+    if (!audio.paused) {
+      audio.pause()
+      audio.currentTime = 0
+      setPadPlaying((p) => { const n = [...p]; n[idx] = false; return n })
+      setPadProgress((p) => { const n = [...p]; n[idx] = 0; return n })
+    } else {
+      if (!padSrcRefs.current[idx]) {
+        const src = audioEngineRef.current?.connectPadAudio?.(audio)
+        if (src) padSrcRefs.current[idx] = src
+      }
+      audio.currentTime = 0
+      audio.play().catch(() => { /**/ })
+      setPadPlaying((p) => { const n = [...p]; n[idx] = true; return n })
+    }
+  }, [])
+
+  const clearPad = useCallback((idx) => {
+    const audio = padAudioRefs.current[idx]
+    if (audio) { audio.pause(); audio.src = '' }
+    if (padSrcRefs.current[idx]) {
+      try { padSrcRefs.current[idx].disconnect() } catch { /**/ }
+      padSrcRefs.current[idx] = null
+    }
+    padAudioRefs.current[idx] = null
+    setPadTracks((t) => { const n = [...t]; n[idx] = null; return n })
+    setPadPlaying((p) => { const n = [...p]; n[idx] = false; return n })
+    setPadProgress((p) => { const n = [...p]; n[idx] = 0; return n })
+  }, [])
 
   // ── Pitch → playbackRate ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -1877,6 +1949,10 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
                 if (playing) m.play().catch(() => {})
                 else m.pause()
               }}
+              pads={[0,1,2,6,7,8].map((gi, li) => ({ globalIdx: gi, number: [1,2,3,7,8,9][li], track: padTracks[gi], playing: padPlaying[gi], progress: padProgress[gi] }))}
+              onPadLoad={loadPad}
+              onPadToggle={togglePad}
+              onPadClear={clearPad}
             />
 
             <CenterMixer
@@ -1986,6 +2062,10 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
                 if (playingB) m.play().catch(() => {})
                 else m.pause()
               }}
+              pads={[3,4,5,9,10,11].map((gi, li) => ({ globalIdx: gi, number: [4,5,6,10,11,12][li], track: padTracks[gi], playing: padPlaying[gi], progress: padProgress[gi] }))}
+              onPadLoad={loadPad}
+              onPadToggle={togglePad}
+              onPadClear={clearPad}
             />
           </div>
         </div>

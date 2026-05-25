@@ -266,6 +266,17 @@ export function AudioEngineProvider({ children }) {
     masterRef.current.gain.setTargetAtTime(value, acRef.current.currentTime, 0.02)
   }, [])
 
+  // ── Pad bus — connect a sample pad directly to the master gain ───────────
+  const connectPadAudio = useCallback((element) => {
+    const ac = acRef.current
+    if (!ac || !masterRef.current) return null
+    try {
+      const src = ac.createMediaElementSource(element)
+      src.connect(masterRef.current)
+      return src
+    } catch { return null }
+  }, [])
+
   // ── Master bus 3-band EQ ─────────────────────────────────────────────────
   const updateMasterEq = useCallback((band, value) => {
     const eq = masterEqRef.current
@@ -621,6 +632,7 @@ export function AudioEngineProvider({ children }) {
       updateChannelParam,
       setChannelActive,
       updateMasterFader,
+      connectPadAudio,
       updateMasterEq,
       updatePhonesVol,
       updateCueVol,
