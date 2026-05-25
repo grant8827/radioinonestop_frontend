@@ -287,7 +287,7 @@ function VuStrip({ active = true, level = 0, segments = 14 }) {
 }
 
 // ── Waveform display ───────────────────────────────────────────────────────────
-function WaveformDisplay({ playing, color, waveData, progress = 0, onSeek, cuePoint = null }) {
+function WaveformDisplay({ playing, color, waveData, progress = 0, onSeek, cuePoint = null, hotCues = [] }) {
   const barRef  = useRef(null)
   const dragging = useRef(false)
 
@@ -355,6 +355,16 @@ function WaveformDisplay({ playing, color, waveData, progress = 0, onSeek, cuePo
             boxShadow: '0 0 5px #f97316cc',
           }}
         />
+      )}
+      {hotCues.map((pos, i) =>
+        pos !== null ? (
+          <div key={i} className="absolute top-0 bottom-0 pointer-events-none" style={{ left: `${Math.min(100, Math.max(0, pos * 100))}%` }}>
+            <div style={{ width: '2px', height: '100%', backgroundColor: HC_COLORS[i], boxShadow: `0 0 4px ${HC_COLORS[i]}cc` }} />
+            <span style={{ position: 'absolute', top: 1, left: 3, fontSize: 7, fontWeight: 900, color: HC_COLORS[i], lineHeight: 1, userSelect: 'none' }}>
+              {['A','B','C','D'][i]}
+            </span>
+          </div>
+        ) : null
       )}
       <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-black/40 pointer-events-none" />
     </div>
@@ -548,20 +558,20 @@ function PitchFader({ value, onChange, height = 80 }) {
 // ── Hot cue buttons ────────────────────────────────────────────────────────────
 const HC_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899']
 
-function HotCues({ cues, onSet, onClear }) {
+function HotCues({ cues, onSet, onClear, onJump }) {
   return (
     <div className="grid grid-cols-4 gap-1">
       {['A', 'B', 'C', 'D'].map((lbl, i) => (
         <button
           key={i}
-          onClick={() => (cues[i] ? onClear(i) : onSet(i))}
+          onClick={() => (cues[i] !== null ? onJump(i) : onSet(i))}
           onContextMenu={(e) => { e.preventDefault(); onClear(i) }}
           className="h-7 rounded text-[8px] font-black tracking-wider transition-all active:scale-95"
           style={{
-            backgroundColor: cues[i] ? HC_COLORS[i] : '#1a1d24',
-            color: cues[i] ? '#000' : '#4b5563',
-            border: `1px solid ${cues[i] ? HC_COLORS[i] : '#2d3340'}`,
-            boxShadow: cues[i] ? `0 0 6px ${HC_COLORS[i]}55` : 'none',
+            backgroundColor: cues[i] !== null ? HC_COLORS[i] : '#1a1d24',
+            color: cues[i] !== null ? '#000' : '#4b5563',
+            border: `1px solid ${cues[i] !== null ? HC_COLORS[i] : '#2d3340'}`,
+            boxShadow: cues[i] !== null ? `0 0 6px ${HC_COLORS[i]}55` : 'none',
           }}
         >
           {lbl}
@@ -615,7 +625,7 @@ function DeckUnit({
   cuePoint, onCueDown, onCueUp, onRestart,
   onScratch, onScratchEnd,
   pitch, onPitchChange,
-  hotCues, onHotCueSet, onHotCueClear,
+  hotCues, onHotCueSet, onHotCueClear, onHotCueJump,
   loopActive, loopSizeIdx, onLoopToggle, onLoopResize,
   synced, onSyncToggle,
   keyLock, onKeyLockToggle,
@@ -670,7 +680,7 @@ function DeckUnit({
         </div>
       </div>
 
-      <WaveformDisplay playing={playing && active} color={color} waveData={waveData} progress={progress} onSeek={active ? onSeek : undefined} cuePoint={active ? cuePoint : null} />
+      <WaveformDisplay playing={playing && active} color={color} waveData={waveData} progress={progress} onSeek={active ? onSeek : undefined} cuePoint={active ? cuePoint : null} hotCues={active ? hotCues : []} />
 
       <div className="flex justify-center py-1">
         <JogWheel
@@ -683,7 +693,7 @@ function DeckUnit({
 
       <div>
         <p className="text-[7px] font-bold text-gray-700 uppercase tracking-widest mb-1">Hot Cues</p>
-        <HotCues cues={hotCues} onSet={onHotCueSet} onClear={onHotCueClear} />
+        <HotCues cues={hotCues} onSet={onHotCueSet} onClear={onHotCueClear} onJump={onHotCueJump} />
       </div>
 
       <div className="flex items-start gap-3">
@@ -973,8 +983,8 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
 
   const [pitchA, setPitchA] = useState(0)
   const [pitchB, setPitchB] = useState(0)
-  const [hotCuesA, setHotCuesA] = useState([false, false, false, false])
-  const [hotCuesB, setHotCuesB] = useState([false, false, false, false])
+  const [hotCuesA, setHotCuesA] = useState([null, null, null, null])
+  const [hotCuesB, setHotCuesB] = useState([null, null, null, null])
   const [loopActA, setLoopActA] = useState(false)
   const [loopActB, setLoopActB] = useState(false)
   const [loopIdxA, setLoopIdxA] = useState(3)
@@ -1759,8 +1769,15 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
               }}
               pitch={pitchA} onPitchChange={setPitchA}
               hotCues={hotCuesA}
-              onHotCueSet={(i) => setHotCuesA((c) => c.map((v, j) => (j === i ? true : v)))}
-              onHotCueClear={(i) => setHotCuesA((c) => c.map((v, j) => (j === i ? false : v)))}
+              onHotCueSet={(i) => setHotCuesA((c) => c.map((v, j) => (j === i ? progressA : v)))}
+              onHotCueClear={(i) => setHotCuesA((c) => c.map((v, j) => (j === i ? null : v)))}
+              onHotCueJump={(i) => {
+                const m = mediaRef.current
+                const pos = hotCuesA[i]
+                if (!m || pos === null || !isFinite(m.duration) || m.duration === 0) return
+                m.currentTime = m.duration * pos
+                setProgressA(pos)
+              }}
               loopActive={loopActA} loopSizeIdx={loopIdxA}
               onLoopToggle={() => setLoopActA((v) => !v)}
               onLoopResize={(d) => setLoopIdxA((v) => Math.max(0, Math.min(LOOP_SIZES.length - 1, v + d)))}
@@ -1862,8 +1879,15 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
               }}
               pitch={pitchB} onPitchChange={setPitchB}
               hotCues={hotCuesB}
-              onHotCueSet={(i) => setHotCuesB((c) => c.map((v, j) => (j === i ? true : v)))}
-              onHotCueClear={(i) => setHotCuesB((c) => c.map((v, j) => (j === i ? false : v)))}
+              onHotCueSet={(i) => setHotCuesB((c) => c.map((v, j) => (j === i ? progressB : v)))}
+              onHotCueClear={(i) => setHotCuesB((c) => c.map((v, j) => (j === i ? null : v)))}
+              onHotCueJump={(i) => {
+                const m = mediaRefB.current
+                const pos = hotCuesB[i]
+                if (!m || pos === null || !isFinite(m.duration) || m.duration === 0) return
+                m.currentTime = m.duration * pos
+                setProgressB(pos)
+              }}
               loopActive={loopActB} loopSizeIdx={loopIdxB}
               onLoopToggle={() => setLoopActB((v) => !v)}
               onLoopResize={(d) => setLoopIdxB((v) => Math.max(0, Math.min(LOOP_SIZES.length - 1, v + d)))}
