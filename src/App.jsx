@@ -105,8 +105,10 @@ function MainApp() {
           <ViewerCount />
         </header>
 
-        {/* Content */}
-        <main className="flex-1 min-h-0 overflow-y-auto flex flex-col lg:flex-row gap-4 p-4 lg:p-6 max-w-6xl mx-auto w-full">
+        {/* Content — main is a pure scroll container; the inner div handles flex layout
+              so flex items can grow naturally and trigger overflow-y scroll */}
+        <main className="flex-1 min-h-0 overflow-y-auto">
+          <div className="flex flex-col gap-4 p-4 lg:p-6 max-w-6xl mx-auto w-full min-h-full">
           {/* Keep StreamSetup mounted so an active broadcast isn't killed by tab navigation.
               Hidden via CSS — the WS + MediaRecorder stay alive. */}
           <div className={mode !== 'stream' ? 'hidden' : 'contents'}>
@@ -134,6 +136,7 @@ function MainApp() {
                 <TrackLibrary onTrackLoadA={setTrackA} onTrackLoadB={setTrackB} queue={queue} onQueueChange={setQueue} repeatPlaylist={repeatPlaylist} onRepeatChange={setRepeatPlaylist} nowPlayingA={trackA} nowPlayingB={trackB} />
               </div>
             </div>
+          </div>
           </div>
         </main>
       </div>
