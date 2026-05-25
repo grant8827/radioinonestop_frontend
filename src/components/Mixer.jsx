@@ -735,11 +735,11 @@ function MasterSection({ master, onUpdate, vuL = 0, vuR = 0 }) {
 
       <Divider />
 
-      {/* Monitor knobs */}
+      {/* Monitor / headphone knobs */}
       <SectionLabel>Monitor</SectionLabel>
       <Knob value={master.monitor} onChange={(v) => onUpdate('monitor', v)} size={36} color="#d1d5db" label="Mon"   />
-      <Knob value={master.booth}   onChange={(v) => onUpdate('booth', v)}   size={30} color="#94a3b8" label="Booth" />
-      <Knob value={master.phones}  onChange={(v) => onUpdate('phones', v)}  size={30} color="#a78bfa" label="Phones"/>
+      <Knob value={master.booth}   onChange={(v) => onUpdate('booth', v)}   size={30} color="#818cf8" label="HDPH"  />
+      <Knob value={master.phones}  onChange={(v) => onUpdate('phones', v)}  size={30} color="#f97316" label="CUE"   />
 
       <Divider />
 
@@ -1031,7 +1031,9 @@ export default function Mixer({ config, onOpenConference }) {
       try { localStorage.setItem('mixer_master', JSON.stringify(next)) } catch { /* ignore */ }
       return next
     })
-    if (key === 'fader' && audioEngine) audioEngine.updateMasterFader(value)
+    if (key === 'fader'  && audioEngine) audioEngine.updateMasterFader(value)
+    if (key === 'booth'  && audioEngine) audioEngine.updatePhonesVol?.(value)
+    if (key === 'phones' && audioEngine) audioEngine.updateCueVol?.(value)
   }, [audioEngine])
 
   const micChs  = channels.filter(ch => ch.isMic)

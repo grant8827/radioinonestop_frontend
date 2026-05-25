@@ -1212,24 +1212,14 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
   const onRepeatReloadRef   = useRef(null)
 
   const [masterVol,  setMasterVol]  = useState(0.85)
-  const [boothVol,   setBoothVol]   = useState(0.7)
-  const [cueVol,     setCueVol]     = useState(0.8)
   const [masterEqHi,  setMasterEqHi]  = useState(0.5)
   const [masterEqMid, setMasterEqMid] = useState(0.5)
   const [masterEqLo,  setMasterEqLo]  = useState(0.5)
 
-  // ── Sync master/phones/cue volume knobs to AudioEngine ────────────────────
+  // ── Sync master fader + master EQ knobs to AudioEngine ───────────────────
   useEffect(() => {
     audioEngine?.updateMasterFader?.(masterVol)
   }, [masterVol, audioEngine])
-
-  useEffect(() => {
-    audioEngine?.updatePhonesVol?.(boothVol)
-  }, [boothVol, audioEngine])
-
-  useEffect(() => {
-    audioEngine?.updateCueVol?.(cueVol)
-  }, [cueVol, audioEngine])
 
   useEffect(() => {
     audioEngine?.updateMasterEq?.('hi',  masterEqHi)

@@ -31,6 +31,9 @@ export function AudioEngineProvider({ children }) {
   // Headphone phones gain — sits between masterAnalyser and ac.destination (local only, stream unaffected)
   const phonesGainRef = useRef(null)
 
+  // Gain node between masterAnalyser and phonesGain — set to 0 when CUE is held (switches phones to cue)
+  const mainToPhonesGainRef = useRef(null)
+
   // Cue bus — deck signals are routed here when CUE is held; feeds into phonesGain
   const cueBusRef = useRef(null)
 
@@ -89,10 +92,16 @@ export function AudioEngineProvider({ children }) {
 
       // Phones gain: local headphone/speaker path only — stream is NOT affected
       const phonesGain = ac.createGain()
-      phonesGain.gain.value = 1.0   // Player state (boothVol=0.7) will set this on mount
+      phonesGain.gain.value = 0.8   // default headphone level
       phonesGainRef.current = phonesGain
-      masterAnalyser.connect(phonesGain)
       phonesGain.connect(ac.destination)
+
+      // mainToPhonesGain: switched OFF (gain=0) when CUE is held so only cue signal heard
+      const mainToPhonesGain = ac.createGain()
+      mainToPhonesGain.gain.value = 1.0
+      mainToPhonesGainRef.current = mainToPhonesGain
+      masterAnalyser.connect(mainToPhonesGain)
+      mainToPhonesGain.connect(phonesGain)
 
       // Cue bus: deck signals tap here when CUE button held; feeds into phonesGain
       const cueBus = ac.createGain()
@@ -272,10 +281,10 @@ export function AudioEngineProvider({ children }) {
     cueBusRef.current.gain.setTargetAtTime(value, acRef.current.currentTime, 0.02)
   }, [])
 
-  // ── Route a deck into / out of the cue bus (called on CUE button down/up) ─
+  // ── Route a deck into / out of the cue bus (true switch: mutes main from phones while held) ─
   const setCueSend = useCallback((deckKey, active) => {
     const ac = acRef.current
-    if (!ac || !cueBusRef.current) return
+    if (!ac || !cueBusRef.current || !mainToPhonesGainRef.current) return
     const src = mediaSources.current[deckKey]
     if (!src) return   // deck not yet connected — nothing to monitor
 
@@ -288,11 +297,16 @@ export function AudioEngineProvider({ children }) {
       cueSendNodes.current[deckKey] = send
     }
 
-    cueSendNodes.current[deckKey].gain.setTargetAtTime(
-      active ? 1.0 : 0,
-      ac.currentTime,
-      0.01
-    )
+    const t = ac.currentTime
+    if (active) {
+      // Switch: silence main mix in headphones, open cue deck
+      mainToPhonesGainRef.current.gain.setTargetAtTime(0,   t, 0.01)
+      cueSendNodes.current[deckKey].gain.setTargetAtTime(1.0, t, 0.01)
+    } else {
+      // Switch back: close cue deck, restore main mix to headphones
+      cueSendNodes.current[deckKey].gain.setTargetAtTime(0,   t, 0.01)
+      mainToPhonesGainRef.current.gain.setTargetAtTime(1.0, t, 0.01)
+    }
   }, [])
 
   // ── Register a media element so AudioEngine can create a source from it ──
