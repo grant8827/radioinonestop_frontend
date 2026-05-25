@@ -430,7 +430,7 @@ function JogWheel({ spinning, size = 160, color, label, onScratch, onScratchEnd 
     rotRef.current = (rotRef.current + delta + 360) % 360
     setRot(rotRef.current)
     // Seek audio — 1 full revolution (360°) = 2.5 s
-    if (onScratch && Math.abs(delta) > 0.1) onScratch((delta / 360) * 2.5)
+    if (onScratch && Math.abs(delta) > 0.1) onScratch((delta / 360) * 2.5, velRef.current)
     lastAngleRef.current     = angle
     lastScratchTsRef.current = now
   }
@@ -1769,10 +1769,16 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
                   m.play().catch(() => {}); setPlaying(true)
                 }
               }}
-              onScratch={(dt) => {
+              onScratch={(dt, vel) => {
                 const m = mediaRef.current
                 if (!m || !isFinite(m.duration)) return
-                m.playbackRate = 0
+                // 0.055 deg/ms = normal 1× spin → scale drag velocity to playbackRate
+                const rate = Math.max(0, Math.min(4, Math.abs(vel ?? 0) / 0.055))
+                m.playbackRate = rate
+                if (m.paused && rate > 0.05) {
+                  audioEngineRef.current?.resume()
+                  m.play().catch(() => {})
+                }
                 m.currentTime = Math.max(0, Math.min(m.duration, m.currentTime + dt))
                 setProgressA(m.duration > 0 ? m.currentTime / m.duration : 0)
               }}
@@ -1781,6 +1787,7 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
                 if (!m) return
                 m.playbackRate = Math.max(0.5, Math.min(2, 1 + pitchA * 0.08))
                 if (playing) m.play().catch(() => {})
+                else m.pause()
               }}
             />
 
@@ -1862,10 +1869,15 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
                   m.play().catch(() => {}); setPlayingB(true)
                 }
               }}
-              onScratch={(dt) => {
+              onScratch={(dt, vel) => {
                 const m = mediaRefB.current
                 if (!m || !isFinite(m.duration)) return
-                m.playbackRate = 0
+                const rate = Math.max(0, Math.min(4, Math.abs(vel ?? 0) / 0.055))
+                m.playbackRate = rate
+                if (m.paused && rate > 0.05) {
+                  audioEngineRef.current?.resume()
+                  m.play().catch(() => {})
+                }
                 m.currentTime = Math.max(0, Math.min(m.duration, m.currentTime + dt))
                 setProgressB(m.duration > 0 ? m.currentTime / m.duration : 0)
               }}
@@ -1874,6 +1886,7 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
                 if (!m) return
                 m.playbackRate = Math.max(0.5, Math.min(2, 1 + pitchB * 0.08))
                 if (playingB) m.play().catch(() => {})
+                else m.pause()
               }}
             />
           </div>
