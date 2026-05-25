@@ -1759,7 +1759,8 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
               onCueDown={() => {
                 const m = mediaRef.current
                 if (!m || !isFinite(m.duration)) return
-                audioEngineRef.current?.setCueSend('dj-a', true)
+                // Only monitor Deck A in headphones when it's the off-air deck (crossfader ≥ 0.5 → B is on air)
+                if (crossfaderRef.current >= 0.5) audioEngineRef.current?.setCueSend('dj-a', true)
                 if (!playing) {
                   // Paused: set cue point at current position and preview while held
                   const t = m.currentTime
@@ -1861,7 +1862,8 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
               onCueDown={() => {
                 const m = mediaRefB.current
                 if (!m || !isFinite(m.duration)) return
-                audioEngineRef.current?.setCueSend('dj-b', true)
+                // Only monitor Deck B in headphones when it's the off-air deck (crossfader ≤ 0.5 → A is on air)
+                if (crossfaderRef.current <= 0.5) audioEngineRef.current?.setCueSend('dj-b', true)
                 if (!playingB) {
                   // Paused: set cue point at current position and preview while held
                   const t = m.currentTime
