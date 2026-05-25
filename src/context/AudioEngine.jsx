@@ -22,6 +22,9 @@ export function AudioEngineProvider({ children }) {
   // 'dj-a' | 'dj-b' → { hi, mid, lo } BiquadFilterNodes (per-deck EQ)
   const deckEqNodes = useRef({})
 
+  // 'dj-a' | 'dj-b' → GainNode — pre-EQ fader/crossfader mix (keeps element.volume=1 so CUE taps pure signal)
+  const deckMixNodes = useRef({})
+
   // Master output AnalyserNode
   const masterAnalyserRef = useRef(null)
 
@@ -238,6 +241,13 @@ export function AudioEngineProvider({ children }) {
   }, [])
 
   // ── Per-deck EQ ──────────────────────────────────────────────────────────
+  // ── Per-deck mix gain (fader × crossfader) — applied in graph so element.volume stays 1 ──
+  const updateDeckMix = useCallback((key, value) => {
+    const node = deckMixNodes.current[key]
+    if (!node || !acRef.current) return
+    node.gain.setTargetAtTime(Math.max(0, Math.min(1, value)), acRef.current.currentTime, 0.01)
+  }, [])
+
   const updateDeckEq = useCallback((key, band, value) => {
     const eq = deckEqNodes.current[key]
     if (!eq || !acRef.current) return
@@ -344,13 +354,22 @@ export function AudioEngineProvider({ children }) {
             hi.connect(mid); mid.connect(lo)
             deckEqNodes.current[k] = { hi, mid, lo }
           }
+          // deckMixNode: gain-controls the channel path pre-EQ so element.volume stays 1 (CUE taps pure pre-fader signal)
+          if (!deckMixNodes.current[k]) {
+            const mx = ac.createGain()
+            mx.gain.value = 1.0
+            deckMixNodes.current[k] = mx
+          }
           const src = mediaSources.current[k]
+          const dmx = deckMixNodes.current[k]
           const deq = deckEqNodes.current[k]
           const dka = deckAnalysers.current[k]
-          try { src.disconnect(deq.hi) } catch { /* ignore */ }   // only unplug the channel path; cueSendNode stays connected
+          try { src.disconnect(dmx) } catch { /* ignore */ }   // only unplug channel path; cueSendNode stays connected
+          try { dmx.disconnect() } catch { /* ignore */ }
           try { deq.lo.disconnect() } catch { /* ignore */ }
           try { dka.disconnect() } catch { /* ignore */ }
-          src.connect(deq.hi)
+          src.connect(dmx)
+          dmx.connect(deq.hi)
           deq.lo.connect(dka)
           dka.connect(nodes.gainNode)
         })
@@ -442,13 +461,22 @@ export function AudioEngineProvider({ children }) {
         hi.connect(mid); mid.connect(lo)
         deckEqNodes.current[key] = { hi, mid, lo }
       }
+      // deckMixNode: gain-controls the channel path pre-EQ so element.volume stays 1 (CUE taps pure pre-fader signal)
+      if (!deckMixNodes.current[key]) {
+        const mx = ac.createGain()
+        mx.gain.value = 1.0
+        deckMixNodes.current[key] = mx
+      }
       const src = mediaSources.current[key]
+      const dmx = deckMixNodes.current[key]
       const deq = deckEqNodes.current[key]
       const dka = deckAnalysers.current[key]
-      try { src.disconnect(deq.hi) } catch { /* not yet connected */ }   // only unplug the channel path; cueSendNode stays connected
+      try { src.disconnect(dmx) } catch { /* not yet connected */ }   // only unplug channel path; cueSendNode stays connected
+      try { dmx.disconnect() } catch { /* not yet connected */ }
       try { deq.lo.disconnect() } catch { /* not yet connected */ }
       try { dka.disconnect() } catch { /* not yet connected */ }
-      src.connect(deq.hi)
+      src.connect(dmx)
+      dmx.connect(deq.hi)
       deq.lo.connect(dka)
       dka.connect(nodes.gainNode)
     })
@@ -607,6 +635,7 @@ export function AudioEngineProvider({ children }) {
       getAnalyser,
       getMasterAnalyser,
       getDeckAnalyser,
+      updateDeckMix,
       updateDeckEq,
       setDjActive,
       micOnAirMap,

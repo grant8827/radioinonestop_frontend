@@ -1233,18 +1233,29 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
     audioEngine?.updateMasterEq?.('lo',  masterEqLo)
   }, [masterEqLo, audioEngine])
 
-  // ── Sync deck faders + crossfader to media element volume ───────────────────
+  // ── Sync deck faders + crossfader into AudioEngine deckMixNode ─────────────
+  // element.volume stays 1 so the MediaElementSourceNode always outputs the full
+  // pre-fader signal. CUE taps from that raw source → only the CUE knob in the
+  // Mixer controls what the DJ hears in headphones.
   useEffect(() => {
     if (!mediaRef.current) return
-    const xA = crossfader <= 0.5 ? 1 : 1 - (crossfader - 0.5) * 2
-    mediaRef.current.volume = Math.max(0, Math.min(1, faderA * xA))
-  }, [faderA, crossfader])
+    mediaRef.current.volume = 1
+  }, []) // set once on mount
 
   useEffect(() => {
     if (!mediaRefB.current) return
+    mediaRefB.current.volume = 1
+  }, []) // set once on mount
+
+  useEffect(() => {
+    const xA = crossfader <= 0.5 ? 1 : 1 - (crossfader - 0.5) * 2
+    audioEngine?.updateDeckMix?.('dj-a', faderA * xA)
+  }, [faderA, crossfader, audioEngine])
+
+  useEffect(() => {
     const xB = crossfader >= 0.5 ? 1 : crossfader * 2
-    mediaRefB.current.volume = Math.max(0, Math.min(1, faderB * xB))
-  }, [faderB, crossfader])
+    audioEngine?.updateDeckMix?.('dj-b', faderB * xB)
+  }, [faderB, crossfader, audioEngine])
 
   // ── Sync per-deck EQ knobs to AudioEngine ───────────────────────────────────
   useEffect(() => {
