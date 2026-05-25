@@ -123,7 +123,7 @@ function MainApp() {
 
           {/* Player + NowPlaying + Chat — always mounted so audio elements survive
               mode switches. Hidden (display:none) when not in radio/video mode. */}
-          <div className={`flex-1 flex flex-col lg:flex-row gap-4 w-full${
+          <div className={`flex flex-col lg:flex-row gap-4 w-full${
             mode !== 'radio' && mode !== 'video' ? ' hidden' : ''
           }`}>
             <div className="flex-1 flex flex-col gap-4 min-w-0">

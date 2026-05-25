@@ -1437,7 +1437,7 @@ function VideoPreview({ isLive, liveStatus, onGoLive, onStop }) {
         {/* Go Live / Stop */}
         {onGoLive && (
           <button
-            onClick={liveStatus === 'live' ? onStop : onGoLive}
+            onClick={liveStatus === 'live' ? onStop : () => onGoLive(streamRef.current || null)}
             disabled={liveStatus === 'connecting'}
             className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold border transition-all shrink-0 disabled:cursor-wait ${
               liveStatus === 'live'
@@ -1461,9 +1461,10 @@ function VideoPreview({ isLive, liveStatus, onGoLive, onStop }) {
 
 function ChannelTab({ host, audioKey }) {
   const { token } = useAuth()
-  const { broadcastMode, icecastStatus, radioStatus, icecastStartRef, icecastStopRef, startRadio, stopRadio } = useStream()
+  const { broadcastMode, icecastStatus, radioStatus, icecastStartRef, icecastStopRef, startRadio, stopRadio,
+    videoStatus, startVideo, stopVideo } = useStream()
 
-  // Disable editing while a broadcast is live
+  // Disable editing while an AUDIO broadcast is live (multistream destinations only)
   const liveStatus = broadcastMode === 'icecast' ? icecastStatus : radioStatus
   const isLive = liveStatus === 'live'
 
@@ -1572,20 +1573,20 @@ function ChannelTab({ host, audioKey }) {
 
   const selectedPlatform = SOCIAL_PLATFORMS.find((p) => p.id === formPlatform) || SOCIAL_PLATFORMS[0]
 
-  function handleGoLive() {
-    if (broadcastMode === 'icecast') icecastStartRef.current?.()
-    else startRadio()
+  // Video go live — passes the camera stream when available so VideoPreview's camera feed is used;
+  // falls back to screen-share capture (same as the radio page's Go Live Video button)
+  function handleVideoGoLive(cameraStream) {
+    startVideo(audioKey, cameraStream || null)
   }
-  function handleStop() {
-    if (broadcastMode === 'icecast') icecastStopRef.current?.()
-    else stopRadio()
+  function handleVideoStop() {
+    stopVideo()
   }
 
   return (
     <div className="space-y-6">
 
-      {/* ── Video Preview ── */}
-      <VideoPreview isLive={isLive} liveStatus={liveStatus} onGoLive={handleGoLive} onStop={handleStop} />
+      {/* ── Video Preview — mirrored with radio page's Go Live Video button via shared StreamContext ── */}
+      <VideoPreview isLive={videoStatus === 'live'} liveStatus={videoStatus} onGoLive={handleVideoGoLive} onStop={handleVideoStop} />
 
       {/* ── Multistream Destinations ── */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
