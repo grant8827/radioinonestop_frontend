@@ -789,14 +789,10 @@ function CenterMixer({
   crossfader, onCrossfaderChange,
   masterVol, onMasterVolChange,
   boothVol, onBoothVolChange,
+  cueVol, onCueVolChange,
   playing, playingB = false,
   levelA = 0, levelB = 0, levelMasterL = 0, levelMasterR = 0,
   autoDJ = false, onAutoDJToggle, autoDJToast = '',
-  // Phones / cue
-  cueVol = 0.8, onCueVolChange,
-  cueDevice = '', onCueDeviceChange,
-  outputDevices = [],
-  cueActive = false,
 }) {
   return (
     <div
@@ -890,55 +886,8 @@ function CenterMixer({
 
       <div className="flex gap-2 justify-center mt-1">
         <Knob value={masterVol} onChange={onMasterVolChange} size={30} color="#d1d5db" label="MASTER" />
-        <Knob value={boothVol}  onChange={onBoothVolChange}  size={30} color="#9ca3af" label="BOOTH" />
-      </div>
-
-      {/* PHONES / headphone cue section */}
-      <div className="border-t border-[#1e2128] pt-2 mt-1">
-        <div className="text-center mb-1.5 flex items-center justify-center gap-1.5">
-          <svg
-            className="w-3 h-3"
-            style={{ color: cueActive ? '#c084fc' : '#374151' }}
-            fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-          </svg>
-          <span
-            className="text-[7px] font-black uppercase tracking-widest"
-            style={{ color: cueActive ? '#c084fc' : '#4b5563' }}
-          >
-            PHONES
-          </span>
-          {cueActive && (
-            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
-          )}
-        </div>
-
-        {/* Output device selector */}
-        {outputDevices.length > 0 && (
-          <select
-            value={cueDevice}
-            onChange={(e) => onCueDeviceChange?.(e.target.value)}
-            className="w-full text-[8px] bg-[#0f1117] border border-[#2d3340] text-gray-400 rounded px-1 py-1 mb-1.5 focus:outline-none focus:border-purple-500 truncate"
-          >
-            <option value="">Default output</option>
-            {outputDevices.map((d) => (
-              <option key={d.deviceId} value={d.deviceId}>
-                {d.label || `Output ${d.deviceId.slice(0, 6)}`}
-              </option>
-            ))}
-          </select>
-        )}
-
-        <div className="flex justify-center">
-          <Knob
-            value={cueVol}
-            onChange={onCueVolChange}
-            size={28}
-            color="#c084fc"
-            label="VOL"
-          />
-        </div>
+        <Knob value={boothVol}  onChange={onBoothVolChange}  size={30} color="#818cf8" label="HDPH" />
+        <Knob value={cueVol}    onChange={onCueVolChange}    size={28} color="#f97316" label="CUE" />
       </div>
 
       {/* Auto DJ toggle */}
@@ -1234,21 +1183,6 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
   const [faderB, setFaderB] = useState(0.75)
   const [pflA, setPflA] = useState(false)
   const [pflB, setPflB] = useState(false)
-
-  // ── Phones / cue bus ───────────────────────────────────────────────────
-  const [cueVol, setCueVol]       = useState(0.8)
-  const [cueDevice, setCueDevice] = useState('')
-  const [outputDevices, setOutputDevices] = useState([])
-
-  useEffect(() => {
-    const load = () =>
-      navigator.mediaDevices.enumerateDevices()
-        .then((devs) => setOutputDevices(devs.filter((d) => d.kind === 'audiooutput')))
-        .catch(() => {})
-    load()
-    navigator.mediaDevices.addEventListener?.('devicechange', load)
-    return () => navigator.mediaDevices.removeEventListener?.('devicechange', load)
-  }, [])
   const [crossfader, setCrossfader] = useState(0.5)
   const crossfaderRef = useRef(0.5)
   const sweepRAFRef   = useRef(null)
@@ -1277,6 +1211,20 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
 
   const [masterVol,  setMasterVol]  = useState(0.85)
   const [boothVol,   setBoothVol]   = useState(0.7)
+  const [cueVol,     setCueVol]     = useState(0.8)
+
+  // ── Sync master/phones/cue volume knobs to AudioEngine ────────────────────
+  useEffect(() => {
+    audioEngine?.updateMasterFader?.(masterVol)
+  }, [masterVol, audioEngine])
+
+  useEffect(() => {
+    audioEngine?.updatePhonesVol?.(boothVol)
+  }, [boothVol, audioEngine])
+
+  useEffect(() => {
+    audioEngine?.updateCueVol?.(cueVol)
+  }, [cueVol, audioEngine])
 
   // ── Sync deck faders + crossfader to media element volume ───────────────────
   useEffect(() => {
@@ -1804,6 +1752,7 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
               onCueDown={() => {
                 const m = mediaRef.current
                 if (!m || !isFinite(m.duration)) return
+                audioEngineRef.current?.setCueSend('dj-a', true)
                 if (playing) {
                   // Snap to cue point and pause
                   m.currentTime = cuePointASecRef.current
@@ -1816,16 +1765,15 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
                   setCuePointA(m.duration > 0 ? t / m.duration : 0)
                   cuePreviewingA.current = true
                   audioEngineRef.current?.resume()
-                  audioEngineRef.current?.sendToCue('dj-a')
                   m.play().catch(() => {}); setPlaying(true)
                 }
               }}
               onCueUp={() => {
                 if (!cuePreviewingA.current) return
                 cuePreviewingA.current = false
+                audioEngineRef.current?.setCueSend('dj-a', false)
                 const m = mediaRef.current
                 if (!m) return
-                audioEngineRef.current?.removeFromCue('dj-a')
                 m.pause(); m.currentTime = cuePointASecRef.current
                 setPlaying(false)
                 setProgressA(m.duration > 0 ? cuePointASecRef.current / m.duration : 0)
@@ -1865,22 +1813,15 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
               eqA={eqA}    onEqAChange={(k, v) => setEqA((e) => ({ ...e, [k]: v }))}
               gainA={gainA} onGainAChange={setGainA}
               faderA={faderA} onFaderAChange={setFaderA}
-              pflA={pflA} onPflAToggle={() => {
-                const next = !pflA; setPflA(next)
-                if (next) audioEngineRef.current?.sendToCue('dj-a')
-                else      audioEngineRef.current?.removeFromCue('dj-a')
-              }}
+              pflA={pflA} onPflAToggle={() => setPflA((v) => !v)}
               eqB={eqB}    onEqBChange={(k, v) => setEqB((e) => ({ ...e, [k]: v }))}
               gainB={gainB} onGainBChange={setGainB}
               faderB={faderB} onFaderBChange={setFaderB}
-              pflB={pflB} onPflBToggle={() => {
-                const next = !pflB; setPflB(next)
-                if (next) audioEngineRef.current?.sendToCue('dj-b')
-                else      audioEngineRef.current?.removeFromCue('dj-b')
-              }}
+              pflB={pflB} onPflBToggle={() => setPflB((v) => !v)}
               crossfader={crossfader} onCrossfaderChange={handleCrossfaderChange}
               masterVol={masterVol} onMasterVolChange={setMasterVol}
               boothVol={boothVol}  onBoothVolChange={setBoothVol}
+              cueVol={cueVol}      onCueVolChange={setCueVol}
               playing={playing}
               playingB={playingB}
               levelA={deckLevels.a}
@@ -1890,12 +1831,6 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
               autoDJ={autoDJ}
               onAutoDJToggle={handleAutoDJToggle}
               autoDJToast={autoDJToast}
-              cueVol={cueVol}
-              onCueVolChange={(v) => { setCueVol(v); audioEngineRef.current?.setCueVolume(v) }}
-              cueDevice={cueDevice}
-              onCueDeviceChange={(id) => { setCueDevice(id); audioEngineRef.current?.setCueSink(id) }}
-              outputDevices={outputDevices}
-              cueActive={pflA || pflB}
             />
 
             <DeckUnit
@@ -1922,6 +1857,7 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
               onCueDown={() => {
                 const m = mediaRefB.current
                 if (!m || !isFinite(m.duration)) return
+                audioEngineRef.current?.setCueSend('dj-b', true)
                 if (playingB) {
                   m.currentTime = cuePointBSecRef.current
                   m.pause(); setPlayingB(false)
@@ -1932,16 +1868,15 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
                   setCuePointB(m.duration > 0 ? t / m.duration : 0)
                   cuePreviewingB.current = true
                   audioEngineRef.current?.resume()
-                  audioEngineRef.current?.sendToCue('dj-b')
                   m.play().catch(() => {}); setPlayingB(true)
                 }
               }}
               onCueUp={() => {
                 if (!cuePreviewingB.current) return
                 cuePreviewingB.current = false
+                audioEngineRef.current?.setCueSend('dj-b', false)
                 const m = mediaRefB.current
                 if (!m) return
-                audioEngineRef.current?.removeFromCue('dj-b')
                 m.pause(); m.currentTime = cuePointBSecRef.current
                 setPlayingB(false)
                 setProgressB(m.duration > 0 ? cuePointBSecRef.current / m.duration : 0)
