@@ -287,11 +287,34 @@ function VuStrip({ active = true, level = 0, segments = 14 }) {
 }
 
 // ── Waveform display ───────────────────────────────────────────────────────────
-function WaveformDisplay({ playing, color, waveData, progress = 0 }) {
+function WaveformDisplay({ playing, color, waveData, progress = 0, onSeek, cuePoint = null }) {
+  const barRef  = useRef(null)
+  const dragging = useRef(false)
+
+  const getSeekFraction = (e) => {
+    const rect = barRef.current.getBoundingClientRect()
+    return Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+  }
+  const handlePointerDown = (e) => {
+    if (!onSeek) return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    dragging.current = true
+    onSeek(getSeekFraction(e))
+  }
+  const handlePointerMove = (e) => {
+    if (!dragging.current || !onSeek) return
+    onSeek(getSeekFraction(e))
+  }
+  const handlePointerUp = () => { dragging.current = false }
+
   return (
     <div
+      ref={barRef}
       className="relative rounded overflow-hidden border border-[#1e2128]"
-      style={{ height: 40, background: '#060810' }}
+      style={{ height: 40, background: '#060810', cursor: onSeek ? 'crosshair' : 'default' }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
     >
       <div className="flex items-end h-full px-0.5 pt-1 gap-px">
         {waveData.map((h, i) => (
@@ -322,6 +345,17 @@ function WaveformDisplay({ playing, color, waveData, progress = 0 }) {
           transition: 'left 0.25s linear',
         }}
       />
+      {cuePoint !== null && (
+        <div
+          className="absolute top-0 bottom-0 pointer-events-none"
+          style={{
+            left: `${Math.min(100, Math.max(0, cuePoint * 100))}%`,
+            width: '2px',
+            backgroundColor: '#f97316',
+            boxShadow: '0 0 5px #f97316cc',
+          }}
+        />
+      )}
       <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-black/40 pointer-events-none" />
     </div>
   )
@@ -516,7 +550,8 @@ function LoopControls({ active, sizeIdx, onToggle, onResize }) {
 // ── Deck unit ──────────────────────────────────────────────────────────────────
 function DeckUnit({
   side, color, active, playing, onTogglePlay,
-  streamLive, stationName, waveData, progress,
+  streamLive, stationName, waveData, progress, onSeek,
+  cuePoint, onCueDown, onCueUp, onRestart,
   pitch, onPitchChange,
   hotCues, onHotCueSet, onHotCueClear,
   loopActive, loopSizeIdx, onLoopToggle, onLoopResize,
@@ -573,7 +608,7 @@ function DeckUnit({
         </div>
       </div>
 
-      <WaveformDisplay playing={playing && active} color={color} waveData={waveData} progress={progress} />
+      <WaveformDisplay playing={playing && active} color={color} waveData={waveData} progress={progress} onSeek={active ? onSeek : undefined} cuePoint={active ? cuePoint : null} />
 
       <div className="flex justify-center py-1">
         <JogWheel spinning={playing && active} size={158} color={color} label={side} />
@@ -611,8 +646,17 @@ function DeckUnit({
         </button>
 
         <button
-          className="flex-1 h-9 rounded-lg text-[8px] font-black tracking-wider transition-all active:scale-95"
-          style={{ backgroundColor: '#1a1d24', color: '#ef4444', border: '1px solid #ef444440' }}
+          onPointerDown={active ? onCueDown : undefined}
+          onPointerUp={active ? onCueUp : undefined}
+          onPointerLeave={active ? onCueUp : undefined}
+          className="flex-1 h-9 rounded-lg text-[8px] font-black tracking-wider transition-all select-none"
+          style={{
+            backgroundColor: active ? (cuePoint !== null ? '#f9731620' : '#1a1d24') : '#1a1d24',
+            color: active ? '#f97316' : '#4b5563',
+            border: `1px solid ${active ? (cuePoint !== null ? '#f97316aa' : '#f9731640') : '#2d3340'}`,
+            boxShadow: active && cuePoint !== null ? '0 0 8px #f9731640' : 'none',
+            cursor: active ? 'pointer' : 'not-allowed',
+          }}
         >
           CUE
         </button>
@@ -650,11 +694,21 @@ function DeckUnit({
           SYNC
         </button>
 
+        {/* Restart — jump to 00:00 and keep playing */}
         <button
-          className="flex-1 h-8 rounded text-[7px] font-black tracking-wide transition-all active:scale-95"
-          style={{ backgroundColor: '#1a1d24', color: '#4b5563', border: '1px solid #2d3340' }}
+          onClick={active ? onRestart : undefined}
+          className="flex-1 h-8 rounded flex items-center justify-center transition-all active:scale-95"
+          style={{
+            backgroundColor: '#1a1d24',
+            color: active ? color : '#4b5563',
+            border: `1px solid ${active ? color + '50' : '#2d3340'}`,
+            cursor: active ? 'pointer' : 'not-allowed',
+          }}
+          title="Restart"
         >
-          REV
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/>
+          </svg>
         </button>
       </div>
     </div>
@@ -1064,6 +1118,14 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
   const crossfaderRef = useRef(0.5)
   const sweepRAFRef   = useRef(null)
   const wakeLockRef   = useRef(null)
+
+  // ── CUE points (stored as 0–1 fraction for waveform display) ──────────────
+  const [cuePointA, setCuePointA] = useState(null)
+  const [cuePointB, setCuePointB] = useState(null)
+  const cuePointASecRef  = useRef(0)   // seconds, for seeking
+  const cuePointBSecRef  = useRef(0)
+  const cuePreviewingA   = useRef(false)
+  const cuePreviewingB   = useRef(false)
 
   // ── Auto DJ ─────────────────────────────────────────────────────────────────
   const [autoDJ,      setAutoDJ]      = useState(false)
@@ -1588,6 +1650,12 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
               active={true} playing={playing} onTogglePlay={togglePlay}
               streamLive={streamLive} stationName={trackA?.name ?? config?.stationName}
               waveData={WAVE_A} progress={progressA}
+              onSeek={(f) => {
+                const m = mediaRef.current
+                if (!m || !isFinite(m.duration) || m.duration === 0) return
+                m.currentTime = m.duration * f
+                setProgressA(f)
+              }}
               pitch={pitchA} onPitchChange={setPitchA}
               hotCues={hotCuesA}
               onHotCueSet={(i) => setHotCuesA((c) => c.map((v, j) => (j === i ? true : v)))}
@@ -1597,6 +1665,43 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
               onLoopResize={(d) => setLoopIdxA((v) => Math.max(0, Math.min(LOOP_SIZES.length - 1, v + d)))}
               synced={syncA} onSyncToggle={() => setSyncA((v) => !v)}
               keyLock={keyA} onKeyLockToggle={() => setKeyA((v) => !v)}
+              cuePoint={cuePointA}
+              onCueDown={() => {
+                const m = mediaRef.current
+                if (!m || !isFinite(m.duration)) return
+                if (playing) {
+                  // Snap to cue point and pause
+                  m.currentTime = cuePointASecRef.current
+                  m.pause(); setPlaying(false)
+                  setProgressA(m.duration > 0 ? cuePointASecRef.current / m.duration : 0)
+                } else {
+                  // Set cue at current position and preview (play while held)
+                  const t = m.currentTime
+                  cuePointASecRef.current = t
+                  setCuePointA(m.duration > 0 ? t / m.duration : 0)
+                  cuePreviewingA.current = true
+                  audioEngineRef.current?.resume()
+                  m.play().catch(() => {}); setPlaying(true)
+                }
+              }}
+              onCueUp={() => {
+                if (!cuePreviewingA.current) return
+                cuePreviewingA.current = false
+                const m = mediaRef.current
+                if (!m) return
+                m.pause(); m.currentTime = cuePointASecRef.current
+                setPlaying(false)
+                setProgressA(m.duration > 0 ? cuePointASecRef.current / m.duration : 0)
+              }}
+              onRestart={() => {
+                const m = mediaRef.current
+                if (!m) return
+                m.currentTime = 0; setProgressA(0)
+                if (!playing) {
+                  audioEngineRef.current?.resume()
+                  m.play().catch(() => {}); setPlaying(true)
+                }
+              }}
             />
 
             <CenterMixer
@@ -1627,6 +1732,12 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
               active={!!trackB} playing={playingB} onTogglePlay={togglePlayB}
               streamLive={false} stationName={trackB?.name ?? config?.stationName}
               waveData={WAVE_B} progress={progressB}
+              onSeek={(f) => {
+                const m = mediaRefB.current
+                if (!m || !isFinite(m.duration) || m.duration === 0) return
+                m.currentTime = m.duration * f
+                setProgressB(f)
+              }}
               pitch={pitchB} onPitchChange={setPitchB}
               hotCues={hotCuesB}
               onHotCueSet={(i) => setHotCuesB((c) => c.map((v, j) => (j === i ? true : v)))}
@@ -1636,6 +1747,41 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
               onLoopResize={(d) => setLoopIdxB((v) => Math.max(0, Math.min(LOOP_SIZES.length - 1, v + d)))}
               synced={syncB} onSyncToggle={() => setSyncB((v) => !v)}
               keyLock={keyB} onKeyLockToggle={() => setKeyB((v) => !v)}
+              cuePoint={cuePointB}
+              onCueDown={() => {
+                const m = mediaRefB.current
+                if (!m || !isFinite(m.duration)) return
+                if (playingB) {
+                  m.currentTime = cuePointBSecRef.current
+                  m.pause(); setPlayingB(false)
+                  setProgressB(m.duration > 0 ? cuePointBSecRef.current / m.duration : 0)
+                } else {
+                  const t = m.currentTime
+                  cuePointBSecRef.current = t
+                  setCuePointB(m.duration > 0 ? t / m.duration : 0)
+                  cuePreviewingB.current = true
+                  audioEngineRef.current?.resume()
+                  m.play().catch(() => {}); setPlayingB(true)
+                }
+              }}
+              onCueUp={() => {
+                if (!cuePreviewingB.current) return
+                cuePreviewingB.current = false
+                const m = mediaRefB.current
+                if (!m) return
+                m.pause(); m.currentTime = cuePointBSecRef.current
+                setPlayingB(false)
+                setProgressB(m.duration > 0 ? cuePointBSecRef.current / m.duration : 0)
+              }}
+              onRestart={() => {
+                const m = mediaRefB.current
+                if (!m) return
+                m.currentTime = 0; setProgressB(0)
+                if (!playingB) {
+                  audioEngineRef.current?.resume()
+                  m.play().catch(() => {}); setPlayingB(true)
+                }
+              }}
             />
           </div>
         </div>
