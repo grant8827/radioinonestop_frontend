@@ -362,31 +362,85 @@ function WaveformDisplay({ playing, color, waveData, progress = 0, onSeek, cuePo
 }
 
 // ── Jog Wheel ──────────────────────────────────────────────────────────────────
-function JogWheel({ spinning, size = 160, color, label }) {
-  const rotRef = useRef(0)
-  const rafRef = useRef(null)
-  const lastRef = useRef(null)
-  const [rot, setRot] = useState(0)
+function JogWheel({ spinning, size = 160, color, label, onScratch, onScratchEnd }) {
+  const rotRef           = useRef(0)
+  const rafRef           = useRef(null)
+  const lastSpinRef      = useRef(null)
+  const [rot, setRot]    = useState(0)
+  const spinningRef      = useRef(spinning)
+  const scratchingRef    = useRef(false)
+  const lastAngleRef     = useRef(null)
+  const lastScratchTsRef = useRef(null)
+  const velRef           = useRef(0) // deg / ms
 
-  useEffect(() => {
-    if (!spinning) {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
-      lastRef.current = null
-      return
-    }
+  useEffect(() => { spinningRef.current = spinning }, [spinning])
+
+  const startSpin = () => {
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
+    lastSpinRef.current = null
     const step = (ts) => {
-      if (lastRef.current !== null) {
-        rotRef.current = (rotRef.current + (ts - lastRef.current) * 0.055) % 360
+      if (lastSpinRef.current !== null) {
+        rotRef.current = (rotRef.current + (ts - lastSpinRef.current) * 0.055) % 360
         setRot(rotRef.current)
       }
-      lastRef.current = ts
+      lastSpinRef.current = ts
       rafRef.current = requestAnimationFrame(step)
     }
     rafRef.current = requestAnimationFrame(step)
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+  }
+
+  useEffect(() => {
+    if (!spinning) {
+      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
+      lastSpinRef.current = null
+      return
     }
-  }, [spinning])
+    if (!scratchingRef.current) startSpin()
+    return () => { if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null } }
+  }, [spinning]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const getAngle = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    return Math.atan2(
+      e.clientY - (rect.top  + rect.height / 2),
+      e.clientX - (rect.left + rect.width  / 2)
+    ) * (180 / Math.PI)
+  }
+
+  const handlePointerDown = (e) => {
+    e.currentTarget.setPointerCapture(e.pointerId)
+    scratchingRef.current = true
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
+    lastSpinRef.current   = null
+    lastAngleRef.current  = getAngle(e)
+    lastScratchTsRef.current = performance.now()
+    velRef.current = 0
+  }
+
+  const handlePointerMove = (e) => {
+    if (!scratchingRef.current) return
+    const angle = getAngle(e)
+    const now   = performance.now()
+    let delta = angle - lastAngleRef.current
+    if (delta >  180) delta -= 360  // wrap ±180
+    if (delta < -180) delta += 360
+    const dt = now - lastScratchTsRef.current
+    velRef.current = dt > 0 ? delta / dt : 0
+    // Rotate visual
+    rotRef.current = (rotRef.current + delta + 360) % 360
+    setRot(rotRef.current)
+    // Seek audio — 1 full revolution (360°) = 2.5 s
+    if (onScratch && Math.abs(delta) > 0.1) onScratch((delta / 360) * 2.5)
+    lastAngleRef.current     = angle
+    lastScratchTsRef.current = now
+  }
+
+  const handlePointerUp = () => {
+    if (!scratchingRef.current) return
+    scratchingRef.current = false
+    onScratchEnd?.()
+    if (spinningRef.current) startSpin()
+  }
 
   const cx = size / 2, cy = size / 2
   const outerR = size * 0.47
@@ -394,8 +448,15 @@ function JogWheel({ spinning, size = 160, color, label }) {
   const innerR = size * 0.15
 
   return (
-    <div className="relative select-none flex-shrink-0" style={{ width: size, height: size }}>
-      <svg width={size} height={size}>
+    <div
+      className="relative select-none flex-shrink-0"
+      style={{ width: size, height: size, touchAction: 'none', cursor: onScratch ? 'grab' : 'default' }}
+      onPointerDown={onScratch ? handlePointerDown : undefined}
+      onPointerMove={onScratch ? handlePointerMove : undefined}
+      onPointerUp={onScratch ? handlePointerUp : undefined}
+      onPointerLeave={onScratch ? handlePointerUp : undefined}
+    >
+      <svg width={size} height={size} style={{ pointerEvents: 'none' }}>
         <circle cx={cx} cy={cy} r={outerR} fill="#191c22" stroke="#3d4350" strokeWidth="2" />
         {Array.from({ length: 72 }).map((_, i) => {
           const big = i % 6 === 0
@@ -552,6 +613,7 @@ function DeckUnit({
   side, color, active, playing, onTogglePlay,
   streamLive, stationName, waveData, progress, onSeek,
   cuePoint, onCueDown, onCueUp, onRestart,
+  onScratch, onScratchEnd,
   pitch, onPitchChange,
   hotCues, onHotCueSet, onHotCueClear,
   loopActive, loopSizeIdx, onLoopToggle, onLoopResize,
@@ -611,7 +673,12 @@ function DeckUnit({
       <WaveformDisplay playing={playing && active} color={color} waveData={waveData} progress={progress} onSeek={active ? onSeek : undefined} cuePoint={active ? cuePoint : null} />
 
       <div className="flex justify-center py-1">
-        <JogWheel spinning={playing && active} size={158} color={color} label={side} />
+        <JogWheel
+          spinning={playing && active}
+          size={158} color={color} label={side}
+          onScratch={active ? onScratch : undefined}
+          onScratchEnd={active ? onScratchEnd : undefined}
+        />
       </div>
 
       <div>
@@ -1702,6 +1769,19 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
                   m.play().catch(() => {}); setPlaying(true)
                 }
               }}
+              onScratch={(dt) => {
+                const m = mediaRef.current
+                if (!m || !isFinite(m.duration)) return
+                m.playbackRate = 0
+                m.currentTime = Math.max(0, Math.min(m.duration, m.currentTime + dt))
+                setProgressA(m.duration > 0 ? m.currentTime / m.duration : 0)
+              }}
+              onScratchEnd={() => {
+                const m = mediaRef.current
+                if (!m) return
+                m.playbackRate = Math.max(0.5, Math.min(2, 1 + pitchA * 0.08))
+                if (playing) m.play().catch(() => {})
+              }}
             />
 
             <CenterMixer
@@ -1781,6 +1861,19 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
                   audioEngineRef.current?.resume()
                   m.play().catch(() => {}); setPlayingB(true)
                 }
+              }}
+              onScratch={(dt) => {
+                const m = mediaRefB.current
+                if (!m || !isFinite(m.duration)) return
+                m.playbackRate = 0
+                m.currentTime = Math.max(0, Math.min(m.duration, m.currentTime + dt))
+                setProgressB(m.duration > 0 ? m.currentTime / m.duration : 0)
+              }}
+              onScratchEnd={() => {
+                const m = mediaRefB.current
+                if (!m) return
+                m.playbackRate = Math.max(0.5, Math.min(2, 1 + pitchB * 0.08))
+                if (playingB) m.play().catch(() => {})
               }}
             />
           </div>
