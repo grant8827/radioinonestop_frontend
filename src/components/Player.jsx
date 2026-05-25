@@ -793,15 +793,63 @@ function DeckUnit({
       {pads && (
         <div className="mt-2">
           <p className="text-[7px] font-bold text-gray-700 uppercase tracking-widest mb-1">Instant Play</p>
-          <SamplePads slots={pads} color={color} onLoad={onPadLoad} onToggle={onPadToggle} onClear={onPadClear} />
+          <SamplePads slots={pads} onLoad={onPadLoad} onToggle={onPadToggle} onClear={onPadClear} />
         </div>
       )}
     </div>
   )
 }
 
+// ── Pad bank IDB persistence ─────────────────────────────────────────────────
+const PAD_IDB_STORE = 'pads'
+function openPadDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('radio-pad-bank', 1)
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result
+      if (!db.objectStoreNames.contains(PAD_IDB_STORE))
+        db.createObjectStore(PAD_IDB_STORE, { keyPath: 'idx' })
+    }
+    req.onsuccess = (e) => resolve(e.target.result)
+    req.onerror   = (e) => reject(e.target.error)
+  })
+}
+async function padIdbSave(idx, name, blob) {
+  const db = await openPadDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(PAD_IDB_STORE, 'readwrite')
+    tx.objectStore(PAD_IDB_STORE).put({ idx, name, blob })
+    tx.oncomplete = () => { db.close(); resolve() }
+    tx.onerror    = (e) => { db.close(); reject(e.target.error) }
+  })
+}
+async function padIdbDelete(idx) {
+  const db = await openPadDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(PAD_IDB_STORE, 'readwrite')
+    tx.objectStore(PAD_IDB_STORE).delete(idx)
+    tx.oncomplete = () => { db.close(); resolve() }
+    tx.onerror    = (e) => { db.close(); reject(e.target.error) }
+  })
+}
+async function padIdbLoadAll() {
+  const db = await openPadDB()
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(PAD_IDB_STORE, 'readonly')
+    const req = tx.objectStore(PAD_IDB_STORE).getAll()
+    req.onsuccess = (e) => {
+      db.close()
+      resolve(e.target.result.map((r) => ({ idx: r.idx, name: r.name, url: URL.createObjectURL(r.blob) })))
+    }
+    req.onerror = (e) => { db.close(); reject(e.target.error) }
+  })
+}
+
+// ── Pad colour palette (6 colours, one per slot position) ─────────────────────
+const PAD_COLORS = ['#f87171', '#fb923c', '#fbbf24', '#4ade80', '#60a5fa', '#c084fc']
+
 // ── Sample Pads ───────────────────────────────────────────────────────────────
-function SamplePads({ slots, color, onLoad, onToggle, onClear }) {
+function SamplePads({ slots, onLoad, onToggle, onClear }) {
   const [ctxMenu, setCtxMenu] = useState(null) // { idx, x, y }
   const fileRef = useRef(null)
   const pendingRef = useRef(null)
@@ -845,37 +893,40 @@ function SamplePads({ slots, color, onLoad, onToggle, onClear }) {
         </>
       )}
       <div className="grid grid-cols-3 gap-1">
-        {slots.map(({ globalIdx, number, track, playing, progress }) => (
-          <button
-            key={globalIdx}
-            onClick={() => onToggle(globalIdx)}
-            onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ idx: globalIdx, x: e.clientX, y: e.clientY }) }}
-            className="relative h-9 rounded overflow-hidden text-left transition-all active:scale-95 select-none"
-            style={{
-              backgroundColor: playing ? `${color}22` : (track ? '#151820' : '#0d0f14'),
-              border: `1px solid ${playing ? color : (track ? `${color}35` : '#1e2128')}`,
-              boxShadow: playing ? `0 0 7px ${color}40` : 'none',
-            }}
-          >
-            {track && (
-              <div
-                className="absolute bottom-0 left-0 h-0.5"
-                style={{ width: `${progress * 100}%`, backgroundColor: color, transition: 'width 0.1s linear' }}
-              />
-            )}
-            <div className="px-1.5 py-1 flex flex-col justify-center h-full">
-              <span
-                className="text-[8px] font-black leading-none"
-                style={{ color: playing ? color : (track ? '#6b7280' : '#374151') }}
-              >
-                {number}
-              </span>
+        {slots.map(({ globalIdx, number, track, playing, progress }, li) => {
+          const pc = PAD_COLORS[li % PAD_COLORS.length]
+          return (
+            <button
+              key={globalIdx}
+              onClick={() => onToggle(globalIdx)}
+              onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ idx: globalIdx, x: e.clientX, y: e.clientY }) }}
+              className="relative h-9 rounded overflow-hidden text-left transition-all active:scale-95 select-none"
+              style={{
+                backgroundColor: playing ? `${pc}45` : (track ? `${pc}18` : '#0d0f14'),
+                border: `1px solid ${playing ? pc : (track ? `${pc}60` : '#1e2128')}`,
+                boxShadow: playing ? `0 0 8px ${pc}60` : 'none',
+              }}
+            >
               {track && (
-                <p className="text-[7px] text-gray-600 truncate leading-tight mt-0.5">{track.name}</p>
+                <div
+                  className="absolute bottom-0 left-0 h-0.5"
+                  style={{ width: `${progress * 100}%`, backgroundColor: pc, transition: 'width 0.1s linear' }}
+                />
               )}
-            </div>
-          </button>
-        ))}
+              <div className="px-1.5 py-1 flex flex-col justify-center h-full">
+                <span
+                  className="text-[8px] font-black leading-none"
+                  style={{ color: playing ? pc : (track ? pc : '#374151') }}
+                >
+                  {number}
+                </span>
+                {track && (
+                  <p className="text-[7px] truncate leading-tight mt-0.5" style={{ color: `${pc}99` }}>{track.name}</p>
+                )}
+              </div>
+            </button>
+          )
+        })}
       </div>
     </div>
   )
@@ -1313,6 +1364,28 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
   const [padProgress, setPadProgress] = useState(Array(12).fill(0))
   const padAudioRefs = useRef(Array.from({ length: 12 }, () => null))
   const padSrcRefs   = useRef(Array.from({ length: 12 }, () => null))
+
+  // ── Restore pads from IDB on mount ──────────────────────────────────────────
+  useEffect(() => {
+    padIdbLoadAll()
+      .then((saved) => {
+        saved.forEach(({ idx, name, url }) => {
+          const audio = new Audio(url)
+          audio.addEventListener('timeupdate', () => {
+            if (!audio.duration) return
+            setPadProgress((p) => { const n = [...p]; n[idx] = audio.currentTime / audio.duration; return n })
+          })
+          audio.addEventListener('ended', () => {
+            setPadPlaying((p) => { const n = [...p]; n[idx] = false; return n })
+            setPadProgress((p) => { const n = [...p]; n[idx] = 0; return n })
+          })
+          padAudioRefs.current[idx] = audio
+          setPadTracks((t) => { const n = [...t]; n[idx] = { name, url }; return n })
+        })
+      })
+      .catch(() => {})
+  }, [])
+
   const onLoadTrackARef  = useRef(null)
   const onLoadTrackBRef  = useRef(null)
   const preloadedDeckRef    = useRef(null)  // 'A' | 'B' | null — standby deck pre-loaded for next transition
@@ -1409,6 +1482,7 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
       setPadProgress((p) => { const n = [...p]; n[idx] = 0; return n })
     })
     padAudioRefs.current[idx] = audio
+    padIdbSave(idx, file.name.replace(/\.[^.]+$/, ''), file).catch(() => {})
     setPadTracks((t) => { const n = [...t]; n[idx] = { name: file.name.replace(/\.[^.]+$/, ''), url }; return n })
     setPadPlaying((p) => { const n = [...p]; n[idx] = false; return n })
     setPadProgress((p) => { const n = [...p]; n[idx] = 0; return n })
@@ -1442,6 +1516,7 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
       padSrcRefs.current[idx] = null
     }
     padAudioRefs.current[idx] = null
+    padIdbDelete(idx).catch(() => {})
     setPadTracks((t) => { const n = [...t]; n[idx] = null; return n })
     setPadPlaying((p) => { const n = [...p]; n[idx] = false; return n })
     setPadProgress((p) => { const n = [...p]; n[idx] = 0; return n })
