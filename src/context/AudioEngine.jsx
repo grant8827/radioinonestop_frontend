@@ -7,6 +7,11 @@ export function AudioEngineProvider({ children }) {
   const masterRef     = useRef(null)   // GainNode → destination + streamDest
   const streamDestRef = useRef(null)   // MediaStreamDestinationNode
 
+  // ── Cue / headphone bus ───────────────────────────────────────────────────
+  const cueGainRef      = useRef(null)  // GainNode — controls phones volume
+  const cueStreamDestRef = useRef(null) // MediaStreamDestinationNode for cue
+  const cueAudioElRef   = useRef(null)  // hidden <audio> element
+
   // channelId → { gainNode, hiEQ, midEQ, loEQ, panNode, faderNode, analyserNode }
   const channelNodes  = useRef({})
 
@@ -66,6 +71,19 @@ export function AudioEngineProvider({ children }) {
       master.connect(masterAnalyser)
       masterAnalyser.connect(ac.destination)
       masterAnalyser.connect(streamDest)
+
+      // Cue / headphone bus — completely separate from master path
+      const cueGain = ac.createGain()
+      cueGain.gain.value = 0.8
+      cueGainRef.current = cueGain
+      const cueDest = ac.createMediaStreamDestination()
+      cueStreamDestRef.current = cueDest
+      cueGain.connect(cueDest)
+      // Wire up the hidden audio element if it already exists in the DOM
+      if (cueAudioElRef.current) {
+        cueAudioElRef.current.srcObject = cueDest.stream
+        cueAudioElRef.current.play().catch(() => {})
+      }
 
       // Auto-resume if the OS suspends the context mid-playback
       ac.addEventListener('statechange', () => {
@@ -462,6 +480,36 @@ export function AudioEngineProvider({ children }) {
     return streamDestRef.current?.stream ?? null
   }, [getAC])
 
+  // ── Cue bus controls ─────────────────────────────────────────────────────
+  const sendToCue = useCallback((deckKey) => {
+    getAC()
+    const analyser = deckAnalysers.current[deckKey]
+    const cueGain  = cueGainRef.current
+    if (analyser && cueGain) {
+      try { analyser.connect(cueGain) } catch { /* already connected */ }
+    }
+  }, [getAC])
+
+  const removeFromCue = useCallback((deckKey) => {
+    const analyser = deckAnalysers.current[deckKey]
+    const cueGain  = cueGainRef.current
+    if (analyser && cueGain) {
+      try { analyser.disconnect(cueGain) } catch { /* not connected */ }
+    }
+  }, [])
+
+  const setCueVolume = useCallback((val) => {
+    if (cueGainRef.current) cueGainRef.current.gain.value = Math.max(0, Math.min(1, val))
+  }, [])
+
+  const setCueSink = useCallback((deviceId) => {
+    const el = cueAudioElRef.current
+    if (!el) return
+    if ('setSinkId' in el) {
+      el.setSinkId(deviceId).catch(() => {})
+    }
+  }, [])
+
   // ── On-Air mic tracking (shared across NowPlaying + Mixer) ───────────────
   const [micOnAirMap, setMicOnAirMap] = useState({})
 
@@ -514,8 +562,24 @@ export function AudioEngineProvider({ children }) {
       disconnectConferenceStream,
       disconnectAllConferenceStreams,
       disconnectConferenceFromChannel,
+      // Cue / headphone bus
+      sendToCue,
+      removeFromCue,
+      setCueVolume,
+      setCueSink,
     }}>
       {children}
+      {/* Hidden audio element for cue/headphone output */}
+      <audio
+        ref={cueAudioElRef}
+        style={{ display: 'none' }}
+        onCanPlay={(e) => {
+          // Attach stream when AudioContext has been initialised
+          if (cueStreamDestRef.current && !e.target.srcObject) {
+            e.target.srcObject = cueStreamDestRef.current.stream
+          }
+        }}
+      />
     </AudioEngineCtx.Provider>
   )
 }
