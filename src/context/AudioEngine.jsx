@@ -347,7 +347,7 @@ export function AudioEngineProvider({ children }) {
           const src = mediaSources.current[k]
           const deq = deckEqNodes.current[k]
           const dka = deckAnalysers.current[k]
-          try { src.disconnect() } catch { /* ignore */ }
+          try { src.disconnect(deq.hi) } catch { /* ignore */ }   // only unplug the channel path; cueSendNode stays connected
           try { deq.lo.disconnect() } catch { /* ignore */ }
           try { dka.disconnect() } catch { /* ignore */ }
           src.connect(deq.hi)
@@ -445,7 +445,7 @@ export function AudioEngineProvider({ children }) {
       const src = mediaSources.current[key]
       const deq = deckEqNodes.current[key]
       const dka = deckAnalysers.current[key]
-      try { src.disconnect() } catch { /* not yet connected */ }
+      try { src.disconnect(deq.hi) } catch { /* not yet connected */ }   // only unplug the channel path; cueSendNode stays connected
       try { deq.lo.disconnect() } catch { /* not yet connected */ }
       try { dka.disconnect() } catch { /* not yet connected */ }
       src.connect(deq.hi)
