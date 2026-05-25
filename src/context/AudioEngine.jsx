@@ -25,6 +25,9 @@ export function AudioEngineProvider({ children }) {
   // Master output AnalyserNode
   const masterAnalyserRef = useRef(null)
 
+  // 3-band EQ on the master bus (between master gain and master analyser)
+  const masterEqRef = useRef(null)  // { hi, mid, lo } BiquadFilterNodes
+
   // Headphone phones gain — sits between masterAnalyser and ac.destination (local only, stream unaffected)
   const phonesGainRef = useRef(null)
 
@@ -67,12 +70,22 @@ export function AudioEngineProvider({ children }) {
       const streamDest = ac.createMediaStreamDestination()
       streamDestRef.current = streamDest
 
-      // Master analyser — tap after the master gain, before destination
+      // 3-band master EQ — inserted between master gain and master analyser
+      const masterHi  = ac.createBiquadFilter()
+      masterHi.type  = 'highshelf'; masterHi.frequency.value  = 8000; masterHi.gain.value  = 0
+      const masterMid = ac.createBiquadFilter()
+      masterMid.type = 'peaking';   masterMid.frequency.value = 1000; masterMid.Q.value    = 0.8; masterMid.gain.value = 0
+      const masterLo  = ac.createBiquadFilter()
+      masterLo.type  = 'lowshelf';  masterLo.frequency.value  = 200;  masterLo.gain.value  = 0
+      master.connect(masterHi); masterHi.connect(masterMid); masterMid.connect(masterLo)
+      masterEqRef.current = { hi: masterHi, mid: masterMid, lo: masterLo }
+
+      // Master analyser — tap after the master EQ, before destination
       const masterAnalyser = ac.createAnalyser()
       masterAnalyser.fftSize = 256
       masterAnalyser.smoothingTimeConstant = 0.85
       masterAnalyserRef.current = masterAnalyser
-      master.connect(masterAnalyser)
+      masterLo.connect(masterAnalyser)
 
       // Phones gain: local headphone/speaker path only — stream is NOT affected
       const phonesGain = ac.createGain()
@@ -232,6 +245,19 @@ export function AudioEngineProvider({ children }) {
   const updateMasterFader = useCallback((value) => {
     if (!masterRef.current || !acRef.current) return
     masterRef.current.gain.setTargetAtTime(value, acRef.current.currentTime, 0.02)
+  }, [])
+
+  // ── Master bus 3-band EQ ─────────────────────────────────────────────────
+  const updateMasterEq = useCallback((band, value) => {
+    const eq = masterEqRef.current
+    if (!eq || !acRef.current) return
+    const t  = acRef.current.currentTime
+    const dB = (value - 0.5) * 24
+    switch (band) {
+      case 'hi':  eq.hi.gain.setTargetAtTime(dB,  t, 0.01); break
+      case 'mid': eq.mid.gain.setTargetAtTime(dB, t, 0.01); break
+      case 'lo':  eq.lo.gain.setTargetAtTime(dB,  t, 0.01); break
+    }
   }, [])
 
   // ── Headphone / phones output level (local only — stream is never touched) ─
@@ -553,6 +579,7 @@ export function AudioEngineProvider({ children }) {
       updateChannelParam,
       setChannelActive,
       updateMasterFader,
+      updateMasterEq,
       updatePhonesVol,
       updateCueVol,
       setCueSend,
