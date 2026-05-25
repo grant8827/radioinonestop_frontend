@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useAuth } from '../context/AuthContext'
 
 const NAV_ITEMS = [
   { id: 'radio', label: 'Radio', icon: RadioIcon },
@@ -60,6 +61,7 @@ function StreamDot({ live }) {
 export default function Sidebar({ stationName, mode, onModeChange, onSettingsClick }) {
   const [streams, setStreams] = useState([])
   const [open, setOpen] = useState(false) // mobile drawer
+  const { logout } = useAuth()
 
   useEffect(() => {
     const load = () =>
@@ -147,8 +149,27 @@ export default function Sidebar({ stationName, mode, onModeChange, onSettingsCli
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Settings */}
-      <div className="px-3 pb-5 border-t border-gray-800 pt-3">
+      {/* Settings area */}
+      <div className="px-3 pb-5 border-t border-gray-800 pt-3 space-y-0.5">
+        {/* Profile */}
+        <button
+          onClick={() => { onModeChange('profile'); setOpen(false) }}
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+            mode === 'profile'
+              ? 'bg-red-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-gray-800'
+          }`}
+        >
+          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+          </svg>
+          Profile
+          {mode === 'profile' && (
+            <span className="ml-auto text-[10px] font-semibold bg-white/20 rounded px-1.5 py-0.5 leading-none">ON</span>
+          )}
+        </button>
+
+        {/* Settings */}
         <button
           onClick={() => { onModeChange('settings'); setOpen(false) }}
           className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -165,6 +186,17 @@ export default function Sidebar({ stationName, mode, onModeChange, onSettingsCli
           {mode === 'settings' && (
             <span className="ml-auto text-[10px] font-semibold bg-white/20 rounded px-1.5 py-0.5 leading-none">ON</span>
           )}
+        </button>
+
+        {/* Logout */}
+        <button
+          onClick={() => { logout(); setOpen(false) }}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all text-gray-400 hover:text-red-400 hover:bg-gray-800"
+        >
+          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+          </svg>
+          Logout
         </button>
       </div>
     </div>

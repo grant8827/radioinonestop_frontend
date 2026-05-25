@@ -10,6 +10,7 @@ import Mixer from './components/Mixer'
 import SocialLive from './components/SocialLive'
 import TrackLibrary from './components/TrackLibrary'
 import ConferenceRoom from './pages/ConferenceRoom'
+import SettingsPage from './components/SettingsPage'
 import ProfileSettings from './components/ProfileSettings'
 import LandingPage from './pages/LandingPage'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -115,7 +116,8 @@ function MainApp() {
           {mode === 'conference' && (
             <ConferenceRoom roomId="studio" username={user?.stationName} onLeave={() => handleModeChange('radio')} />
           )}
-          {mode === 'settings' && <ProfileSettings />}
+          {mode === 'profile' && <ProfileSettings />}
+          {mode === 'settings' && <SettingsPage />}
 
           {/* Player + NowPlaying + Chat — always mounted so audio elements survive
               mode switches. Hidden (display:none) when not in radio/video mode. */}

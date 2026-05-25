@@ -208,7 +208,7 @@ export default function ProfileSettings() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-gray-950 px-4 py-6 lg:px-8">
-      <h1 className="text-lg font-bold text-white mb-6">Settings</h1>
+      <h1 className="text-lg font-bold text-white mb-6">Profile</h1>
 
       <div className="max-w-lg space-y-5">
 
