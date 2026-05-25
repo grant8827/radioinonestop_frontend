@@ -79,7 +79,7 @@ function MainApp() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex">
+    <div className="h-screen overflow-hidden bg-gray-950 text-white flex">
       {reconnectNeeded && (
         <div className="fixed top-0 left-0 right-0 z-100 bg-amber-900/95 text-amber-100 text-sm py-2 px-4 flex items-center justify-between gap-2 border-b border-amber-700">
           <span>Your stream was interrupted. Reconnect to resume broadcasting.</span>
@@ -98,7 +98,7 @@ function MainApp() {
       />
 
       {/* Main area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
         {/* Header */}
         <header className="bg-gray-900 border-b border-gray-800 px-4 lg:px-6 py-3 flex items-center justify-between">
           <h1 className="text-base font-semibold tracking-tight truncate">{stationName || user?.stationName || config.stationName}</h1>
@@ -106,7 +106,7 @@ function MainApp() {
         </header>
 
         {/* Content */}
-        <main className="flex-1 flex flex-col lg:flex-row gap-4 p-4 lg:p-6 max-w-6xl mx-auto w-full">
+        <main className="flex-1 min-h-0 overflow-y-auto flex flex-col lg:flex-row gap-4 p-4 lg:p-6 max-w-6xl mx-auto w-full">
           {/* Keep StreamSetup mounted so an active broadcast isn't killed by tab navigation.
               Hidden via CSS — the WS + MediaRecorder stay alive. */}
           <div className={mode !== 'stream' ? 'hidden' : 'contents'}>
@@ -130,7 +130,7 @@ function MainApp() {
             </div>
             <div className="lg:w-80 xl:w-96 shrink-0 flex flex-col gap-3 min-h-0">
               <SocialLive />
-              <div className="min-h-0 overflow-hidden h-[calc(94vh-260px)]">
+              <div className="flex-1 min-h-0 overflow-hidden">
                 <TrackLibrary onTrackLoadA={setTrackA} onTrackLoadB={setTrackB} queue={queue} onQueueChange={setQueue} repeatPlaylist={repeatPlaylist} onRepeatChange={setRepeatPlaylist} nowPlayingA={trackA} nowPlayingB={trackB} />
               </div>
             </div>

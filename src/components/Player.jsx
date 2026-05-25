@@ -1207,6 +1207,8 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
   const cuePointBSecRef  = useRef(0)
   const cuePreviewingA   = useRef(false)
   const cuePreviewingB   = useRef(false)
+  const loopStartARef    = useRef(null)   // seconds, captured when loop is enabled
+  const loopStartBRef    = useRef(null)
 
   // ── Auto DJ ─────────────────────────────────────────────────────────────────
   const [autoDJ,      setAutoDJ]      = useState(false)
@@ -1300,6 +1302,42 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
   useEffect(() => {
     if (mediaRefB.current) mediaRefB.current.playbackRate = Math.max(0.5, Math.min(2, 1 + pitchB * 0.08))
   }, [pitchB])
+
+  // ── Key Lock → preservesPitch ──────────────────────────────────────────────
+  useEffect(() => {
+    if (mediaRef.current)  mediaRef.current.preservesPitch  = keyA
+  }, [keyA])
+
+  useEffect(() => {
+    if (mediaRefB.current) mediaRefB.current.preservesPitch = keyB
+  }, [keyB])
+
+  // ── Loop ──────────────────────────────────────────────────────────────────
+  const LOOP_BAR_SIZES = [1/8, 1/4, 1/2, 1, 2, 4, 8, 16]
+
+  useEffect(() => {
+    const media = mediaRef.current
+    if (!media || !loopActA) return
+    const loopDur = LOOP_BAR_SIZES[loopIdxA] * 4 * 60 / 128.0
+    const start = loopStartARef.current ?? 0
+    const onLoop = () => {
+      if (media.currentTime >= start + loopDur) media.currentTime = start
+    }
+    media.addEventListener('timeupdate', onLoop)
+    return () => media.removeEventListener('timeupdate', onLoop)
+  }, [loopActA, loopIdxA])
+
+  useEffect(() => {
+    const media = mediaRefB.current
+    if (!media || !loopActB) return
+    const loopDur = LOOP_BAR_SIZES[loopIdxB] * 4 * 60 / 125.0
+    const start = loopStartBRef.current ?? 0
+    const onLoop = () => {
+      if (media.currentTime >= start + loopDur) media.currentTime = start
+    }
+    media.addEventListener('timeupdate', onLoop)
+    return () => media.removeEventListener('timeupdate', onLoop)
+  }, [loopActB, loopIdxB])
 
   // ── Cancel sweep RAF on unmount ────────────────────────────────────────────────
   useEffect(() => () => { if (sweepRAFRef.current) cancelAnimationFrame(sweepRAFRef.current) }, [])
@@ -1779,9 +1817,9 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
                 setProgressA(pos)
               }}
               loopActive={loopActA} loopSizeIdx={loopIdxA}
-              onLoopToggle={() => setLoopActA((v) => !v)}
+              onLoopToggle={() => { if (!loopActA) loopStartARef.current = mediaRef.current?.currentTime ?? 0; setLoopActA(v => !v) }}
               onLoopResize={(d) => setLoopIdxA((v) => Math.max(0, Math.min(LOOP_SIZES.length - 1, v + d)))}
-              synced={syncA} onSyncToggle={() => setSyncA((v) => !v)}
+              synced={syncA} onSyncToggle={() => { if (!syncA) setPitchA(pitchB); setSyncA(v => !v) }}
               keyLock={keyA} onKeyLockToggle={() => setKeyA((v) => !v)}
               cuePoint={cuePointA}
               onCueDown={() => {
@@ -1889,9 +1927,9 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
                 setProgressB(pos)
               }}
               loopActive={loopActB} loopSizeIdx={loopIdxB}
-              onLoopToggle={() => setLoopActB((v) => !v)}
+              onLoopToggle={() => { if (!loopActB) loopStartBRef.current = mediaRefB.current?.currentTime ?? 0; setLoopActB(v => !v) }}
               onLoopResize={(d) => setLoopIdxB((v) => Math.max(0, Math.min(LOOP_SIZES.length - 1, v + d)))}
-              synced={syncB} onSyncToggle={() => setSyncB((v) => !v)}
+              synced={syncB} onSyncToggle={() => { if (!syncB) setPitchB(pitchA); setSyncB(v => !v) }}
               keyLock={keyB} onKeyLockToggle={() => setKeyB((v) => !v)}
               cuePoint={cuePointB}
               onCueDown={() => {
