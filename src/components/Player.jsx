@@ -1063,6 +1063,7 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
   const [crossfader, setCrossfader] = useState(0.5)
   const crossfaderRef = useRef(0.5)
   const sweepRAFRef   = useRef(null)
+  const wakeLockRef   = useRef(null)
 
   // ── Auto DJ ─────────────────────────────────────────────────────────────────
   const [autoDJ,      setAutoDJ]      = useState(false)
@@ -1129,6 +1130,74 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
 
   // ── Cancel sweep RAF on unmount ────────────────────────────────────────────────
   useEffect(() => () => { if (sweepRAFRef.current) cancelAnimationFrame(sweepRAFRef.current) }, [])
+
+  // ── Screen Wake Lock — prevent device sleep while Auto DJ is broadcasting ────
+  // On mobile, keeping the screen on prevents the AudioContext from being
+  // suspended, which would cut the stream. Acquired when Auto DJ turns ON,
+  // released when it turns OFF or the component unmounts.
+  useEffect(() => {
+    if (!autoDJ) {
+      wakeLockRef.current?.release().catch(() => {})
+      wakeLockRef.current = null
+      return
+    }
+    if ('wakeLock' in navigator) {
+      navigator.wakeLock.request('screen')
+        .then(lock => { wakeLockRef.current = lock })
+        .catch(() => {}) // user may have denied or device doesn’t support it
+    }
+    return () => {
+      wakeLockRef.current?.release().catch(() => {})
+      wakeLockRef.current = null
+    }
+  }, [autoDJ])
+
+  // ── Resume audio engine + re-acquire wake lock after device wakes from sleep ─
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState !== 'visible') return
+      // Resume AudioContext (it is suspended when the browser is backgrounded)
+      audioEngineRef.current?.resume()
+      // Re-acquire the wake lock — it is released automatically when the screen locked
+      if (autoDJRef.current && 'wakeLock' in navigator && !wakeLockRef.current) {
+        navigator.wakeLock.request('screen')
+          .then(lock => { wakeLockRef.current = lock })
+          .catch(() => {})
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [])
+
+  // ── Media Session — show current track on device lock screen ─────────────────
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return
+    const activeTrack = playing ? trackA : playingB ? trackB : null
+    if (!activeTrack) {
+      try { navigator.mediaSession.playbackState = 'paused' } catch (e) {}
+      return
+    }
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title:   activeTrack.name  || 'Unknown Track',
+        artist:  'DJ Mix',
+        album:   'Radio In One Stop',
+        artwork: [],
+      })
+      navigator.mediaSession.playbackState = 'playing'
+      navigator.mediaSession.setActionHandler('pause', () => {
+        mediaRef.current?.pause(); setPlaying(false)
+        mediaRefB.current?.pause(); setPlayingB(false)
+        if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused'
+      })
+      navigator.mediaSession.setActionHandler('play', () => {
+        audioEngineRef.current?.resume()
+        if (playing && mediaRef.current) mediaRef.current.play().catch(() => {})
+        if (playingB && mediaRefB.current) mediaRefB.current.play().catch(() => {})
+        if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'
+      })
+    } catch (e) {}
+  }, [trackA, trackB, playing, playingB])
 
   // ── Real-time VU levels for the Player CenterMixer strips ─────────────────
   const [deckLevels, setDeckLevels] = useState({ a: 0, b: 0, masterL: 0, masterR: 0 })

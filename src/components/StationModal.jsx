@@ -200,6 +200,18 @@ export default function StationModal({ station, onClose }) {
     }
   }, [])
 
+  // Resume AudioContext if the OS suspended it while the tab/app was backgrounded
+  // (e.g. device woke from sleep, user switches back from another app).
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && acRef.current?.state === 'suspended') {
+        acRef.current.resume().catch(() => {})
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [])
+
   // Volume / mute
   useEffect(() => {
     if (audioRef.current) {
@@ -212,10 +224,13 @@ export default function StationModal({ station, onClose }) {
     if (!audio) return
 
     // Build AudioContext + analyser for visualizer.
-    // Attempted on ALL platforms (including iOS Safari 15+, which does support
-    // createMediaElementSource for audio elements). Wrapped in try/catch so older
-    // iOS devices fall back gracefully to the idle sine-wave animation.
-    if (!acRef.current) {
+    // IMPORTANT: On iOS, routing audio through AudioContext (createMediaElementSource)
+    // causes the AudioContext to suspend when the screen locks, killing the stream.
+    // We skip the wiring on iOS so the native <audio> element plays uninterrupted in
+    // the background (exactly like Spotify/Apple Music). The idle sine animation shows
+    // instead of the live waveform, which is the correct trade-off.
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
+    if (!acRef.current && !isIOS) {
       try {
         const ac           = new (window.AudioContext || window.webkitAudioContext)()
         const analyserNode = ac.createAnalyser()
@@ -227,7 +242,7 @@ export default function StationModal({ station, onClose }) {
         analyserNode.connect(ac.destination)
         setAnalyser(analyserNode)
       } catch (e) {
-        // createMediaElementSource unsupported on this platform — idle animation only
+        // createMediaElementSource unavailable on this platform — idle animation only
       }
     }
     if (acRef.current?.state === 'suspended') acRef.current.resume()
