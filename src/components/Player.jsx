@@ -1760,13 +1760,8 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
                 const m = mediaRef.current
                 if (!m || !isFinite(m.duration)) return
                 audioEngineRef.current?.setCueSend('dj-a', true)
-                if (playing) {
-                  // Snap to cue point and pause
-                  m.currentTime = cuePointASecRef.current
-                  m.pause(); setPlaying(false)
-                  setProgressA(m.duration > 0 ? cuePointASecRef.current / m.duration : 0)
-                } else {
-                  // Set cue at current position and preview (play while held)
+                if (!playing) {
+                  // Paused: set cue point at current position and preview while held
                   const t = m.currentTime
                   cuePointASecRef.current = t
                   setCuePointA(m.duration > 0 ? t / m.duration : 0)
@@ -1774,11 +1769,12 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
                   audioEngineRef.current?.resume()
                   m.play().catch(() => {}); setPlaying(true)
                 }
+                // Playing: just monitor the deck through headphones — don't pause
               }}
               onCueUp={() => {
+                audioEngineRef.current?.setCueSend('dj-a', false)
                 if (!cuePreviewingA.current) return
                 cuePreviewingA.current = false
-                audioEngineRef.current?.setCueSend('dj-a', false)
                 const m = mediaRef.current
                 if (!m) return
                 m.pause(); m.currentTime = cuePointASecRef.current
@@ -1866,11 +1862,8 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
                 const m = mediaRefB.current
                 if (!m || !isFinite(m.duration)) return
                 audioEngineRef.current?.setCueSend('dj-b', true)
-                if (playingB) {
-                  m.currentTime = cuePointBSecRef.current
-                  m.pause(); setPlayingB(false)
-                  setProgressB(m.duration > 0 ? cuePointBSecRef.current / m.duration : 0)
-                } else {
+                if (!playingB) {
+                  // Paused: set cue point at current position and preview while held
                   const t = m.currentTime
                   cuePointBSecRef.current = t
                   setCuePointB(m.duration > 0 ? t / m.duration : 0)
@@ -1878,11 +1871,12 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
                   audioEngineRef.current?.resume()
                   m.play().catch(() => {}); setPlayingB(true)
                 }
+                // Playing: just monitor the deck through headphones — don't pause
               }}
               onCueUp={() => {
+                audioEngineRef.current?.setCueSend('dj-b', false)
                 if (!cuePreviewingB.current) return
                 cuePreviewingB.current = false
-                audioEngineRef.current?.setCueSend('dj-b', false)
                 const m = mediaRefB.current
                 if (!m) return
                 m.pause(); m.currentTime = cuePointBSecRef.current
