@@ -800,6 +800,87 @@ function DeckUnit({
   )
 }
 
+// ── Sample Pads ───────────────────────────────────────────────────────────────
+function SamplePads({ slots, color, onLoad, onToggle, onClear }) {
+  const [ctxMenu, setCtxMenu] = useState(null) // { idx, x, y }
+  const fileRef = useRef(null)
+  const pendingRef = useRef(null)
+
+  return (
+    <div>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="audio/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f && pendingRef.current !== null) onLoad(pendingRef.current, f)
+          e.target.value = ''
+          setCtxMenu(null)
+        }}
+      />
+      {ctxMenu && (
+        <>
+          <div className="fixed inset-0 z-40" onPointerDown={() => setCtxMenu(null)} />
+          <div
+            className="fixed z-50 bg-[#1a1d24] border border-gray-700 rounded-lg shadow-xl py-1 min-w-[130px]"
+            style={{ left: ctxMenu.x, top: ctxMenu.y }}
+          >
+            <button
+              className="w-full text-left px-3 py-1.5 text-[10px] font-bold text-sky-400 hover:bg-gray-800/80"
+              onClick={() => { pendingRef.current = ctxMenu.idx; fileRef.current?.click() }}
+            >
+              Load track
+            </button>
+            {slots.find((s) => s.globalIdx === ctxMenu.idx)?.track && (
+              <button
+                className="w-full text-left px-3 py-1.5 text-[10px] font-bold text-red-500 hover:bg-gray-800/80"
+                onClick={() => { onClear(ctxMenu.idx); setCtxMenu(null) }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </>
+      )}
+      <div className="grid grid-cols-3 gap-1">
+        {slots.map(({ globalIdx, number, track, playing, progress }) => (
+          <button
+            key={globalIdx}
+            onClick={() => onToggle(globalIdx)}
+            onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ idx: globalIdx, x: e.clientX, y: e.clientY }) }}
+            className="relative h-9 rounded overflow-hidden text-left transition-all active:scale-95 select-none"
+            style={{
+              backgroundColor: playing ? `${color}22` : (track ? '#151820' : '#0d0f14'),
+              border: `1px solid ${playing ? color : (track ? `${color}35` : '#1e2128')}`,
+              boxShadow: playing ? `0 0 7px ${color}40` : 'none',
+            }}
+          >
+            {track && (
+              <div
+                className="absolute bottom-0 left-0 h-0.5"
+                style={{ width: `${progress * 100}%`, backgroundColor: color, transition: 'width 0.1s linear' }}
+              />
+            )}
+            <div className="px-1.5 py-1 flex flex-col justify-center h-full">
+              <span
+                className="text-[8px] font-black leading-none"
+                style={{ color: playing ? color : (track ? '#6b7280' : '#374151') }}
+              >
+                {number}
+              </span>
+              {track && (
+                <p className="text-[7px] text-gray-600 truncate leading-tight mt-0.5">{track.name}</p>
+              )}
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Center Mixer ───────────────────────────────────────────────────────────────
 function CenterMixer({
   eqA, onEqAChange, gainA, onGainAChange, faderA, onFaderAChange, pflA, onPflAToggle,
