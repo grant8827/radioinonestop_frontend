@@ -37,6 +37,7 @@ function KpiCard({ label, value, sub, accent }) {
     green:  'border-green-500/30 bg-green-950/20',
     purple: 'border-purple-500/30 bg-purple-950/20',
     blue:   'border-blue-500/30 bg-blue-950/20',
+    cyan:   'border-cyan-500/30 bg-cyan-950/20',
     orange: 'border-orange-500/30 bg-orange-950/20',
   }[accent] ?? 'border-gray-700/50 bg-gray-900/40'
 
@@ -44,6 +45,7 @@ function KpiCard({ label, value, sub, accent }) {
     green:  'bg-green-400',
     purple: 'bg-purple-400',
     blue:   'bg-blue-400',
+    cyan:   'bg-cyan-400',
     orange: 'bg-orange-400',
   }[accent] ?? 'bg-gray-400'
 
@@ -185,7 +187,7 @@ export default function ListenersPage() {
       )}
 
       {/* ── KPI cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <KpiCard
           label="Live Now"
           value={data?.live_count ?? '—'}
@@ -203,6 +205,12 @@ export default function ListenersPage() {
           value={data?.monthly_sessions ?? '—'}
           sub="unique listeners"
           accent="blue"
+        />
+        <KpiCard
+          label="Total"
+          value={data?.total_listeners ?? '—'}
+          sub="all-time unique"
+          accent="cyan"
         />
         <KpiCard
           label="Avg Duration"
