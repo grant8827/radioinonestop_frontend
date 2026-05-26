@@ -1,10 +1,8 @@
 import { useState, useRef } from 'react'
 import { useAudioEngine } from '../context/AudioEngine'
-import ListenersPage from './ListenersPage'
 
 const TABS = [
-  { id: 'record',    label: 'Record' },
-  { id: 'listeners', label: 'Listeners' },
+  { id: 'record', label: 'Record' },
 ]
 
 const hasDirPicker = typeof window !== 'undefined' && 'showDirectoryPicker' in window
@@ -253,8 +251,6 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Listeners tab */}
-      {tab === 'listeners' && <ListenersPage />}
     </div>
   )
 }
