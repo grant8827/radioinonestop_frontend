@@ -169,6 +169,8 @@ export default function StationModal({ station, onClose }) {
   const acRef     = useRef(null)
   const srcRef    = useRef(null)
   const pollRef   = useRef(null)
+  const listenerSessionRef = useRef(null)
+  const heartbeatRef       = useRef(null)
 
   const hlsUrl    = `/hls/${info.slug}/index.m3u8`
   const streamUrl  = `/listen/${info.slug}` // WebM fallback (desktop Chrome/Firefox)
@@ -191,15 +193,6 @@ export default function StationModal({ station, onClose }) {
     return () => clearInterval(pollRef.current)
   }, [info.slug])
 
-  // Cleanup HLS + AudioContext on unmount
-  useEffect(() => {
-    return () => {
-      hlsRef.current?.destroy()
-      srcRef.current?.disconnect()
-      acRef.current?.close()
-    }
-  }, [])
-
   // Resume AudioContext if the OS suspended it while the tab/app was backgrounded
   // (e.g. device woke from sleep, user switches back from another app).
   useEffect(() => {
@@ -219,9 +212,71 @@ export default function StationModal({ station, onClose }) {
     }
   }, [volume, muted])
 
-  const play = useCallback(() => {
+  const stopListenerSession = useCallback((keepalive = false) => {
+    const sessionID = listenerSessionRef.current
+    if (!sessionID) return
+    listenerSessionRef.current = null
+    if (heartbeatRef.current) {
+      clearInterval(heartbeatRef.current)
+      heartbeatRef.current = null
+    }
+    const body = JSON.stringify({ session_id: sessionID })
+    if (keepalive && navigator.sendBeacon) {
+      navigator.sendBeacon('/api/listeners/stop', new Blob([body], { type: 'application/json' }))
+      return
+    }
+    fetch('/api/listeners/stop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      keepalive,
+    }).catch(() => {})
+  }, [])
+
+  const startListenerSession = useCallback(async () => {
+    if (listenerSessionRef.current) return listenerSessionRef.current
+    try {
+      const r = await fetch('/api/listeners/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: info.slug }),
+      })
+      if (!r.ok) return null
+      const data = await r.json()
+      const sessionID = data.session_id
+      if (!sessionID) return null
+      listenerSessionRef.current = sessionID
+      heartbeatRef.current = setInterval(() => {
+        fetch('/api/listeners/heartbeat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionID }),
+          keepalive: true,
+        }).catch(() => {})
+      }, 15_000)
+      return sessionID
+    } catch {
+      return null
+    }
+  }, [info.slug])
+
+  // Cleanup HLS + listener session + AudioContext on unmount
+  useEffect(() => {
+    return () => {
+      hlsRef.current?.destroy()
+      stopListenerSession(true)
+      srcRef.current?.disconnect()
+      acRef.current?.close()
+    }
+  }, [stopListenerSession])
+
+  const play = useCallback(async () => {
     const audio = audioRef.current
     if (!audio) return
+    const sessionID = await startListenerSession()
+    const countedStreamUrl = sessionID
+      ? `${streamUrl}?listener_session=${encodeURIComponent(sessionID)}`
+      : streamUrl
 
     // Build AudioContext + analyser for visualizer.
     // IMPORTANT: On iOS, routing audio through AudioContext (createMediaElementSource)
@@ -266,12 +321,14 @@ export default function StationModal({ station, onClose }) {
         navigator.mediaSession.setActionHandler('pause', () => {
           hlsRef.current?.destroy(); hlsRef.current = null
           if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = '' }
+          stopListenerSession(true)
           setPlaying(false)
           if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused'
         })
         navigator.mediaSession.setActionHandler('stop',  () => {
           hlsRef.current?.destroy(); hlsRef.current = null
           if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = '' }
+          stopListenerSession(true)
           setPlaying(false)
           if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none'
         })
@@ -291,7 +348,7 @@ export default function StationModal({ station, onClose }) {
           // HLS not ready — try Icecast URL if available, else raw WebM hub stream
           hls.destroy()
           hlsRef.current = null
-          audio.src = info.icecast_listen_url || streamUrl
+          audio.src = info.icecast_listen_url || countedStreamUrl
           audio.play().catch(() => {})
         }
       })
@@ -305,12 +362,12 @@ export default function StationModal({ station, onClose }) {
     } else {
       // Final fallback: Icecast stream or raw WebM
       hlsRef.current = null
-      audio.src = info.icecast_listen_url || streamUrl
+      audio.src = info.icecast_listen_url || countedStreamUrl
       audio.play().catch(() => {})
     }
 
     setPlaying(true)
-  }, [hlsUrl, streamUrl])
+  }, [hlsUrl, info.genre, info.icecast_listen_url, info.logo_url, info.name, startListenerSession, stopListenerSession, streamUrl])
 
   const stop = useCallback(() => {
     hlsRef.current?.destroy()
@@ -319,11 +376,12 @@ export default function StationModal({ station, onClose }) {
       audioRef.current.pause()
       audioRef.current.src = ''
     }
+    stopListenerSession(true)
     setPlaying(false)
     if ('mediaSession' in navigator) {
       try { navigator.mediaSession.playbackState = 'paused' } catch (e) {}
     }
-  }, [])
+  }, [stopListenerSession])
 
   const close = useCallback(() => {
     stop()
