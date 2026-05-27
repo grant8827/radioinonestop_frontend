@@ -240,7 +240,14 @@ export default function ListenersPage() {
       {/* ── Geographic distribution ── */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-800">
-          <h3 className="text-sm font-semibold text-white">Geographic Distribution</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-white">Geographic Distribution</h3>
+            {data && (
+              <span className="text-xs text-gray-400">
+                🌍 {data.countries?.length ?? 0} {(data.countries?.length ?? 0) === 1 ? 'country' : 'countries'}
+              </span>
+            )}
+          </div>
           <p className="text-xs text-gray-500 mt-0.5">
             {data?.live_count > 0
               ? 'Based on active listeners'
