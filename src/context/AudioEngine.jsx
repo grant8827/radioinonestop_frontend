@@ -626,6 +626,83 @@ export function AudioEngineProvider({ children }) {
     })
   }, [duckLineChannels, setChannelActive])
 
+  // ── Recording ─────────────────────────────────────────────────────────────
+  const recDirHandleRef = useRef(null)
+  const [recDirName, setRecDirName] = useState(() => localStorage.getItem('recDirName') || '')
+  const [recording, setRecording] = useState(false)
+  const [recTime, setRecTime] = useState(0)
+  const recMrRef     = useRef(null)
+  const recChunksRef = useRef([])
+  const recTimerRef  = useRef(null)
+
+  const setRecDirHandle = useCallback((handle) => {
+    recDirHandleRef.current = handle
+    setRecDirName(handle.name)
+    localStorage.setItem('recDirName', handle.name)
+  }, [])
+
+  const clearRecDirHandle = useCallback(() => {
+    recDirHandleRef.current = null
+    setRecDirName('')
+    localStorage.removeItem('recDirName')
+  }, [])
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 10000)
+  }
+
+  const startRec = useCallback((format = 'webm') => {
+    getAC()
+    const stream = streamDestRef.current?.stream ?? null
+    if (!stream || stream.getAudioTracks().length === 0) return 'no-stream'
+
+    const mimeType = format === 'ogg' ? 'audio/ogg; codecs=opus' : 'audio/webm; codecs=opus'
+    let mr
+    try {
+      mr = new MediaRecorder(stream, { mimeType })
+    } catch {
+      try { mr = new MediaRecorder(stream) } catch { return 'unsupported' }
+    }
+
+    recChunksRef.current = []
+    mr.ondataavailable = (e) => { if (e.data.size > 0) recChunksRef.current.push(e.data) }
+    mr.onstop = async () => {
+      clearInterval(recTimerRef.current)
+      const actualMime = mr.mimeType || mimeType
+      const blob = new Blob(recChunksRef.current, { type: actualMime })
+      const ext = actualMime.includes('ogg') ? 'ogg' : 'webm'
+      const filename = `mix-${new Date().toISOString().replace(/[:.]/g, '-')}.${ext}`
+      if (recDirHandleRef.current) {
+        try {
+          const fh = await recDirHandleRef.current.getFileHandle(filename, { create: true })
+          const writable = await fh.createWritable()
+          await writable.write(blob)
+          await writable.close()
+        } catch { downloadBlob(blob, filename) }
+      } else {
+        downloadBlob(blob, filename)
+      }
+      setRecTime(0)
+      setRecording(false)
+    }
+
+    recMrRef.current = mr
+    mr.start(1000)
+    setRecording(true)
+    setRecTime(0)
+    recTimerRef.current = setInterval(() => setRecTime((t) => t + 1), 1000)
+    return 'ok'
+  }, [getAC])
+
+  const stopRec = useCallback(() => {
+    recMrRef.current?.stop()
+  }, [])
+
   return (
     <AudioEngineCtx.Provider value={{
       setupChannelNodes,
@@ -652,6 +729,14 @@ export function AudioEngineProvider({ children }) {
       setDjActive,
       micOnAirMap,
       setMicOnAir,
+      // Recording
+      recording,
+      recTime,
+      recDirName,
+      setRecDirHandle,
+      clearRecDirHandle,
+      startRec,
+      stopRec,
       // Conference streams
       connectConferenceStream,
       disconnectConferenceStream,

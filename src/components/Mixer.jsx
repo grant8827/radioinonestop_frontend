@@ -696,7 +696,7 @@ function ChannelStrip({ ch, onUpdate, level = 0 }) {
 }
 
 // ─── Master section ───────────────────────────────────────────────────────────
-function MasterSection({ master, onUpdate, vuL = 0, vuR = 0 }) {
+function MasterSection({ master, onUpdate, vuL = 0, vuR = 0, onRecToggle, recording, recDirName }) {
   const clipping = vuL > 0.92 || vuR > 0.92
 
   return (
@@ -769,7 +769,16 @@ function MasterSection({ master, onUpdate, vuL = 0, vuR = 0 }) {
       <Divider />
 
       {/* REC + ON AIR */}
-      <Pill on={master.rec} onToggle={() => onUpdate('rec', !master.rec)} label="● Rec" color="#ef4444" />
+      <Pill on={recording} onToggle={onRecToggle} label="● Rec" color="#ef4444" />
+      {!recDirName && !recording && (
+        <div style={{ fontSize: 8, color: '#f59e0b', textAlign: 'center', lineHeight: 1.4, padding: '0 2px' }}>
+          No save location —{' '}
+          <span style={{ textDecoration: 'underline', cursor: 'pointer', color: '#fbbf24' }}
+            onClick={() => document.dispatchEvent(new CustomEvent('open-settings-record'))}>
+            Settings → Record
+          </span>
+        </div>
+      )}
       <button onClick={() => onUpdate('onAir', !master.onAir)} style={{
         width: '100%', padding: '8px 0', borderRadius: 10, fontSize: 11,
         fontWeight: 900, letterSpacing: '0.1em', textTransform: 'uppercase',
@@ -1036,6 +1045,23 @@ export default function Mixer({ config, onOpenConference }) {
     if (key === 'phones' && audioEngine) audioEngine.updateCueVol?.(value)
   }, [audioEngine])
 
+  // ── Rec pill handler ─────────────────────────────────────────────────────
+  const handleRecToggle = useCallback(() => {
+    if (!audioEngine) return
+    const { recording, startRec, stopRec, recDirName } = audioEngine
+    if (recording) {
+      stopRec()
+      return
+    }
+    // If no folder set, still allow recording — will fall back to download
+    const format = localStorage.getItem('recFormat') || 'webm'
+    const result = startRec(format)
+    if (result === 'no-stream') {
+      // Show error in mixer header — dispatch event Settings page can also pick up
+      document.dispatchEvent(new CustomEvent('rec-error', { detail: 'No audio stream — load a track first.' }))
+    }
+  }, [audioEngine])
+
   const micChs  = channels.filter(ch => ch.isMic)
   const lineChs = channels.filter(ch => !ch.isMic)
 
@@ -1094,7 +1120,7 @@ export default function Mixer({ config, onOpenConference }) {
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {master.rec && (
+          {audioEngine?.recording && (
             <div style={{
               display: 'flex', alignItems: 'center', gap: 5,
               padding: '4px 12px', borderRadius: 20, fontSize: 9, fontWeight: 800,
@@ -1189,7 +1215,11 @@ export default function Mixer({ config, onOpenConference }) {
             borderLeft: `1px solid ${T.border}`,
             background: T.bg,
           }}>
-            <MasterSection master={master} onUpdate={updateMaster} vuL={masterLevels.L} vuR={masterLevels.R} />
+            <MasterSection master={master} onUpdate={updateMaster} vuL={masterLevels.L} vuR={masterLevels.R}
+              onRecToggle={handleRecToggle}
+              recording={audioEngine?.recording ?? false}
+              recDirName={audioEngine?.recDirName ?? ''}
+            />
           </div>
         </div>
 
