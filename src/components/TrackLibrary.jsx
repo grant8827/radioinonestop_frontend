@@ -123,12 +123,31 @@ export default function TrackLibrary({
   const fileInputRef = useRef(null)
   const dirInputRef  = useRef(null)
 
-  // ── restore library from IndexedDB on mount ──────────────────────────────────
+  // ── restore library from IndexedDB on mount + rebuild saved auto playlist ─────
   useEffect(() => {
     idbLoadAllTracks()
-      .then((tracks) => { if (tracks.length > 0) setLibrary(tracks) })
+      .then((tracks) => {
+        if (tracks.length > 0) {
+          setLibrary(tracks)
+          try {
+            const savedNames = JSON.parse(localStorage.getItem('auto_playlist_queue') || '[]')
+            if (savedNames.length > 0) {
+              const byName = Object.fromEntries(tracks.map((t) => [t.name, t]))
+              const restored = savedNames.map((n) => byName[n]).filter(Boolean)
+              if (restored.length > 0) onQueueChange?.(restored)
+            }
+          } catch {}
+        }
+      })
       .catch(() => {/* IDB unavailable or empty — silently ignore */})
   }, [])
+
+  // ── persist auto playlist to localStorage on every change ────────────────────
+  useEffect(() => {
+    try {
+      localStorage.setItem('auto_playlist_queue', JSON.stringify(queue.map((t) => t.name)))
+    } catch {}
+  }, [queue])
 
   // ── load handlers ────────────────────────────────────────────────────────────
   const addToLibrary = (newTracks) => {
