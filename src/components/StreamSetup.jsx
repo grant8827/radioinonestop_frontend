@@ -1465,9 +1465,8 @@ function ChannelTab({ host, audioKey }) {
   const { broadcastMode, icecastStatus, radioStatus, icecastStartRef, icecastStopRef, startRadio, stopRadio,
     videoStatus, startVideo, stopVideo } = useStream()
 
-  // Disable editing while an AUDIO broadcast is live (multistream destinations only)
-  const liveStatus = broadcastMode === 'icecast' ? icecastStatus : radioStatus
-  const isLive = liveStatus === 'live'
+  // Disable editing while a VIDEO broadcast is live (multistream destinations only)
+  const isLive = videoStatus === 'live'
 
   // ── Channels list ──────────────────────────────────────────────────────────
   const [channels, setChannels] = useState([])
