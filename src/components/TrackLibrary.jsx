@@ -122,6 +122,7 @@ export default function TrackLibrary({
   const [library, setLibrary] = useState([])
   const fileInputRef = useRef(null)
   const dirInputRef  = useRef(null)
+  const queueReadyRef = useRef(false) // don't save until restore is done
 
   // ── restore library from IndexedDB on mount + rebuild saved auto playlist ─────
   useEffect(() => {
@@ -134,16 +135,22 @@ export default function TrackLibrary({
             if (savedNames.length > 0) {
               const byName = Object.fromEntries(tracks.map((t) => [t.name, t]))
               const restored = savedNames.map((n) => byName[n]).filter(Boolean)
-              if (restored.length > 0) onQueueChange?.(restored)
+              if (restored.length > 0) {
+                onQueueChange?.(restored)
+                queueReadyRef.current = true
+                return
+              }
             }
           } catch {}
         }
+        queueReadyRef.current = true
       })
-      .catch(() => {/* IDB unavailable or empty — silently ignore */})
+      .catch(() => { queueReadyRef.current = true })
   }, [])
 
   // ── persist auto playlist to localStorage on every change ────────────────────
   useEffect(() => {
+    if (!queueReadyRef.current) return
     try {
       localStorage.setItem('auto_playlist_queue', JSON.stringify(queue.map((t) => t.name)))
     } catch {}
