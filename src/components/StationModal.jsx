@@ -163,6 +163,7 @@ export default function StationModal({ station, onClose }) {
   const [muted, setMuted]       = useState(false)
   const [analyser, setAnalyser] = useState(null)
   const [visible, setVisible]   = useState(false)
+  const [copied, setCopied]     = useState(false)
 
   const audioRef  = useRef(null)
   const hlsRef    = useRef(null)
@@ -389,6 +390,21 @@ export default function StationModal({ station, onClose }) {
     setTimeout(onClose, 280)
   }, [stop, onClose])
 
+  const share = useCallback(async () => {
+    const url = `${window.location.origin}/?station=${encodeURIComponent(info.slug)}`
+    const title = info.name || 'Radio Station'
+    const text = `Listen to ${title} live on Radio In One Stop`
+    if (navigator.share) {
+      try { await navigator.share({ title, text, url }) } catch { /* dismissed */ }
+    } else {
+      try {
+        await navigator.clipboard.writeText(url)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      } catch { /* clipboard unavailable */ }
+    }
+  }, [info.slug, info.name])
+
   // Click outside overlay
   const overlayClick = (e) => {
     if (e.target === e.currentTarget) close()
@@ -431,17 +447,43 @@ export default function StationModal({ station, onClose }) {
           animation: 'modal-fade-in 0.28s cubic-bezier(0.34,1.56,0.64,1)',
           position: 'relative',
         }}>
-          {/* Close button */}
-          <button
-            onClick={close}
-            style={{
-              position: 'absolute', top: 14, right: 14, zIndex: 10,
-              background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 8, color: '#9ca3af', cursor: 'pointer',
-              width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 16, lineHeight: 1,
-            }}
-          >✕</button>
+          {/* Top-right action buttons */}
+          <div style={{ position: 'absolute', top: 14, right: 14, zIndex: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* Share button */}
+            <button
+              onClick={share}
+              title={copied ? 'Link copied!' : 'Share station'}
+              style={{
+                background: copied ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.07)',
+                border: `1px solid ${copied ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.1)'}`,
+                borderRadius: 8, color: copied ? '#a5b4fc' : '#9ca3af', cursor: 'pointer',
+                height: 32, padding: '0 10px', display: 'flex', alignItems: 'center', gap: 5,
+                fontSize: 11, fontWeight: 600, transition: 'all 0.15s ease', whiteSpace: 'nowrap',
+              }}
+            >
+              {copied ? (
+                <>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>
+                  Share
+                </>
+              )}
+            </button>
+            {/* Close button */}
+            <button
+              onClick={close}
+              style={{
+                background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 8, color: '#9ca3af', cursor: 'pointer',
+                width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 16, lineHeight: 1,
+              }}
+            >✕</button>
+          </div>
 
           {/* Live badge */}
           {info.is_live && (

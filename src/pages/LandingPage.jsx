@@ -115,7 +115,15 @@ export default function LandingPage() {
         const r = await fetch('/api/stations')
         if (r.ok) {
           const data = await r.json()
-          if (data && data.length > 0) setStations(data)
+          if (data && data.length > 0) {
+            setStations(data)
+            // Auto-open station from shared link (?station=slug)
+            const slug = new URLSearchParams(window.location.search).get('station')
+            if (slug) {
+              const match = data.find((s) => s.slug === slug)
+              if (match) setSelectedStation(match)
+            }
+          }
         }
       } catch { /* ignore */ }
     }
