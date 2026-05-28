@@ -123,6 +123,13 @@ export function StreamProvider({ children }) {
   function videoCleanup() {
     if (videoPcRef.current) { videoPcRef.current.close(); videoPcRef.current = null }
     if (videoStreamRef.current) { videoStreamRef.current.getTracks().forEach(t => t.stop()); videoStreamRef.current = null }
+    // Stop any running FFmpeg relay for this user (best-effort, fire-and-forget)
+    if (token) {
+      fetch('/api/stream/relay/stop', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {})
+    }
   }
 
   // providedStream: pass a camera/getUserMedia stream from SocialLive so we reuse it;
@@ -192,6 +199,13 @@ export function StreamProvider({ children }) {
           videoCleanup()
         })
       }
+
+      // Start FFmpeg relay: pull from MediaMTX RTSP → push to user's active destinations
+      fetch('/api/stream/relay/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ path: videoKey }),
+      }).catch(() => {})
 
       setVideoStatusBoth('live')
     } catch (err) {
