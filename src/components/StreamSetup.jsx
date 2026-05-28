@@ -1152,6 +1152,236 @@ const SOCIAL_PLATFORMS = [
   },
 ]
 
+// ── OAuth Platform Definitions ─────────────────────────────────────────────
+const OAUTH_PLATFORMS = [
+  {
+    id: 'youtube',
+    name: 'YouTube',
+    tag: 'YouTube Live',
+    authPath: '/api/auth/youtube/connect',
+    color: '#FF0000',
+    bg: 'rgba(255,0,0,0.08)',
+    border: 'rgba(255,0,0,0.25)',
+    textColor: '#FF6B6B',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+        <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+      </svg>
+    ),
+    scopes: 'youtube.force-ssl',
+    ticket: 'ST-1002',
+  },
+  {
+    id: 'twitch',
+    name: 'Twitch',
+    tag: 'Twitch TV',
+    authPath: '/api/auth/twitch/connect',
+    color: '#9146FF',
+    bg: 'rgba(145,70,255,0.08)',
+    border: 'rgba(145,70,255,0.25)',
+    textColor: '#B98EFF',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+        <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
+      </svg>
+    ),
+    scopes: 'channel:manage:broadcast',
+    ticket: 'ST-1001',
+  },
+  {
+    id: 'facebook',
+    name: 'Facebook',
+    tag: 'Facebook Live',
+    authPath: '/api/auth/facebook/connect',
+    color: '#1877F2',
+    bg: 'rgba(24,119,242,0.08)',
+    border: 'rgba(24,119,242,0.25)',
+    textColor: '#60A5FA',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+      </svg>
+    ),
+    scopes: 'publish_video, pages_manage_posts',
+    ticket: 'ST-1003',
+  },
+  {
+    id: 'tiktok',
+    name: 'TikTok',
+    tag: 'TikTok Live',
+    authPath: '/api/auth/tiktok/connect',
+    color: '#FE2C55',
+    bg: 'rgba(254,44,85,0.08)',
+    border: 'rgba(254,44,85,0.25)',
+    textColor: '#FE6B85',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+        <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+      </svg>
+    ),
+    scopes: 'user.info.basic, video.publish',
+    ticket: 'ST-1004',
+  },
+  {
+    id: 'instagram',
+    name: 'Instagram',
+    tag: 'IG Live Producer',
+    authPath: '/api/auth/instagram/connect',
+    color: '#E1306C',
+    bg: 'rgba(225,48,108,0.08)',
+    border: 'rgba(225,48,108,0.30)',
+    textColor: '#F472B6',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+        <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
+      </svg>
+    ),
+    scopes: 'instagram_basic, publish_video',
+    ticket: 'ST-1005',
+  },
+  {
+    id: 'x',
+    name: 'X (Twitter)',
+    tag: 'X Live',
+    authPath: '/api/auth/x/connect',
+    color: '#FFFFFF',
+    bg: 'rgba(255,255,255,0.05)',
+    border: 'rgba(255,255,255,0.15)',
+    textColor: '#E2E8F0',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.748l7.73-8.835L1.254 2.25H8.08l4.259 5.631 5.905-5.631zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+      </svg>
+    ),
+    scopes: 'tweet.write, media.write',
+    ticket: 'ST-1006',
+  },
+  {
+    id: 'linkedin',
+    name: 'LinkedIn',
+    tag: 'LinkedIn Live',
+    authPath: '/api/auth/linkedin/connect',
+    color: '#0A66C2',
+    bg: 'rgba(10,102,194,0.08)',
+    border: 'rgba(10,102,194,0.25)',
+    textColor: '#60A5FA',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+        <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+      </svg>
+    ),
+    scopes: 'w_member_social, rw_organizationAdmin',
+    ticket: 'ST-1007',
+  },
+]
+
+// ── Platform Connections UI component ──────────────────────────────────────
+function PlatformConnections({ connectedPlatforms = {}, onConnect, onDisconnect, disabled }) {
+  const [toast, setToast] = useState(null) // { id, msg }
+
+  function handleConnect(platform) {
+    // Stage 2: redirect to `/api/auth/{platform.id}/connect`
+    // Stage 1: show "coming soon" inline
+    setToast({ id: platform.id, msg: `OAuth integration for ${platform.name} is in development — use manual stream key below.` })
+    setTimeout(() => setToast(null), 4000)
+  }
+
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-800">
+        <span className="w-8 h-8 rounded-lg bg-purple-900/30 border border-purple-700/40 flex items-center justify-center shrink-0">
+          <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+          </svg>
+        </span>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-white text-sm">Platform Connections</h3>
+          <p className="text-xs text-gray-400">Login-to-Stream — connect accounts for automatic credential provisioning</p>
+        </div>
+        <span className="text-[9px] font-bold text-purple-400 bg-purple-900/20 border border-purple-700/30 rounded px-2 py-1 uppercase tracking-wider shrink-0">OAuth 2.0</span>
+      </div>
+
+      {/* Platform grid */}
+      <div className="p-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {OAUTH_PLATFORMS.map((platform) => {
+          const connected = !!connectedPlatforms[platform.id]
+          const isToast = toast?.id === platform.id
+          return (
+            <div
+              key={platform.id}
+              style={{ border: `1px solid ${platform.border}`, background: platform.bg }}
+              className="rounded-xl p-3.5 flex flex-col gap-3 relative overflow-hidden"
+            >
+              {/* Glow line at top */}
+              <div style={{ background: platform.color, height: 2, position: 'absolute', top: 0, left: 0, right: 0, opacity: connected ? 0.8 : 0.3 }} />
+
+              {/* Icon + name */}
+              <div className="flex items-center gap-2.5">
+                <span style={{ color: platform.textColor }}>{platform.icon}</span>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-white leading-tight truncate">{platform.name}</p>
+                  <p className="text-[9px] text-gray-500 truncate">{platform.tag}</p>
+                </div>
+              </div>
+
+              {/* Status badge */}
+              <div className="flex items-center gap-1.5">
+                <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-400' : 'bg-gray-600'}`} />
+                <span className={`text-[9px] font-semibold uppercase tracking-wider ${connected ? 'text-green-400' : 'text-gray-500'}`}>
+                  {connected ? 'Connected' : 'Not Connected'}
+                </span>
+              </div>
+
+              {/* Toast / Connect button */}
+              {isToast ? (
+                <div className="text-[9px] text-amber-400 leading-relaxed bg-amber-900/20 border border-amber-700/30 rounded-lg px-2 py-1.5">
+                  {toast.msg}
+                </div>
+              ) : connected ? (
+                <button
+                  onClick={() => onDisconnect?.(platform.id)}
+                  disabled={disabled}
+                  style={{ borderColor: platform.border, color: platform.textColor }}
+                  className="w-full text-[10px] font-semibold border rounded-lg py-1.5 bg-transparent hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Disconnect
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleConnect(platform)}
+                  disabled={disabled}
+                  style={{ background: platform.bg, borderColor: platform.border, color: platform.textColor }}
+                  className="w-full text-[10px] font-bold border rounded-lg py-1.5 hover:brightness-125 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                >
+                  <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+                  </svg>
+                  Connect
+                </button>
+              )}
+
+              {/* Ticket ref */}
+              <p className="text-[8px] text-gray-700 font-mono">{platform.ticket}</p>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Info footer */}
+      <div className="px-5 py-3 border-t border-gray-800 bg-gray-950/40 flex items-start gap-2">
+        <svg className="w-3.5 h-3.5 text-blue-500 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+        </svg>
+        <p className="text-[10px] text-gray-500 leading-relaxed">
+          OAuth integration provisions stream credentials automatically when you go live — no copy-pasting stream keys.
+          Until each platform integration ships, use the <span className="text-gray-400 font-semibold">Manual Destinations</span> section below.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 // Migrate old format { platform, stream_key, enabled } → new format { id, platform, label, serverUrl, streamKey, active }
 function migrateChannel(d) {
   if (d.streamKey !== undefined) return d // already new format
@@ -1472,6 +1702,9 @@ function ChannelTab({ host, audioKey }) {
   const [channels, setChannels] = useState([])
   const [showKeys, setShowKeys] = useState({}) // id → bool (per-card key reveal)
 
+  // ── OAuth platform connection status (Stage 2: loaded from backend) ────────
+  const [connectedPlatforms, setConnectedPlatforms] = useState({})
+
   // ── Add-channel form ───────────────────────────────────────────────────────
   const [formPlatform, setFormPlatform] = useState('youtube')
   const [formLabel,    setFormLabel]    = useState('')
@@ -1588,6 +1821,14 @@ function ChannelTab({ host, audioKey }) {
       {/* ── Video Preview — mirrored with radio page's Go Live Video button via shared StreamContext ── */}
       <VideoPreview isLive={videoStatus === 'live'} liveStatus={videoStatus} onGoLive={handleVideoGoLive} onStop={handleVideoStop} />
 
+      {/* ── Platform Connections (OAuth Login-to-Stream) ── */}
+      <PlatformConnections
+        connectedPlatforms={connectedPlatforms}
+        onConnect={() => {/* Stage 2: redirect to OAuth */}}
+        onDisconnect={(id) => setConnectedPlatforms((prev) => { const n = { ...prev }; delete n[id]; return n })}
+        disabled={isLive}
+      />
+
       {/* ── Multistream Destinations ── */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
 
@@ -1599,8 +1840,8 @@ function ChannelTab({ host, audioKey }) {
             </svg>
           </span>
           <div>
-            <h3 className="font-semibold text-white text-sm">Multistream Destinations</h3>
-            <p className="text-xs text-gray-400">Auto-forward your stream to social platforms</p>
+            <h3 className="font-semibold text-white text-sm">Manual Destinations</h3>
+            <p className="text-xs text-gray-400">Paste stream keys directly — fallback while OAuth is in development</p>
           </div>
           {isLive && (
             <span className="ml-auto text-[10px] font-bold text-red-400 bg-red-900/30 border border-red-700/40 rounded px-2 py-0.5">● LIVE — editing locked</span>
