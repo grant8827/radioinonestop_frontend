@@ -1277,13 +1277,45 @@ const OAUTH_PLATFORMS = [
 
 // ── Platform Connections UI component ──────────────────────────────────────
 function PlatformConnections({ connectedPlatforms = {}, onConnect, onDisconnect, disabled }) {
-  const [toast, setToast] = useState(null) // { id, msg }
+  const { token } = useAuth()
+  const [toast, setToast] = useState(null)    // { id, msg, type } type: 'info'|'error'
+  const [connecting, setConnecting] = useState(null) // platform id currently initiating
 
-  function handleConnect(platform) {
-    // Stage 2: redirect to `/api/auth/{platform.id}/connect`
-    // Stage 1: show "coming soon" inline
-    setToast({ id: platform.id, msg: `OAuth integration for ${platform.name} is in development — use manual stream key below.` })
-    setTimeout(() => setToast(null), 4000)
+  async function handleConnect(platform) {
+    if (!token) {
+      setToast({ id: platform.id, msg: 'Sign in to connect platforms.', type: 'info' })
+      setTimeout(() => setToast(null), 3500)
+      return
+    }
+    if (!platform.authPath) {
+      setToast({ id: platform.id, msg: `OAuth integration for ${platform.name} is in development — use manual stream key below.`, type: 'info' })
+      setTimeout(() => setToast(null), 4000)
+      return
+    }
+    setConnecting(platform.id)
+    try {
+      const res = await fetch(`/api/auth/${platform.id}/connect`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) {
+        const text = await res.text()
+        if (res.status === 503) {
+          setToast({ id: platform.id, msg: `${platform.name} OAuth is not yet configured on the server.`, type: 'info' })
+        } else {
+          setToast({ id: platform.id, msg: `Could not connect: ${text}`, type: 'error' })
+        }
+        setTimeout(() => setToast(null), 4000)
+        return
+      }
+      const { redirect_url } = await res.json()
+      window.location.href = redirect_url
+    } catch (err) {
+      setToast({ id: platform.id, msg: `Network error: ${err.message}`, type: 'error' })
+      setTimeout(() => setToast(null), 4000)
+    } finally {
+      setConnecting(null)
+    }
   }
 
   return (
@@ -1335,7 +1367,11 @@ function PlatformConnections({ connectedPlatforms = {}, onConnect, onDisconnect,
 
               {/* Toast / Connect button */}
               {isToast ? (
-                <div className="text-[9px] text-amber-400 leading-relaxed bg-amber-900/20 border border-amber-700/30 rounded-lg px-2 py-1.5">
+                <div className={`text-[9px] leading-relaxed rounded-lg px-2 py-1.5 ${
+                  toast.type === 'error'
+                    ? 'text-red-400 bg-red-900/20 border border-red-700/30'
+                    : 'text-amber-400 bg-amber-900/20 border border-amber-700/30'
+                }`}>
                   {toast.msg}
                 </div>
               ) : connected ? (
@@ -1350,14 +1386,21 @@ function PlatformConnections({ connectedPlatforms = {}, onConnect, onDisconnect,
               ) : (
                 <button
                   onClick={() => handleConnect(platform)}
-                  disabled={disabled}
+                  disabled={disabled || connecting === platform.id}
                   style={{ background: platform.bg, borderColor: platform.border, color: platform.textColor }}
                   className="w-full text-[10px] font-bold border rounded-lg py-1.5 hover:brightness-125 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1"
                 >
-                  <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
-                  </svg>
-                  Connect
+                  {connecting === platform.id ? (
+                    <svg className="w-2.5 h-2.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                  ) : (
+                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+                    </svg>
+                  )}
+                  {connecting === platform.id ? 'Connecting…' : 'Connect'}
                 </button>
               )}
 
@@ -1740,6 +1783,51 @@ function ChannelTab({ host, audioKey }) {
       .catch(() => {})
   }, [token])
 
+  // ── Load OAuth connections on mount ────────────────────────────────────────
+  useEffect(() => {
+    if (!token) return
+    fetch('/api/user/oauth-connections', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        if (Array.isArray(data)) {
+          const map = {}
+          data.forEach((c) => { map[c.platform] = c })
+          setConnectedPlatforms(map)
+        }
+      })
+      .catch(() => {})
+  }, [token])
+
+  // ── Handle ?oauth_success=platform redirect back from provider ─────────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const success = params.get('oauth_success')
+    const error = params.get('oauth_error')
+    if (!success && !error) return
+    // Clean the query params from the URL without a page reload
+    window.history.replaceState({}, '', window.location.pathname)
+    if (success && token) {
+      // Refresh connection list
+      fetch('/api/user/oauth-connections', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((r) => (r.ok ? r.json() : []))
+        .then((data) => {
+          if (Array.isArray(data)) {
+            const map = {}
+            data.forEach((c) => { map[c.platform] = c })
+            setConnectedPlatforms(map)
+          }
+        })
+        .catch(() => {})
+    }
+    if (error) {
+      console.warn('[oauth] callback error:', error, params.get('platform'))
+    }
+  }, [token])
+
   // ── Persist channels to backend ────────────────────────────────────────────
   async function saveChannels(updated) {
     if (!token) return
@@ -1824,8 +1912,15 @@ function ChannelTab({ host, audioKey }) {
       {/* ── Platform Connections (OAuth Login-to-Stream) ── */}
       <PlatformConnections
         connectedPlatforms={connectedPlatforms}
-        onConnect={() => {/* Stage 2: redirect to OAuth */}}
-        onDisconnect={(id) => setConnectedPlatforms((prev) => { const n = { ...prev }; delete n[id]; return n })}
+        onDisconnect={async (platformId) => {
+          try {
+            await fetch(`/api/user/oauth-connections/${platformId}`, {
+              method: 'DELETE',
+              headers: { Authorization: `Bearer ${token}` },
+            })
+          } catch { /* best-effort */ }
+          setConnectedPlatforms((prev) => { const n = { ...prev }; delete n[platformId]; return n })
+        }}
         disabled={isLive}
       />
 
