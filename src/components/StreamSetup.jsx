@@ -1276,10 +1276,48 @@ const OAUTH_PLATFORMS = [
 ]
 
 // ── Platform Connections UI component ──────────────────────────────────────
-function PlatformConnections({ connectedPlatforms = {}, onConnect, onDisconnect, disabled }) {
+function PlatformConnections({ connectedPlatforms = {}, onConnect, onDisconnect, onSyncComplete, disabled }) {
   const { token } = useAuth()
   const [toast, setToast] = useState(null)    // { id, msg, type } type: 'info'|'error'
   const [connecting, setConnecting] = useState(null) // platform id currently initiating
+  const [syncing, setSyncing] = useState(false)
+
+  async function handleSync() {
+    if (!token) {
+      setToast({ id: '__sync', msg: 'Sign in to sync stream keys.', type: 'info' })
+      setTimeout(() => setToast(null), 3500)
+      return
+    }
+    setSyncing(true)
+    try {
+      const r = await fetch('/api/user/oauth-stream-keys/sync', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!r.ok) throw new Error(`Server error ${r.status}`)
+      const results = await r.json() // [{platform, dest?, error?}]
+      const synced = results.filter((x) => x.dest).map((x) => x.dest)
+      const errors = results.filter((x) => x.error)
+      if (synced.length > 0 && onSyncComplete) {
+        onSyncComplete(synced)
+      }
+      if (synced.length > 0) {
+        const names = synced.map((d) => d.label).join(', ')
+        setToast({ id: '__sync_ok', msg: `Synced: ${names}`, type: 'info' })
+      } else if (errors.length > 0) {
+        const first = errors[0]
+        setToast({ id: '__sync_err', msg: `Sync failed for ${first.platform}: ${first.error}`, type: 'error' })
+      } else {
+        setToast({ id: '__sync_none', msg: 'No connected platforms to sync.', type: 'info' })
+      }
+      setTimeout(() => setToast(null), 5000)
+    } catch (err) {
+      setToast({ id: '__sync_err', msg: `Sync error: ${err.message}`, type: 'error' })
+      setTimeout(() => setToast(null), 5000)
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   async function handleConnect(platform) {
     if (!token) {
@@ -1411,15 +1449,37 @@ function PlatformConnections({ connectedPlatforms = {}, onConnect, onDisconnect,
         })}
       </div>
 
-      {/* Info footer */}
-      <div className="px-5 py-3 border-t border-gray-800 bg-gray-950/40 flex items-start gap-2">
-        <svg className="w-3.5 h-3.5 text-blue-500 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
-        </svg>
-        <p className="text-[10px] text-gray-500 leading-relaxed">
-          OAuth integration provisions stream credentials automatically when you go live — no copy-pasting stream keys.
-          Until each platform integration ships, use the <span className="text-gray-400 font-semibold">Manual Destinations</span> section below.
-        </p>
+      {/* Footer: info + sync button */}
+      <div className="px-5 py-3 border-t border-gray-800 bg-gray-950/40 flex items-center gap-3">
+        <div className="flex items-start gap-2 flex-1 min-w-0">
+          <svg className="w-3.5 h-3.5 text-blue-500 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+          </svg>
+          <p className="text-[10px] text-gray-500 leading-relaxed">
+            OAuth provisions stream credentials automatically. Click <span className="text-gray-400 font-semibold">Sync</span> to pull live stream keys from your connected accounts into the destinations list.
+          </p>
+        </div>
+
+        {/* Sync stream keys button */}
+        <button
+          onClick={handleSync}
+          disabled={syncing || disabled}
+          className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold
+            bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500
+            text-white transition-colors cursor-pointer disabled:cursor-not-allowed"
+        >
+          {syncing ? (
+            <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+          ) : (
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+            </svg>
+          )}
+          {syncing ? 'Syncing…' : 'Sync'}
+        </button>
       </div>
     </div>
   )
@@ -1920,6 +1980,36 @@ function ChannelTab({ host, audioKey }) {
             })
           } catch { /* best-effort */ }
           setConnectedPlatforms((prev) => { const n = { ...prev }; delete n[platformId]; return n })
+        }}
+        onSyncComplete={(synced) => {
+          // synced: [{platform, label, server_url, stream_key}] from backend
+          setChannels((prev) => {
+            const next = [...prev]
+            synced.forEach((dest) => {
+              const existingIdx = next.findIndex((ch) => ch.platform === dest.platform)
+              if (existingIdx >= 0) {
+                // Update existing entry
+                next[existingIdx] = {
+                  ...next[existingIdx],
+                  label: dest.label,
+                  serverUrl: dest.server_url,
+                  streamKey: dest.stream_key,
+                }
+              } else {
+                // Add new entry
+                next.push({
+                  id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                  platform: dest.platform,
+                  label: dest.label,
+                  serverUrl: dest.server_url,
+                  streamKey: dest.stream_key,
+                  active: true,
+                })
+              }
+            })
+            saveChannels(next)
+            return next
+          })
         }}
         disabled={isLive}
       />
