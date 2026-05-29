@@ -600,7 +600,7 @@ function BrowserStreamer({ audioKey }) {
 
 /* ─── Icecast / Shoutcast browser encoder ────────────────────── */
 
-function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl = '' }) {
+function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl = '', isSuspended = false }) {
   const { token } = useAuth()
   const { getStreamTrack, getMasterAnalyser, resume } = useAudioEngine()
   const { radioStatus, startRadio, stopRadio,
@@ -1056,11 +1056,11 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
 
 /* ─── Audio encoder tab ───────────────────────────────────────── */
 
-function AudioEncoderTab({ audioKey, host, listenUrl }) {
+function AudioEncoderTab({ audioKey, host, listenUrl, isSuspended = false }) {
   const mount = '/' + audioKey
   return (
     <div className="space-y-5">
-      <IcecastEncoder defaultHost={host} defaultMount={mount} listenUrl={listenUrl} />
+      <IcecastEncoder defaultHost={host} defaultMount={mount} listenUrl={listenUrl} isSuspended={isSuspended} />
     </div>
   )
 }
@@ -2541,7 +2541,7 @@ export default function StreamSetup({ isSuspended = false }) {
         />
       </div>
       <div style={{ display: tab === 'audio' ? undefined : 'none' }}>
-        <AudioEncoderTab audioKey={audioKey} host={host} listenUrl={creds?.listen_url} />
+        <AudioEncoderTab audioKey={audioKey} host={host} listenUrl={creds?.listen_url} isSuspended={isSuspended} />
       </div>
       <div style={{ display: tab === 'channel' ? undefined : 'none' }}>
         <ChannelTab host={host} audioKey={audioKey} />
