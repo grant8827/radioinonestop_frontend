@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 const PLANS = [
   {
@@ -66,6 +67,7 @@ const PLANS = [
 
 export default function PricingPage() {
   const navigate = useNavigate()
+  const { isAuthenticated, logout } = useAuth()
   const [billingCycle, setBillingCycle] = useState('monthly') // 'monthly' or 'yearly'
 
   function selectPlan(planId) {
@@ -116,12 +118,32 @@ export default function PricingPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate('/')}
-              className="text-sm font-medium text-gray-300 hover:text-white transition-colors px-4 py-1.5 rounded-lg hover:bg-white/5"
-            >
-              Sign In
-            </button>
+            {isAuthenticated ? (
+              <>
+                <button
+                  onClick={() => navigate('/app')}
+                  className="text-sm font-medium text-gray-300 hover:text-white transition-colors px-4 py-1.5 rounded-lg hover:bg-white/5"
+                >
+                  Dashboard
+                </button>
+                <button
+                  onClick={() => {
+                    logout()
+                    navigate('/')
+                  }}
+                  className="px-5 py-2 rounded-lg border border-white/20 hover:bg-white/5 text-white font-semibold text-sm transition-all"
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => navigate('/')}
+                className="text-sm font-medium text-gray-300 hover:text-white transition-colors px-4 py-1.5 rounded-lg hover:bg-white/5"
+              >
+                Sign In
+              </button>
+            )}
           </div>
         </div>
       </nav>

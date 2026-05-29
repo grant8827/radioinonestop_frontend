@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import LoginModal from '../components/LoginModal'
 import RegisterModal from '../components/RegisterModal'
 import StationModal from '../components/StationModal'
@@ -103,6 +104,7 @@ const DEMO_STATIONS = [
 export default function LandingPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const { isAuthenticated, logout } = useAuth()
   const [showLogin, setShowLogin] = useState(false)
   const [showRegister, setShowRegister] = useState(false)
   const [selectedStation, setSelectedStation] = useState(null)
@@ -172,18 +174,40 @@ export default function LandingPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate('/pricing')}
-              className="px-5 py-2 rounded-lg bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold text-sm transition-all shadow-lg shadow-purple-900/30 hover:shadow-purple-900/50"
-            >
-              Start Broadcasting
-            </button>
-            <button
-              onClick={openLogin}
-              className="text-sm font-medium text-gray-300 hover:text-white transition-colors px-4 py-1.5 rounded-lg hover:bg-white/5"
-            >
-              Sign In
-            </button>
+            {isAuthenticated ? (
+              <>
+                <button
+                  onClick={() => navigate('/app')}
+                  className="text-sm font-medium text-gray-300 hover:text-white transition-colors px-4 py-1.5 rounded-lg hover:bg-white/5"
+                >
+                  Dashboard
+                </button>
+                <button
+                  onClick={() => {
+                    logout()
+                    navigate('/')
+                  }}
+                  className="px-5 py-2 rounded-lg border border-white/20 hover:bg-white/5 text-white font-semibold text-sm transition-all"
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => navigate('/pricing')}
+                  className="px-5 py-2 rounded-lg bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold text-sm transition-all shadow-lg shadow-purple-900/30 hover:shadow-purple-900/50"
+                >
+                  Start Broadcasting
+                </button>
+                <button
+                  onClick={openLogin}
+                  className="text-sm font-medium text-gray-300 hover:text-white transition-colors px-4 py-1.5 rounded-lg hover:bg-white/5"
+                >
+                  Sign In
+                </button>
+              </>
+            )}
           </div>
         </div>
       </nav>
