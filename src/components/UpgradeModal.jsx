@@ -3,17 +3,17 @@ import { useNavigate } from 'react-router-dom'
 const PLAN_DETAILS = {
   professional: {
     name: 'Professional',
-    price: { monthly: 28, yearly: 280 },
+    price: { monthly: 39, yearly: 390 },
     features: ['Conference calls', 'Up to 10 participants', 'Screen sharing', '1000 concurrent listeners']
   },
   enterprise: {
     name: 'Enterprise',
-    price: { monthly: 40, yearly: 400 },
+    price: { monthly: 59, yearly: 590 },
     features: ['Video live streaming', 'Up to 3 streaming channels', 'Social media multistream', '2000 concurrent listeners']
   },
   ultimate: {
     name: 'Ultimate',
-    price: { monthly: 55, yearly: 550 },
+    price: { monthly: 99, yearly: 990 },
     features: ['Up to 6 streaming channels', 'Advanced analytics', 'Custom branding', 'Unlimited listeners']
   }
 }

@@ -3,11 +3,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 const PLAN_INFO = {
-  starter: { name: 'Starter', monthly: 22, yearly: 220 },
-  professional: { name: 'Professional', monthly: 28, yearly: 280 },
-  enterprise: { name: 'Enterprise', monthly: 40, yearly: 400 },
-  ultimate: { name: 'Ultimate', monthly: 55, yearly: 550 },
-}
+    starter: { name: 'Starter', monthly: 29, yearly: 290 },
+    professional: { name: 'Professional', monthly: 39, yearly: 390 },
+    enterprise: { name: 'Enterprise', monthly: 59, yearly: 590 },
+    ultimate: { name: 'Ultimate', monthly: 99, yearly: 990 },
+  }
 
 export default function PaymentPage() {
   const navigate = useNavigate()

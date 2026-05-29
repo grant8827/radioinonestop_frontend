@@ -9,11 +9,11 @@ const GENRES = [
 ]
 
 const PLAN_NAMES = {
-  starter: { monthly: 'Starter ($22/mo)', yearly: 'Starter ($220/yr)' },
-  professional: { monthly: 'Professional ($28/mo)', yearly: 'Professional ($280/yr)' },
-  enterprise: { monthly: 'Enterprise ($40/mo)', yearly: 'Enterprise ($400/yr)' },
-  ultimate: { monthly: 'Ultimate ($55/mo)', yearly: 'Ultimate ($550/yr)' },
-}
+    starter: { monthly: 'Starter ($29/mo)', yearly: 'Starter ($290/yr)' },
+    professional: { monthly: 'Professional ($39/mo)', yearly: 'Professional ($390/yr)' },
+    enterprise: { monthly: 'Enterprise ($59/mo)', yearly: 'Enterprise ($590/yr)' },
+    ultimate: { monthly: 'Ultimate ($99/mo)', yearly: 'Ultimate ($990/yr)' },
+  }
 
 function getPlanName(planId, billing) {
   if (!planId || !PLAN_NAMES[planId]) return planId

@@ -81,10 +81,10 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
 
   // Plan display mapping
   const PLAN_NAMES = {
-    starter: 'Starter ($22/mo)',
-    professional: 'Professional ($28/mo)',
-    enterprise: 'Enterprise ($40/mo)',
-    ultimate: 'Ultimate ($55/mo)',
+    starter: 'Starter ($29/mo)',
+    professional: 'Professional ($39/mo)',
+    enterprise: 'Enterprise ($59/mo)',
+    ultimate: 'Ultimate ($99/mo)',
   }
 
   useEffect(() => {

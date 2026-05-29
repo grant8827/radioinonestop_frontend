@@ -6,7 +6,7 @@ const PLANS = [
   {
     id: 'starter',
     name: 'Starter',
-    price: 22,
+    price: 29,
     description: 'Perfect for getting started with radio broadcasting',
     features: [
       'Radio DJ & Mixer',
@@ -14,6 +14,7 @@ const PLANS = [
       'Embeddable player widget',
       'Listeners analytics',
       'Up to 500 concurrent listeners',
+      'Record sessions',
       //'Basic support',
     ],
     highlighted: false,
@@ -21,7 +22,7 @@ const PLANS = [
   {
     id: 'professional',
     name: 'Professional',
-    price: 28,
+    price: 39,
     description: 'All Starter features plus conference calling',
     features: [
       'Everything in Starter',
@@ -36,7 +37,7 @@ const PLANS = [
   {
     id: 'enterprise',
     name: 'Enterprise',
-    price: 40,
+    price: 59,
     description: 'Complete solution with video streaming',
     features: [
       'Everything in Professional',
@@ -51,7 +52,7 @@ const PLANS = [
   {
     id: 'ultimate',
     name: 'Ultimate',
-    price: 55,
+    price: 99,
     description: 'Maximum power for professional broadcasters',
     features: [
       'Everything in Enterprise',
