@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 
 const AuthContext = createContext(null)
 
@@ -18,18 +18,55 @@ function loadFromStorage() {
     localStorage.removeItem('rio_token')
     return { token: null, user: null }
   }
-  return { token: t, user: { id: payload.user_id, email: payload.email, stationName: payload.station_name || '' } }
+  return { 
+    token: t, 
+    user: { 
+      id: payload.user_id, 
+      email: payload.email, 
+      stationName: payload.station_name || '',
+      plan: 'starter', // default until profile loads
+      billingCycle: 'monthly'
+    } 
+  }
 }
 
 export function AuthProvider({ children }) {
   const [{ token, user }, setAuth] = useState(loadFromStorage)
+
+  // Fetch full user profile when authenticated
+  useEffect(() => {
+    if (!token) return
+    
+    fetch('/api/user/profile', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(r => r.json())
+      .then(profile => {
+        setAuth(prev => ({
+          ...prev,
+          user: prev.user ? {
+            ...prev.user,
+            plan: profile.plan || 'starter',
+            billingCycle: profile.billing_cycle || 'monthly',
+            stationName: profile.station_name || prev.user.stationName
+          } : prev.user
+        }))
+      })
+      .catch(() => {}) // Ignore errors, keep defaults
+  }, [token])
 
   const login = useCallback((newToken) => {
     localStorage.setItem('rio_token', newToken)
     const payload = parseToken(newToken)
     setAuth({
       token: newToken,
-      user: payload ? { id: payload.user_id, email: payload.email, stationName: payload.station_name || '' } : null,
+      user: payload ? { 
+        id: payload.user_id, 
+        email: payload.email, 
+        stationName: payload.station_name || '',
+        plan: 'starter',
+        billingCycle: 'monthly'
+      } : null,
     })
   }, [])
 

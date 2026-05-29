@@ -1,5 +1,20 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
+import UpgradeModal from './UpgradeModal'
+
+// Define which features are available in each plan
+const PLAN_FEATURES = {
+  starter: ['radio', 'mixer', 'stream'],
+  professional: ['radio', 'mixer', 'stream', 'conference'],
+  enterprise: ['radio', 'mixer', 'stream', 'conference', 'video'],
+  ultimate: ['radio', 'mixer', 'stream', 'conference', 'video'],
+}
+
+// Define required plans for locked features
+const FEATURE_REQUIRED_PLAN = {
+  conference: 'professional',
+  video: 'enterprise',
+}
 
 const NAV_ITEMS = [
   { id: 'radio', label: 'Radio', icon: RadioIcon },
@@ -48,6 +63,14 @@ function StreamIcon({ className }) {
   )
 }
 
+function LockIcon({ className }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+    </svg>
+  )
+}
+
 function StreamDot({ live }) {
   return (
     <span
@@ -61,7 +84,11 @@ function StreamDot({ live }) {
 export default function Sidebar({ stationName, mode, onModeChange, onSettingsClick }) {
   const [streams, setStreams] = useState([])
   const [open, setOpen] = useState(false) // mobile drawer
-  const { logout } = useAuth()
+  const [upgradeModal, setUpgradeModal] = useState({ show: false, feature: null, requiredPlan: null })
+  const { logout, user } = useAuth()
+
+  const userPlan = user?.plan || 'starter'
+  const allowedFeatures = PLAN_FEATURES[userPlan] || PLAN_FEATURES.starter
 
   useEffect(() => {
     const load = () =>
@@ -90,25 +117,52 @@ export default function Sidebar({ stationName, mode, onModeChange, onSettingsCli
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-2 mb-2">
           Channels
         </p>
-        {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => { onModeChange(id); setOpen(false) }}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all mb-1 ${
-              mode === id
-                ? 'bg-red-600 text-white'
-                : 'text-gray-400 hover:text-white hover:bg-gray-800'
-            }`}
-          >
-            <Icon className="w-4 h-4 flex-shrink-0" />
-            {label}
-            {mode === id && (
-              <span className="ml-auto text-[10px] font-semibold bg-white/20 rounded px-1.5 py-0.5 leading-none">
-                ON
-              </span>
-            )}
-          </button>
-        ))}
+        {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
+          const isLocked = !allowedFeatures.includes(id)
+          const requiredPlan = FEATURE_REQUIRED_PLAN[id]
+          
+          return (
+            <div key={id} className="relative group">
+              <button
+                onClick={() => {
+                  if (isLocked) {
+                    setUpgradeModal({ show: true, feature: label, requiredPlan })
+                  } else {
+                    onModeChange(id)
+                    setOpen(false)
+                  }
+                }}
+                disabled={isLocked && !requiredPlan}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all mb-1 ${
+                  isLocked
+                    ? 'opacity-50 cursor-not-allowed text-gray-500 hover:text-gray-400 hover:bg-gray-800/50'
+                    : mode === id
+                    ? 'bg-red-600 text-white'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                }`}
+              >
+                <Icon className="w-4 h-4 flex-shrink-0" />
+                {label}
+                {isLocked && <LockIcon className="w-3.5 h-3.5 ml-auto flex-shrink-0" />}
+                {!isLocked && mode === id && (
+                  <span className="ml-auto text-[10px] font-semibold bg-white/20 rounded px-1.5 py-0.5 leading-none">
+                    ON
+                  </span>
+                )}
+                {isLocked && requiredPlan && (
+                  <span className="ml-auto text-[9px] font-bold text-purple-400 uppercase tracking-wider flex-shrink-0">
+                    {requiredPlan === 'professional' ? 'PRO' : requiredPlan === 'enterprise' ? 'ENT' : 'ULT'}
+                  </span>
+                )}
+              </button>
+              {isLocked && requiredPlan && (
+                <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-gray-900 border border-white/10 rounded-lg text-xs text-gray-300 whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none shadow-xl">
+                  Available in {requiredPlan.charAt(0).toUpperCase() + requiredPlan.slice(1)} - Click to upgrade
+                </div>
+              )}
+            </div>
+          )
+        })}
       </nav>
 
       {/* Live Streams */}
@@ -228,6 +282,15 @@ export default function Sidebar({ stationName, mode, onModeChange, onSettingsCli
             {content}
           </aside>
         </div>
+      )}
+
+      {/* Upgrade Modal */}
+      {upgradeModal.show && (
+        <UpgradeModal
+          requiredPlan={upgradeModal.requiredPlan}
+          featureName={upgradeModal.feature}
+          onClose={() => setUpgradeModal({ show: false, feature: null, requiredPlan: null })}
+        />
       )}
     </>
   )

@@ -3,6 +3,15 @@ import { useAuth } from '../context/AuthContext'
 import { useAudioEngine } from '../context/AudioEngine'
 import { useStream } from '../context/StreamContext'
 import ListenersPage from './ListenersPage'
+import UpgradeModal from './UpgradeModal'
+
+// Channel limits per plan
+const MAX_CHANNELS = {
+  starter: 0,       // No video streaming allowed
+  professional: 0,  // No video streaming allowed
+  enterprise: 3,    // Up to 3 channels
+  ultimate: 6,      // Up to 6 channels
+}
 
 /* ─── Shared helpers ──────────────────────────────────────────── */
 
@@ -1794,9 +1803,12 @@ function VideoPreview({ isLive, liveStatus, onGoLive, onStop }) {
 }
 
 function ChannelTab({ host, audioKey }) {
-  const { token } = useAuth()
+  const { token, user } = useAuth()
   const { broadcastMode, icecastStatus, radioStatus, icecastStartRef, icecastStopRef, startRadio, stopRadio,
     videoStatus, startVideo, stopVideo } = useStream()
+
+  const userPlan = user?.plan || 'starter'
+  const maxChannels = MAX_CHANNELS[userPlan] || 0
 
   // Disable editing while a VIDEO broadcast is live (multistream destinations only)
   const isLive = videoStatus === 'live'
@@ -1804,6 +1816,9 @@ function ChannelTab({ host, audioKey }) {
   // ── Channels list ──────────────────────────────────────────────────────────
   const [channels, setChannels] = useState([])
   const [showKeys, setShowKeys] = useState({}) // id → bool (per-card key reveal)
+
+  // ── Upgrade modal state ────────────────────────────────────────────────────
+  const [upgradeModal, setUpgradeModal] = useState({ show: false, feature: null, requiredPlan: null })
 
   // ── OAuth platform connection status (Stage 2: loaded from backend) ────────
   const [connectedPlatforms, setConnectedPlatforms] = useState({})
@@ -1911,6 +1926,18 @@ function ChannelTab({ host, audioKey }) {
   // ── Add channel ────────────────────────────────────────────────────────────
   function addChannel() {
     if (isLive) return
+    
+    // Check channel limit based on user's plan
+    if (channels.length >= maxChannels) {
+      const requiredPlan = maxChannels === 0 ? 'enterprise' : 'ultimate'
+      setUpgradeModal({
+        show: true,
+        feature: 'Video streaming with more channels',
+        requiredPlan
+      })
+      return
+    }
+    
     const key = formKey.trim()
     const url = formUrl.trim()
     if (!key) { setFormError('Stream key is required'); return }
@@ -2140,17 +2167,30 @@ function ChannelTab({ host, audioKey }) {
             </p>
           )}
 
-          {/* Add button */}
-          <button
-            onClick={addChannel}
-            disabled={isLive}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 border border-purple-600/30 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-            {saving ? 'Saving…' : 'Add / Link Channel'}
-          </button>
+          {/* Channel limit info and Add button */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={addChannel}
+              disabled={isLive || channels.length >= maxChannels}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 border border-purple-600/30 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              {channels.length >= maxChannels && maxChannels > 0
+                ? 'Channel Limit Reached'
+                : channels.length >= maxChannels && maxChannels === 0
+                ? 'Upgrade to Add Channels'
+                : saving
+                ? 'Saving…'
+                : 'Add / Link Channel'}
+            </button>
+            {maxChannels > 0 && (
+              <div className="text-xs font-semibold text-gray-400 whitespace-nowrap">
+                {channels.length} / {maxChannels} {maxChannels === 1 ? 'channel' : 'channels'}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* ── Connected channels list ── */}
@@ -2251,6 +2291,15 @@ function ChannelTab({ host, audioKey }) {
           )}
         </div>
       </div>
+
+      {/* Upgrade Modal */}
+      {upgradeModal.show && (
+        <UpgradeModal
+          requiredPlan={upgradeModal.requiredPlan}
+          featureName={upgradeModal.feature}
+          onClose={() => setUpgradeModal({ show: false, feature: null, requiredPlan: null })}
+        />
+      )}
     </div>
   )
 }
