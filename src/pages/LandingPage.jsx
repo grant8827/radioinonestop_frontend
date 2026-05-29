@@ -102,24 +102,12 @@ const DEMO_STATIONS = [
 
 export default function LandingPage() {
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
   const [showLogin, setShowLogin] = useState(false)
   const [showRegister, setShowRegister] = useState(false)
-  const [selectedPlan, setSelectedPlan] = useState(null)
   const [selectedStation, setSelectedStation] = useState(null)
   const [stations, setStations] = useState(DEMO_STATIONS)
   const [showAllStations, setShowAllStations] = useState(false)
-
-  // Check for ?plan= param and auto-open register modal
-  useEffect(() => {
-    const plan = searchParams.get('plan')
-    if (plan) {
-      setSelectedPlan(plan)
-      setShowRegister(true)
-      // Clean URL
-      setSearchParams({})
-    }
-  }, [searchParams, setSearchParams])
 
   // Fetch stations on mount, refresh every 30s
   useEffect(() => {
@@ -151,13 +139,7 @@ export default function LandingPage() {
   function handleAuthSuccess() {
     setShowLogin(false)
     setShowRegister(false)
-    // If user registered with a plan, go to payment; otherwise go to app
-    if (selectedPlan) {
-      navigate(`/payment?plan=${selectedPlan}`)
-      setSelectedPlan(null)
-    } else {
-      navigate('/app')
-    }
+    navigate('/app')
   }
 
   return (
@@ -399,9 +381,8 @@ export default function LandingPage() {
       )}
       {showRegister && (
         <RegisterModal
-          selectedPlan={selectedPlan}
           onSuccess={handleAuthSuccess}
-          onClose={() => { setShowRegister(false); setSelectedPlan(null) }}
+          onClose={() => setShowRegister(false)}
           onSwitchToLogin={openLogin}
         />
       )}
