@@ -1014,10 +1014,22 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
         {canStart ? (
           <button
             onClick={broadcastMode === 'hub' ? startRadio : goLive}
-            disabled={isBusy || !token || (broadcastMode === 'icecast' && !cfg.host)}
+            disabled={isBusy || !token || (broadcastMode === 'icecast' && !cfg.host) || isSuspended}
+            title={isSuspended ? 'Streaming suspended — listener limit exceeded. Upgrade to resume.' : ''}
             className="w-full flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold text-sm rounded-lg px-4 py-2.5 transition-colors shadow-lg shadow-orange-900/20">
-            <span className="w-2 h-2 rounded-full bg-white inline-block" />
-            {broadcastMode === 'hub' ? 'Go Live → Station Hub' : 'Go Live → Icecast / Shoutcast'}
+            {isSuspended ? (
+              <>
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 11c-.55 0-1-.45-1-1V8c0-.55.45-1 1-1s1 .45 1 1v4c0 .55-.45 1-1 1zm1 4h-2v-2h2v2z" />
+                </svg>
+                Streaming Suspended
+              </>
+            ) : (
+              <>
+                <span className="w-2 h-2 rounded-full bg-white inline-block" />
+                {broadcastMode === 'hub' ? 'Go Live → Station Hub' : 'Go Live → Icecast / Shoutcast'}
+              </>
+            )}
           </button>
         ) : (
           <button
@@ -1616,7 +1628,7 @@ function idbDeleteSlate() {
 }
 
 // ── Video Preview component ────────────────────────────────────────────────
-function VideoPreview({ isLive, liveStatus, onGoLive, onStop }) {
+function VideoPreview({ isLive, liveStatus, onGoLive, onStop, isSuspended = false }) {
   const videoRef = useRef(null)
   const streamRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -1781,18 +1793,26 @@ function VideoPreview({ isLive, liveStatus, onGoLive, onStop }) {
         {onGoLive && (
           <button
             onClick={liveStatus === 'live' ? onStop : () => onGoLive(streamRef.current || null)}
-            disabled={liveStatus === 'connecting'}
-            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold border transition-all shrink-0 disabled:cursor-wait ${
+            disabled={liveStatus === 'connecting' || isSuspended}
+            title={isSuspended ? 'Streaming suspended — listener limit exceeded. Upgrade to resume.' : ''}
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold border transition-all shrink-0 ${
               liveStatus === 'live'
                 ? 'bg-red-600/20 hover:bg-red-600/30 text-red-400 border-red-600/40'
-                : liveStatus === 'connecting'
-                ? 'bg-yellow-900/20 text-yellow-500 border-yellow-700/40'
+                : liveStatus === 'connecting' || isSuspended
+                ? 'bg-gray-800/50 text-gray-600 border-gray-700 cursor-not-allowed'
                 : 'bg-green-600/20 hover:bg-green-600/30 text-green-400 border-green-600/40'
             }`}
           >
             {liveStatus === 'live' ? (
               <><span className="w-2 h-2 rounded-sm bg-red-400 inline-block" /> Stop</>
-            ) : liveStatus === 'connecting' ? 'Connecting…' : (
+            ) : liveStatus === 'connecting' ? 'Connecting…' : isSuspended ? (
+              <>
+                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 11c-.55 0-1-.45-1-1V8c0-.55.45-1 1-1s1 .45 1 1v4c0 .55-.45 1-1 1zm1 4h-2v-2h2v2z" />
+                </svg>
+                Suspended
+              </>
+            ) : (
               <><span className="w-2 h-2 rounded-full bg-green-400 animate-pulse inline-block" /> Go Live</>
             )}
           </button>
@@ -1995,7 +2015,7 @@ function ChannelTab({ host, audioKey }) {
 
       {/* ── Video Preview — mirrored with radio page's Go Live Video button via shared StreamContext ── */}
       {maxChannels > 0 ? (
-        <VideoPreview isLive={videoStatus === 'live'} liveStatus={videoStatus} onGoLive={handleVideoGoLive} onStop={handleVideoStop} />
+        <VideoPreview isLive={videoStatus === 'live'} liveStatus={videoStatus} onGoLive={handleVideoGoLive} onStop={handleVideoStop} isSuspended={isSuspended} />
       ) : (
         // Locked video preview for plans without video streaming
         <div className="bg-black border border-gray-800 rounded-xl overflow-hidden relative">
@@ -2455,7 +2475,7 @@ const TABS = [
 
 /* ─── Main component ──────────────────────────────────────────── */
 
-export default function StreamSetup() {
+export default function StreamSetup({ isSuspended = false }) {
   const host = window.location.hostname
   const fallbackRtmpBase = `rtmp://${host}:1935/live`
   const fallbackAudioKey = 'radio'

@@ -11,7 +11,7 @@ const PLAN_INFO = {
 
 export default function PaymentPage() {
   const navigate = useNavigate()
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, user, token, refreshProfile } = useAuth()
   const [searchParams] = useSearchParams()
   const planId = searchParams.get('plan') || 'starter'
   const billingCycle = searchParams.get('billing') || 'monthly'
@@ -41,6 +41,26 @@ export default function PaymentPage() {
       // TODO: Integrate with Stripe or your payment processor
       // For now, simulate payment processing
       await new Promise((resolve) => setTimeout(resolve, 2000))
+
+      // Update the user's plan in the database
+      const response = await fetch('/api/user/upgrade', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          plan: planId,
+          billing_cycle: billingCycle
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to upgrade plan')
+      }
+
+      // Refresh the user profile to get updated plan
+      await refreshProfile()
 
       // On success, redirect to dashboard
       navigate('/app')

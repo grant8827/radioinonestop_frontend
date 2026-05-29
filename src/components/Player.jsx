@@ -1067,35 +1067,50 @@ function CenterMixer({
 }
 
 // ── Go Live Video button (video mode) ─────────────────────────────────────────
-function VideoGoLiveButton({ streamKey }) {
+function VideoGoLiveButton({ streamKey, isSuspended = false }) {
   const { videoStatus, startVideo, stopVideo } = useStream()
   const videoLive = videoStatus === 'live'
   const videoConnecting = videoStatus === 'connecting'
+  const isDisabled = videoConnecting || isSuspended
+  
   return (
     <button
       onClick={videoLive ? stopVideo : () => startVideo(streamKey)}
-      disabled={videoConnecting}
-      title={videoLive ? 'Stop video broadcast' : 'Go Live Video — share your screen'}
+      disabled={isDisabled}
+      title={
+        isSuspended
+          ? 'Streaming suspended — listener limit exceeded. Upgrade to resume.'
+          : videoLive
+          ? 'Stop video broadcast'
+          : 'Go Live Video — share your screen'
+      }
       className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-bold text-xs uppercase tracking-widest transition-all duration-150 shrink-0 ${
         videoLive
           ? 'bg-purple-600 text-white shadow-[0_0_14px_#7c3aed55] animate-pulse'
-          : videoConnecting
-          ? 'bg-gray-700 text-gray-400 cursor-wait border border-gray-600'
+          : isDisabled
+          ? 'bg-gray-800/50 text-gray-600 cursor-not-allowed border border-gray-700'
           : videoStatus === 'error'
           ? 'bg-red-900 text-red-300 border border-red-700 hover:border-red-500 hover:text-white'
           : 'bg-gray-800 text-gray-400 border border-gray-700 hover:border-purple-500 hover:text-purple-400'
       }`}
     >
-      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-        <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z" />
-      </svg>
-      {videoLive ? '● LIVE VIDEO' : videoConnecting ? 'CONNECTING…' : videoStatus === 'error' ? 'RETRY VIDEO' : 'GO LIVE VIDEO'}
+      {isSuspended && !videoLive && (
+        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 11c-.55 0-1-.45-1-1V8c0-.55.45-1 1-1s1 .45 1 1v4c0 .55-.45 1-1 1zm1 4h-2v-2h2v2z" />
+        </svg>
+      )}
+      {!isSuspended && (
+        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z" />
+        </svg>
+      )}
+      {videoLive ? '● LIVE VIDEO' : videoConnecting ? 'CONNECTING…' : isSuspended ? 'SUSPENDED' : videoStatus === 'error' ? 'RETRY VIDEO' : 'GO LIVE VIDEO'}
     </button>
   )
 }
 
 // ── Main Player ────────────────────────────────────────────────────────────────
-export default function Player({ mode, config, trackA, trackB, queue = [], onQueuePop, onLoadTrackA, onLoadTrackB, repeatPlaylist = false, onRepeatReload }) {
+export default function Player({ mode, config, trackA, trackB, queue = [], onQueuePop, onLoadTrackA, onLoadTrackB, repeatPlaylist = false, onRepeatReload, isSuspended = false }) {
   const mediaRef = useRef(null)
   const mediaRefB = useRef(null)
   const hlsRef   = useRef(null)
@@ -1955,7 +1970,7 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
                 <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
               </svg>
             </button>
-            <VideoGoLiveButton streamKey={streamKey} />
+            <VideoGoLiveButton streamKey={streamKey} isSuspended={isSuspended} />
             <span
               className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 font-medium ${
                 streamLive ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-700 text-gray-400'

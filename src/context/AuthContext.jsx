@@ -33,11 +33,11 @@ function loadFromStorage() {
 export function AuthProvider({ children }) {
   const [{ token, user }, setAuth] = useState(loadFromStorage)
 
-  // Fetch full user profile when authenticated
-  useEffect(() => {
-    if (!token) return
+  // Fetch full user profile
+  const refreshProfile = useCallback(() => {
+    if (!token) return Promise.resolve()
     
-    fetch('/api/user/profile', {
+    return fetch('/api/user/profile', {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(r => r.json())
@@ -54,6 +54,11 @@ export function AuthProvider({ children }) {
       })
       .catch(() => {}) // Ignore errors, keep defaults
   }, [token])
+
+  // Fetch full user profile when authenticated
+  useEffect(() => {
+    refreshProfile()
+  }, [refreshProfile])
 
   const login = useCallback((newToken) => {
     localStorage.setItem('rio_token', newToken)
@@ -76,7 +81,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ token, user, login, logout, isAuthenticated: !!token && !!user }}>
+    <AuthContext.Provider value={{ token, user, login, logout, refreshProfile, isAuthenticated: !!token && !!user }}>
       {children}
     </AuthContext.Provider>
   )
