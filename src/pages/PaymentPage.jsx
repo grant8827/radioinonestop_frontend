@@ -186,7 +186,7 @@ export default function PaymentPage() {
                 Processing...
               </span>
             ) : (
-              `Pay $${plan.price}/month`
+              `Pay $${planPrice}${billingCycle === 'yearly' ? '/year' : '/month'}`
             )}
           </button>
 
