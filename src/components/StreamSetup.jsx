@@ -1994,23 +1994,87 @@ function ChannelTab({ host, audioKey }) {
     <div className="space-y-6">
 
       {/* ── Video Preview — mirrored with radio page's Go Live Video button via shared StreamContext ── */}
-      <VideoPreview isLive={videoStatus === 'live'} liveStatus={videoStatus} onGoLive={handleVideoGoLive} onStop={handleVideoStop} />
+      {maxChannels > 0 ? (
+        <VideoPreview isLive={videoStatus === 'live'} liveStatus={videoStatus} onGoLive={handleVideoGoLive} onStop={handleVideoStop} />
+      ) : (
+        // Locked video preview for plans without video streaming
+        <div className="bg-black border border-gray-800 rounded-xl overflow-hidden relative">
+          <div className="relative w-full" style={{ aspectRatio: '16/9', background: '#0a0a0a' }}>
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-purple-600/20 border-2 border-purple-500/30 flex items-center justify-center">
+                <svg className="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                </svg>
+              </div>
+              <div className="text-center px-4">
+                <p className="text-white font-semibold text-lg mb-1">Video Streaming Locked</p>
+                <p className="text-gray-400 text-sm mb-4">Upgrade to Enterprise or Ultimate to broadcast live video</p>
+                <button
+                  onClick={() => setUpgradeModal({ show: true, feature: 'Video Live Streaming', requiredPlan: 'enterprise' })}
+                  className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold text-sm transition-all shadow-lg shadow-purple-900/40"
+                >
+                  Upgrade to Unlock
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 px-4 py-3 bg-gray-900 border-t border-gray-800">
+            <svg className="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+            </svg>
+            <p className="text-xs text-gray-500">Available in <span className="text-purple-400 font-semibold">Enterprise</span> and <span className="text-purple-400 font-semibold">Ultimate</span> plans</p>
+          </div>
+        </div>
+      )}
 
       {/* ── Platform Connections (OAuth Login-to-Stream) ── */}
-      <PlatformConnections
-        connectedPlatforms={connectedPlatforms}
-        onDisconnect={async (platformId) => {
-          try {
-            await fetch(`/api/user/oauth-connections/${platformId}`, {
-              method: 'DELETE',
-              headers: { Authorization: `Bearer ${token}` },
-            })
-          } catch { /* best-effort */ }
-          setConnectedPlatforms((prev) => { const n = { ...prev }; delete n[platformId]; return n })
-        }}
-        onSyncComplete={(synced) => {
-          // synced: [{platform, label, server_url, stream_key}] from backend
-          setChannels((prev) => {
+      {maxChannels > 0 ? (
+        <PlatformConnections
+          connectedPlatforms={connectedPlatforms}
+          onDisconnect={async (platformId) => {
+            try {
+              await fetch(`/api/user/oauth-connections/${platformId}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` },
+              })
+            } catch { /* best-effort */ }
+            setConnectedPlatforms((prev) => { const n = { ...prev }; delete n[platformId]; return n })
+          }}
+          disabled={isLive}
+        />
+      ) : (
+        // Locked platform connections
+        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden relative opacity-60">
+          <div className="absolute inset-0 bg-black/40 z-10 flex items-center justify-center backdrop-blur-sm">
+            <div className="text-center px-4">
+              <div className="w-12 h-12 rounded-full bg-purple-600/20 border-2 border-purple-500/30 flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                </svg>
+              </div>
+              <p className="text-white font-semibold mb-1">Enterprise Feature</p>
+              <button
+                onClick={() => setUpgradeModal({ show: true, feature: 'Social Media Platform Connections', requiredPlan: 'enterprise' })}
+                className="mt-2 px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition-all"
+              >
+                Upgrade
+              </button>
+            </div>
+          </div>
+          <PlatformConnections
+            connectedPlatforms={{}}
+            onDisconnect={() => {}}
+            disabled={true}
+          />
+        </div>
+      )}
+
+      {/* ── Sync from OAuth (if applicable) ── */}
+      {maxChannels > 0 && (
+        <SyncOAuthButton
+          onSyncComplete={(synced) => {
+            // synced: [{platform, label, server_url, stream_key}] from backend
+            setChannels((prev) => {
             const next = [...prev]
             synced.forEach((dest) => {
               const existingIdx = next.findIndex((ch) => ch.platform === dest.platform)
@@ -2040,9 +2104,11 @@ function ChannelTab({ host, audioKey }) {
         }}
         disabled={isLive}
       />
+      )}
 
       {/* ── Multistream Destinations ── */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+      {maxChannels > 0 ? (
+        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
 
         {/* Section header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-800">
@@ -2291,6 +2357,47 @@ function ChannelTab({ host, audioKey }) {
           )}
         </div>
       </div>
+      ) : (
+        // Locked multistream destinations
+        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden relative opacity-60">
+          <div className="absolute inset-0 bg-black/40 z-10 flex items-center justify-center backdrop-blur-sm">
+            <div className="text-center px-4">
+              <div className="w-12 h-12 rounded-full bg-purple-600/20 border-2 border-purple-500/30 flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                </svg>
+              </div>
+              <p className="text-white font-semibold mb-1">Enterprise Feature</p>
+              <p className="text-gray-400 text-sm mb-3">Multistream to multiple platforms simultaneously</p>
+              <button
+                onClick={() => setUpgradeModal({ show: true, feature: 'Multistream Destinations', requiredPlan: 'enterprise' })}
+                className="mt-2 px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition-all"
+              >
+                Upgrade
+              </button>
+            </div>
+          </div>
+          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-800">
+              <span className="w-8 h-8 rounded-lg bg-gray-700/40 border border-gray-700 flex items-center justify-center shrink-0">
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+                </svg>
+              </span>
+              <div>
+                <h3 className="font-semibold text-white text-sm">Manual Destinations</h3>
+                <p className="text-xs text-gray-400">Available with video streaming</p>
+              </div>
+            </div>
+            <div className="px-5 py-16 flex flex-col items-center justify-center gap-2">
+              <svg className="w-10 h-10 text-gray-800" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+              </svg>
+              <p className="text-gray-600 text-xs">Upgrade to configure multistream destinations</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Upgrade Modal */}
       {upgradeModal.show && (

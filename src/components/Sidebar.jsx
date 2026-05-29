@@ -4,15 +4,14 @@ import UpgradeModal from './UpgradeModal'
 
 // Define which features are available in each plan
 const PLAN_FEATURES = {
-  starter: ['radio', 'mixer'],
-  professional: ['radio', 'mixer', 'conference'],
+  starter: ['radio', 'mixer', 'stream'],
+  professional: ['radio', 'mixer', 'stream', 'conference'],
   enterprise: ['radio', 'mixer', 'stream', 'conference'],
   ultimate: ['radio', 'mixer', 'stream', 'conference'],
 }
 
 // Define required plans for locked features
 const FEATURE_REQUIRED_PLAN = {
-  stream: 'enterprise',
   conference: 'professional',
 }
 
