@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 const PLANS = [
@@ -11,8 +12,8 @@ const PLANS = [
       'Custom stream URL',
       'Embeddable player widget',
       'Listeners analytics',
-      'Up to 300 concurrent listeners',
-      'Basic support',
+      'Up to 500 concurrent listeners',
+      //'Basic support',
     ],
     highlighted: false,
   },
@@ -27,7 +28,7 @@ const PLANS = [
       'Screen sharing',
       'Up to 10 participants per call',
       'Up to 1000 concurrent listeners',
-      'Priority support',
+      //'Priority support',
     ],
     highlighted: true,
   },
@@ -42,7 +43,7 @@ const PLANS = [
       'Multistream up to 3 channels',
       'Social media live streaming',
       'Up to 2000 concurrent listeners',
-      'Dedicated support',
+      //'Dedicated support',
     ],
     highlighted: false,
   },
@@ -57,7 +58,7 @@ const PLANS = [
       'Advanced analytics dashboard',
       'Custom branding options',
       'Unlimited concurrent listeners',
-      '24/7 dedicated support',
+      //'24/7 dedicated support',
     ],
     highlighted: false,
   },
@@ -65,9 +66,26 @@ const PLANS = [
 
 export default function PricingPage() {
   const navigate = useNavigate()
+  const [billingCycle, setBillingCycle] = useState('monthly') // 'monthly' or 'yearly'
 
   function selectPlan(planId) {
-    navigate(`/register?plan=${planId}`)
+    navigate(`/register?plan=${planId}&billing=${billingCycle}`)
+  }
+
+  // Calculate price based on billing cycle (yearly gets 2 months free)
+  function getPrice(monthlyPrice) {
+    if (billingCycle === 'yearly') {
+      return Math.round(monthlyPrice * 10) // 10 months price for 12 months
+    }
+    return monthlyPrice
+  }
+
+  function getPriceLabel(monthlyPrice) {
+    if (billingCycle === 'yearly') {
+      const yearlyTotal = Math.round(monthlyPrice * 10)
+      return { amount: yearlyTotal, period: '/year', monthly: monthlyPrice }
+    }
+    return { amount: monthlyPrice, period: '/month', monthly: null }
   }
 
   return (
@@ -131,6 +149,31 @@ export default function PricingPage() {
           <p className="max-w-2xl mx-auto text-lg text-gray-400 leading-relaxed">
             Start broadcasting today. All plans include secure stream keys, HLS playback, and 24/7 uptime.
           </p>
+
+          {/* Billing Toggle */}
+          <div className="flex items-center justify-center gap-3 mt-8">
+            <span className={`text-sm font-medium transition-colors ${billingCycle === 'monthly' ? 'text-white' : 'text-gray-500'}`}>
+              Monthly
+            </span>
+            <button
+              onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
+              className="relative w-14 h-7 bg-white/10 rounded-full transition-colors hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-950"
+            >
+              <div
+                className={`absolute top-0.5 left-0.5 w-6 h-6 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full transition-transform shadow-lg ${
+                  billingCycle === 'yearly' ? 'translate-x-7' : 'translate-x-0'
+                }`}
+              />
+            </button>
+            <span className={`text-sm font-medium transition-colors ${billingCycle === 'yearly' ? 'text-white' : 'text-gray-500'}`}>
+              Yearly
+            </span>
+            {billingCycle === 'yearly' && (
+              <span className="inline-block text-xs font-bold bg-green-900/30 text-green-400 border border-green-800/40 rounded-full px-2 py-0.5">
+                Save 17%
+              </span>
+            )}
+          </div>
         </div>
       </section>
 
@@ -157,10 +200,15 @@ export default function PricingPage() {
               <div className="mb-6">
                 <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
                 <p className="text-sm text-gray-400 mb-4">{plan.description}</p>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-5xl font-extrabold">${plan.price}</span>
-                  <span className="text-gray-400 text-sm">/month</span>
+                <div className="flex items-baseline gap-1 mb-1">
+                  <span className="text-5xl font-extrabold">${getPriceLabel(plan.price).amount}</span>
+                  <span className="text-gray-400 text-sm">{getPriceLabel(plan.price).period}</span>
                 </div>
+                {billingCycle === 'yearly' && (
+                  <p className="text-xs text-gray-500">
+                    ${plan.price}/month billed annually
+                  </p>
+                )}
               </div>
 
               <button

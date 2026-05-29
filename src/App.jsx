@@ -14,6 +14,7 @@ import SettingsPage from './components/SettingsPage'
 import ProfileSettings from './components/ProfileSettings'
 import LandingPage from './pages/LandingPage'
 import PricingPage from './pages/PricingPage'
+import RegisterPage from './pages/RegisterPage'
 import PaymentPage from './pages/PaymentPage'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AudioEngineProvider } from './context/AudioEngine'
@@ -157,6 +158,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/register" element={<RegisterPage />} />
           <Route path="/payment" element={<PaymentPage />} />
           <Route path="/conference/:roomId" element={<ConferenceRoom />} />
           <Route

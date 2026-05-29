@@ -3,10 +3,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 const PLAN_INFO = {
-  starter: { name: 'Starter', price: 22 },
-  professional: { name: 'Professional', price: 28 },
-  enterprise: { name: 'Enterprise', price: 40 },
-  ultimate: { name: 'Ultimate', price: 55 },
+  starter: { name: 'Starter', monthly: 22, yearly: 220 },
+  professional: { name: 'Professional', monthly: 28, yearly: 280 },
+  enterprise: { name: 'Enterprise', monthly: 40, yearly: 400 },
+  ultimate: { name: 'Ultimate', monthly: 55, yearly: 550 },
 }
 
 export default function PaymentPage() {
@@ -14,7 +14,9 @@ export default function PaymentPage() {
   const { isAuthenticated, user } = useAuth()
   const [searchParams] = useSearchParams()
   const planId = searchParams.get('plan') || 'starter'
-  const plan = PLAN_INFO[planId] || PLAN_INFO.starter
+  const billingCycle = searchParams.get('billing') || 'monthly'
+  const planInfo = PLAN_INFO[planId] || PLAN_INFO.starter
+  const planPrice = planInfo[billingCycle] || planInfo.monthly
 
   const [cardNumber, setCardNumber] = useState('')
   const [expiry, setExpiry] = useState('')
@@ -66,7 +68,8 @@ export default function PaymentPage() {
           </div>
           <h1 className="text-3xl font-bold mb-2">Complete Your Purchase</h1>
           <p className="text-gray-400 text-sm">
-            You're subscribing to the <span className="font-semibold text-white">{plan.name}</span> plan
+            You're subscribing to the <span className="font-semibold text-white">{planInfo.name}</span> plan
+            <span className="text-gray-500 ml-1">({billingCycle === 'yearly' ? 'Yearly' : 'Monthly'})</span>
           </p>
         </div>
 
@@ -74,15 +77,23 @@ export default function PaymentPage() {
         <div className="bg-white/5 border border-white/10 rounded-xl p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <span className="text-gray-400 text-sm">Plan</span>
-            <span className="font-semibold">{plan.name}</span>
+            <span className="font-semibold">{planInfo.name}</span>
           </div>
           <div className="flex items-center justify-between mb-4">
             <span className="text-gray-400 text-sm">Billing Cycle</span>
-            <span className="font-semibold">Monthly</span>
+            <span className="font-semibold">{billingCycle === 'yearly' ? 'Yearly' : 'Monthly'}</span>
           </div>
+          {billingCycle === 'yearly' && (
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-gray-400 text-sm">Savings</span>
+              <span className="font-semibold text-green-400">17% off</span>
+            </div>
+          )}
           <div className="border-t border-white/10 pt-4 flex items-center justify-between">
             <span className="text-lg font-bold">Total</span>
-            <span className="text-2xl font-extrabold text-purple-400">${plan.price}/mo</span>
+            <span className="text-2xl font-extrabold text-purple-400">
+              ${planPrice}{billingCycle === 'yearly' ? '/yr' : '/mo'}
+            </span>
           </div>
         </div>
 
