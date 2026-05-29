@@ -97,6 +97,27 @@ export default function PaymentPage() {
           </div>
         </div>
 
+        {/* Test Mode Notice */}
+        <div className="bg-blue-900/20 border border-blue-800/40 rounded-xl p-4 mb-6">
+          <div className="flex items-start gap-3">
+            <svg className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+            </svg>
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-blue-300 mb-2">Test Mode - Use Test Card</h3>
+              <div className="space-y-1 text-xs text-blue-200/80">
+                <p><span className="font-semibold text-blue-300">Card Number:</span> 4242 4242 4242 4242</p>
+                <p><span className="font-semibold text-blue-300">Expiry:</span> Any future date (e.g., 12/25)</p>
+                <p><span className="font-semibold text-blue-300">CVC:</span> Any 3 digits (e.g., 123)</p>
+                <p><span className="font-semibold text-blue-300">Name:</span> Any name</p>
+              </div>
+              <p className="text-xs text-blue-300/60 mt-2 italic">
+                No real charges will be made. This is for testing purposes only.
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Payment Form */}
         <form onSubmit={handleSubmit} className="bg-white/3 border border-white/10 rounded-xl p-6">
           <h2 className="font-semibold text-sm uppercase tracking-wider text-gray-400 mb-4">Payment Details</h2>
