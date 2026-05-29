@@ -56,7 +56,7 @@ function ErrorBox({ message }) {
   )
 }
 
-export default function RegisterModal({ onSuccess, onClose, onSwitchToLogin }) {
+export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwitchToLogin }) {
   const { login } = useAuth()
   const [step, setStep] = useState(1)
 
@@ -78,6 +78,13 @@ export default function RegisterModal({ onSuccess, onClose, onSwitchToLogin }) {
   const [error, setError] = useState('')
   const firstInputRef = useRef(null)
   const logoInputRef = useRef(null)
+
+  // Plan display mapping
+  const PLAN_NAMES = {
+    starter: 'Starter ($22/mo)',
+    professional: 'Professional ($28/mo)',
+    enterprise: 'Enterprise ($34/mo)',
+  }
 
   useEffect(() => {
     setTimeout(() => firstInputRef.current?.focus(), 50)
@@ -170,7 +177,7 @@ export default function RegisterModal({ onSuccess, onClose, onSwitchToLogin }) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
               </svg>
             </div>
-            <div>
+            <div className="flex-1">
               <h2 className="text-lg font-bold text-white">
                 {step === 1 ? 'Create your account' : 'Set up your radio station'}
               </h2>
@@ -178,6 +185,13 @@ export default function RegisterModal({ onSuccess, onClose, onSwitchToLogin }) {
                 {step === 1 ? 'Step 1 of 2 — Personal info' : 'Step 2 of 2 — Radio info'}
               </p>
             </div>
+            {selectedPlan && (
+              <div className="shrink-0">
+                <span className="inline-block text-[10px] font-bold uppercase tracking-wider bg-purple-600/20 text-purple-400 border border-purple-600/40 rounded-full px-3 py-1">
+                  {PLAN_NAMES[selectedPlan] || selectedPlan}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Progress bar */}

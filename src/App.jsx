@@ -13,6 +13,8 @@ import ConferenceRoom from './pages/ConferenceRoom'
 import SettingsPage from './components/SettingsPage'
 import ProfileSettings from './components/ProfileSettings'
 import LandingPage from './pages/LandingPage'
+import PricingPage from './pages/PricingPage'
+import PaymentPage from './pages/PaymentPage'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AudioEngineProvider } from './context/AudioEngine'
 import { StreamProvider, useStream } from './context/StreamContext'
@@ -154,6 +156,8 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<LandingPage />} />
+          <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/payment" element={<PaymentPage />} />
           <Route path="/conference/:roomId" element={<ConferenceRoom />} />
           <Route
             path="/app"

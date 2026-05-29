@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import LoginModal from '../components/LoginModal'
 import RegisterModal from '../components/RegisterModal'
 import StationModal from '../components/StationModal'
@@ -101,12 +101,25 @@ const DEMO_STATIONS = [
 ]
 
 export default function LandingPage() {
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [showLogin, setShowLogin] = useState(false)
   const [showRegister, setShowRegister] = useState(false)
+  const [selectedPlan, setSelectedPlan] = useState(null)
   const [selectedStation, setSelectedStation] = useState(null)
   const [stations, setStations] = useState(DEMO_STATIONS)
   const [showAllStations, setShowAllStations] = useState(false)
-  const navigate = useNavigate()
+
+  // Check for ?plan= param and auto-open register modal
+  useEffect(() => {
+    const plan = searchParams.get('plan')
+    if (plan) {
+      setSelectedPlan(plan)
+      setShowRegister(true)
+      // Clean URL
+      setSearchParams({})
+    }
+  }, [searchParams, setSearchParams])
 
   // Fetch stations on mount, refresh every 30s
   useEffect(() => {
@@ -118,7 +131,7 @@ export default function LandingPage() {
           if (data && data.length > 0) {
             setStations(data)
             // Auto-open station from shared link (?station=slug)
-            const slug = new URLSearchParams(window.location.search).get('station')
+            const slug = searchParams.get('station')
             if (slug) {
               const match = data.find((s) => s.slug === slug)
               if (match) setSelectedStation(match)
@@ -130,7 +143,7 @@ export default function LandingPage() {
     load()
     const id = setInterval(load, 30_000)
     return () => clearInterval(id)
-  }, [])
+  }, [searchParams])
 
   function openLogin() { setShowRegister(false); setShowLogin(true) }
   function openRegister() { setShowLogin(false); setShowRegister(true) }
@@ -138,7 +151,13 @@ export default function LandingPage() {
   function handleAuthSuccess() {
     setShowLogin(false)
     setShowRegister(false)
-    navigate('/app')
+    // If user registered with a plan, go to payment; otherwise go to app
+    if (selectedPlan) {
+      navigate(`/payment?plan=${selectedPlan}`)
+      setSelectedPlan(null)
+    } else {
+      navigate('/app')
+    }
   }
 
   return (
@@ -154,12 +173,36 @@ export default function LandingPage() {
             </svg>
             <span className="font-bold text-sm tracking-tight">Radio In One Stop</span>
           </div>
-          <button
-            onClick={openLogin}
-            className="text-sm font-medium text-gray-300 hover:text-white transition-colors px-4 py-1.5 rounded-lg hover:bg-white/5"
-          >
-            Sign In
-          </button>
+          
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+              className="text-sm font-medium text-gray-300 hover:text-white transition-colors px-4 py-1.5 rounded-lg hover:bg-white/5"
+            >
+              Features
+            </button>
+            <button
+              onClick={() => navigate('/pricing')}
+              className="text-sm font-medium text-gray-300 hover:text-white transition-colors px-4 py-1.5 rounded-lg hover:bg-white/5"
+            >
+              Pricing
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/pricing')}
+              className="px-5 py-2 rounded-lg bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold text-sm transition-all shadow-lg shadow-purple-900/30 hover:shadow-purple-900/50"
+            >
+              Start Broadcasting
+            </button>
+            <button
+              onClick={openLogin}
+              className="text-sm font-medium text-gray-300 hover:text-white transition-colors px-4 py-1.5 rounded-lg hover:bg-white/5"
+            >
+              Sign In
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -191,16 +234,16 @@ export default function LandingPage() {
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
-              onClick={openRegister}
-              className="px-7 py-3 rounded-xl bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold text-sm transition-all shadow-lg shadow-purple-900/40 hover:shadow-purple-900/60"
-            >
-              Start Broadcasting Free
-            </button>
-            <button
               onClick={openLogin}
               className="px-7 py-3 rounded-xl border border-white/10 hover:border-white/20 text-gray-300 hover:text-white font-semibold text-sm transition-all hover:bg-white/5"
             >
               Sign In →
+            </button>
+            <button
+              onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+              className="px-7 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white font-semibold text-sm transition-all border border-white/10 hover:border-white/20"
+            >
+              Explore Features
             </button>
           </div>
         </div>
@@ -295,7 +338,7 @@ export default function LandingPage() {
       )}
 
       {/* ── Features ── */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
+      <section id="features" className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
         <div className="text-center mb-14">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3">Everything you need to go live</h2>
           <p className="text-gray-500 text-sm">No monthly fees. No per-stream limits. Just stream.</p>
@@ -321,12 +364,12 @@ export default function LandingPage() {
       <section className="border-t border-white/5">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4">Ready to go live?</h2>
-          <p className="text-gray-500 text-sm mb-8">Create your account in seconds. No credit card required.</p>
+          <p className="text-gray-500 text-sm mb-8">Choose your plan and start broadcasting in minutes.</p>
           <button
-            onClick={openRegister}
+            onClick={() => navigate('/pricing')}
             className="px-8 py-3 rounded-xl bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold text-sm transition-all shadow-lg shadow-purple-900/40"
           >
-            Create Free Account
+            View Pricing Plans
           </button>
         </div>
       </section>
@@ -356,8 +399,9 @@ export default function LandingPage() {
       )}
       {showRegister && (
         <RegisterModal
+          selectedPlan={selectedPlan}
           onSuccess={handleAuthSuccess}
-          onClose={() => setShowRegister(false)}
+          onClose={() => { setShowRegister(false); setSelectedPlan(null) }}
           onSwitchToLogin={openLogin}
         />
       )}
