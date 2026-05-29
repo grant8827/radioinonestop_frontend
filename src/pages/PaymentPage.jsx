@@ -5,7 +5,8 @@ import { useAuth } from '../context/AuthContext'
 const PLAN_INFO = {
   starter: { name: 'Starter', price: 22 },
   professional: { name: 'Professional', price: 28 },
-  enterprise: { name: 'Enterprise', price: 34 },
+  enterprise: { name: 'Enterprise', price: 40 },
+  ultimate: { name: 'Ultimate', price: 55 },
 }
 
 export default function PaymentPage() {

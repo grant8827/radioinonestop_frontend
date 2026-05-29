@@ -10,8 +10,8 @@ const PLANS = [
       'Radio DJ & Mixer',
       'Custom stream URL',
       'Embeddable player widget',
-      'Live chat & analytics',
-      'Up to 100 concurrent listeners',
+      'Listeners analytics',
+      'Up to 300 concurrent listeners',
       'Basic support',
     ],
     highlighted: false,
@@ -26,7 +26,7 @@ const PLANS = [
       'Conference call rooms',
       'Screen sharing',
       'Up to 10 participants per call',
-      'Up to 500 concurrent listeners',
+      'Up to 1000 concurrent listeners',
       'Priority support',
     ],
     highlighted: true,
@@ -34,15 +34,30 @@ const PLANS = [
   {
     id: 'enterprise',
     name: 'Enterprise',
-    price: 34,
+    price: 40,
     description: 'Complete solution with video streaming',
     features: [
       'Everything in Professional',
       'Video live streaming',
-      'Multistream to YouTube, Twitch, etc.',
-      'WebRTC browser broadcasting',
-      'Unlimited concurrent listeners',
+      'Multistream up to 3 channels',
+      'Social media live streaming',
+      'Up to 2000 concurrent listeners',
       'Dedicated support',
+    ],
+    highlighted: false,
+  },
+  {
+    id: 'ultimate',
+    name: 'Ultimate',
+    price: 55,
+    description: 'Maximum power for professional broadcasters',
+    features: [
+      'Everything in Enterprise',
+      'Multistream up to 6 channels',
+      'Advanced analytics dashboard',
+      'Custom branding options',
+      'Unlimited concurrent listeners',
+      '24/7 dedicated support',
     ],
     highlighted: false,
   },
@@ -121,7 +136,7 @@ export default function PricingPage() {
 
       {/* ── Pricing Cards ── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {PLANS.map((plan) => (
             <div
               key={plan.id}

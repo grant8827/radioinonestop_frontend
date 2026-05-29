@@ -83,7 +83,8 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
   const PLAN_NAMES = {
     starter: 'Starter ($22/mo)',
     professional: 'Professional ($28/mo)',
-    enterprise: 'Enterprise ($34/mo)',
+    enterprise: 'Enterprise ($40/mo)',
+    ultimate: 'Ultimate ($55/mo)',
   }
 
   useEffect(() => {
