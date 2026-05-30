@@ -296,34 +296,186 @@ function CampaignsTab({ campaigns, onRefresh, token }) {
 }
 
 function PlacementsTab({ placements }) {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {placements.map((placement) => (
-        <div key={placement.id} className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <h3 className="text-lg font-semibold text-white">{placement.name}</h3>
-              <p className="text-sm text-gray-400 mt-1">{placement.description}</p>
-            </div>
-            <span className="px-3 py-1 bg-purple-900/30 text-purple-400 text-xs font-medium rounded-full border border-purple-700/30">
-              {placement.placement}
-            </span>
-          </div>
-          
-          {placement.width > 0 && (
-            <div className="text-sm text-gray-400 mb-3">
-              Dimensions: {placement.width}x{placement.height}px
-            </div>
-          )}
+  const [previewPlacement, setPreviewPlacement] = useState(null)
 
-          <div className="flex items-center justify-between pt-4 border-t border-gray-800">
-            <div className="text-2xl font-bold text-white">${placement.basePrice}<span className="text-sm text-gray-400 font-normal">/month</span></div>
-            <div className={`text-xs font-medium ${placement.active ? 'text-green-400' : 'text-gray-500'}`}>
-              {placement.active ? 'Available' : 'Unavailable'}
+  function getPlacementPreview(placement) {
+    switch (placement.placement) {
+      case 'player-overlay':
+        return (
+          <div className="relative bg-gray-950 rounded-lg p-4 aspect-video border border-gray-700">
+            {/* Mock player */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-gray-600 text-6xl">▶</div>
+            </div>
+            {/* Ad overlay */}
+            <div className="absolute bottom-4 right-4 bg-purple-600/90 backdrop-blur-sm border border-purple-400/30 rounded-lg p-3 max-w-xs shadow-xl">
+              <div className="flex gap-3 items-start">
+                <div className="w-16 h-16 bg-purple-700 rounded flex items-center justify-center flex-shrink-0">
+                  <span className="text-2xl">🎵</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold text-purple-200 mb-1">Your Ad Here</div>
+                  <div className="text-xs text-purple-100">Interactive overlay during playback</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      
+      case 'header-banner':
+        return (
+          <div className="bg-gray-950 rounded-lg overflow-hidden border border-gray-700">
+            {/* Banner ad */}
+            <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-6 text-center">
+              <div className="text-white font-bold text-lg mb-1">Your Advertisement</div>
+              <div className="text-purple-100 text-sm">728x90 banner space</div>
+            </div>
+            {/* Mock page content */}
+            <div className="p-4 space-y-2">
+              <div className="h-3 bg-gray-800 rounded w-3/4"></div>
+              <div className="h-3 bg-gray-800 rounded w-1/2"></div>
+            </div>
+          </div>
+        )
+      
+      case 'sidebar':
+        return (
+          <div className="flex gap-2 bg-gray-950 rounded-lg overflow-hidden border border-gray-700 p-2">
+            {/* Mock content */}
+            <div className="flex-1 space-y-2 p-2">
+              <div className="h-3 bg-gray-800 rounded w-full"></div>
+              <div className="h-3 bg-gray-800 rounded w-3/4"></div>
+              <div className="h-3 bg-gray-800 rounded w-5/6"></div>
+            </div>
+            {/* Sidebar ad */}
+            <div className="w-32 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg p-3 flex flex-col items-center justify-center text-center">
+              <div className="text-3xl mb-2">📢</div>
+              <div className="text-xs text-white font-semibold">Ad Space</div>
+              <div className="text-xs text-purple-100 mt-1">300x600</div>
+            </div>
+          </div>
+        )
+      
+      case 'audio-pre':
+        return (
+          <div className="bg-gray-950 rounded-lg p-6 border border-gray-700">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-purple-600 rounded-full flex items-center justify-center animate-pulse">
+                <span className="text-2xl">🔊</span>
+              </div>
+              <div className="flex-1">
+                <div className="text-white font-semibold mb-1">Audio Pre-roll Ad</div>
+                <div className="text-sm text-gray-400">Plays before stream starts</div>
+                <div className="mt-2 flex items-center gap-2">
+                  <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
+                    <div className="w-1/3 h-full bg-purple-600 rounded-full"></div>
+                  </div>
+                  <span className="text-xs text-gray-500">15s</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      
+      default:
+        return null
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Preview Modal */}
+      {previewPlacement && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 max-w-3xl w-full">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-xl font-semibold text-white">{previewPlacement.name}</h3>
+                <p className="text-sm text-gray-400 mt-1">{previewPlacement.description}</p>
+              </div>
+              <button
+                onClick={() => setPreviewPlacement(null)}
+                className="text-gray-400 hover:text-white"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="mb-6">
+              {getPlacementPreview(previewPlacement)}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+              <div>
+                <div className="text-xs text-gray-400 mb-1">Placement ID</div>
+                <div className="text-sm text-white font-mono">{previewPlacement.placement}</div>
+              </div>
+              {previewPlacement.width > 0 && (
+                <div>
+                  <div className="text-xs text-gray-400 mb-1">Dimensions</div>
+                  <div className="text-sm text-white">{previewPlacement.width} × {previewPlacement.height}px</div>
+                </div>
+              )}
+              <div>
+                <div className="text-xs text-gray-400 mb-1">Base Price</div>
+                <div className="text-sm text-white font-semibold">${previewPlacement.basePrice}/month</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-400 mb-1">Status</div>
+                <div className={`text-sm font-medium ${previewPlacement.active ? 'text-green-400' : 'text-gray-500'}`}>
+                  {previewPlacement.active ? 'Available' : 'Unavailable'}
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      ))}
+      )}
+
+      {/* Placements Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {placements.map((placement) => (
+          <div key={placement.id} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden hover:border-purple-700/50 transition-colors">
+            {/* Preview thumbnail */}
+            <div className="p-4 bg-gray-950">
+              {getPlacementPreview(placement)}
+            </div>
+
+            {/* Info */}
+            <div className="p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-white">{placement.name}</h3>
+                  <p className="text-sm text-gray-400 mt-1">{placement.description}</p>
+                </div>
+                <span className="px-3 py-1 bg-purple-900/30 text-purple-400 text-xs font-medium rounded-full border border-purple-700/30 whitespace-nowrap ml-2">
+                  {placement.placement}
+                </span>
+              </div>
+              
+              {placement.width > 0 && (
+                <div className="text-sm text-gray-400 mb-3">
+                  Dimensions: {placement.width}x{placement.height}px
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-4 border-t border-gray-800">
+                <div className="text-2xl font-bold text-white">
+                  ${placement.basePrice}
+                  <span className="text-sm text-gray-400 font-normal">/month</span>
+                </div>
+                <button
+                  onClick={() => setPreviewPlacement(placement)}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  Preview
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
