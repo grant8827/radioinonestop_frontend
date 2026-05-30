@@ -72,7 +72,8 @@ export default function PricingPage() {
   const [billingCycle, setBillingCycle] = useState('monthly') // 'monthly' or 'yearly'
 
   function selectPlan(planId) {
-    navigate(`/register?plan=${planId}&billing=${billingCycle}`)
+    const checkoutPath = `/payment?plan=${planId}&billing=${billingCycle}`
+    navigate(isAuthenticated ? checkoutPath : `/register?plan=${planId}&billing=${billingCycle}`)
   }
 
   // Calculate price based on billing cycle (yearly gets 2 months free)

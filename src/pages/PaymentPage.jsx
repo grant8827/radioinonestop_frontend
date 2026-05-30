@@ -11,10 +11,12 @@ const PLAN_INFO = {
 
 export default function PaymentPage() {
   const navigate = useNavigate()
-  const { isAuthenticated, user, token, refreshProfile } = useAuth()
+  const { isAuthenticated, token, refreshProfile } = useAuth()
   const [searchParams] = useSearchParams()
-  const planId = searchParams.get('plan') || 'starter'
-  const billingCycle = searchParams.get('billing') || 'monthly'
+  const requestedPlan = (searchParams.get('plan') || 'starter').toLowerCase()
+  const requestedBilling = (searchParams.get('billing') || 'monthly').toLowerCase()
+  const planId = PLAN_INFO[requestedPlan] ? requestedPlan : 'starter'
+  const billingCycle = ['monthly', 'yearly'].includes(requestedBilling) ? requestedBilling : 'monthly'
   const planInfo = PLAN_INFO[planId] || PLAN_INFO.starter
   const planPrice = planInfo[billingCycle] || planInfo.monthly
 
@@ -56,7 +58,8 @@ export default function PaymentPage() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to upgrade plan')
+        const message = await response.text()
+        throw new Error(message || 'Failed to upgrade plan')
       }
 
       // Refresh the user profile to get updated plan

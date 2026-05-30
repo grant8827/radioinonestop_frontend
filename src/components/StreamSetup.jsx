@@ -1822,7 +1822,7 @@ function VideoPreview({ isLive, liveStatus, onGoLive, onStop, isSuspended = fals
   )
 }
 
-function ChannelTab({ host, audioKey }) {
+function ChannelTab({ host, audioKey, isSuspended = false }) {
   const { token, user } = useAuth()
   const { broadcastMode, icecastStatus, radioStatus, icecastStartRef, icecastStopRef, startRadio, stopRadio,
     videoStatus, startVideo, stopVideo } = useStream()
@@ -2544,7 +2544,7 @@ export default function StreamSetup({ isSuspended = false }) {
         <AudioEncoderTab audioKey={audioKey} host={host} listenUrl={creds?.listen_url} isSuspended={isSuspended} />
       </div>
       <div style={{ display: tab === 'channel' ? undefined : 'none' }}>
-        <ChannelTab host={host} audioKey={audioKey} />
+        <ChannelTab host={host} audioKey={audioKey} isSuspended={isSuspended} />
       </div>
       {tab === 'listeners' && <ListenersPage />}
     </div>
