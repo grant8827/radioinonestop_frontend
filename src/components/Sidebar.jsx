@@ -4,10 +4,10 @@ import UpgradeModal from './UpgradeModal'
 
 // Define which features are available in each plan
 const PLAN_FEATURES = {
-  starter: ['radio', 'mixer', 'stream', 'ads'],
-  professional: ['radio', 'mixer', 'stream', 'conference', 'ads'],
-  enterprise: ['radio', 'mixer', 'stream', 'conference', 'ads'],
-  ultimate: ['radio', 'mixer', 'stream', 'conference', 'ads'],
+  starter: ['radio', 'mixer', 'stream'],
+  professional: ['radio', 'mixer', 'stream', 'conference'],
+  enterprise: ['radio', 'mixer', 'stream', 'conference'],
+  ultimate: ['radio', 'mixer', 'stream', 'conference'],
 }
 
 // Define required plans for locked features
@@ -20,7 +20,6 @@ const NAV_ITEMS = [
   { id: 'mixer', label: 'Mixer', icon: MixerIcon },
   { id: 'stream', label: 'Stream', icon: StreamIcon },
   { id: 'conference', label: 'Conference', icon: ConferenceIcon },
-  { id: 'ads', label: 'Ads', icon: AdsIcon },
 ]
 
 function RadioIcon({ className }) {
@@ -171,6 +170,34 @@ export default function Sidebar({ stationName, mode, onModeChange, onSettingsCli
             </div>
           )
         })}
+        
+        {/* Admin Navigation - Only for admin users */}
+        {user?.role === 'admin' && (
+          <div className="mt-3 pt-3 border-t border-gray-800">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-2 mb-2">
+              Admin
+            </p>
+            <button
+              onClick={() => {
+                onModeChange('admin')
+                setOpen(false)
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all mb-1 ${
+                mode === 'admin'
+                  ? 'bg-purple-600 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+              }`}
+            >
+              <AdsIcon className="w-4 h-4 flex-shrink-0" />
+              Super Admin
+              {mode === 'admin' && (
+                <span className="ml-auto text-[10px] font-semibold bg-white/20 rounded px-1.5 py-0.5 leading-none">
+                  ON
+                </span>
+              )}
+            </button>
+          </div>
+        )}
       </nav>
 
       {/* Live Streams */}
