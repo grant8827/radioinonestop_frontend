@@ -2090,16 +2090,15 @@ function ChannelTab({ host, audioKey, isSuspended = false }) {
       )}
 
       {/* ── Sync from OAuth (if applicable) ── */}
+      {/* TODO: Implement SyncOAuthButton component for OAuth integration
       {maxChannels > 0 && (
         <SyncOAuthButton
           onSyncComplete={(synced) => {
-            // synced: [{platform, label, server_url, stream_key}] from backend
             setChannels((prev) => {
             const next = [...prev]
             synced.forEach((dest) => {
               const existingIdx = next.findIndex((ch) => ch.platform === dest.platform)
               if (existingIdx >= 0) {
-                // Update existing entry
                 next[existingIdx] = {
                   ...next[existingIdx],
                   label: dest.label,
@@ -2107,7 +2106,6 @@ function ChannelTab({ host, audioKey, isSuspended = false }) {
                   streamKey: dest.stream_key,
                 }
               } else {
-                // Add new entry
                 next.push({
                   id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
                   platform: dest.platform,
@@ -2125,6 +2123,7 @@ function ChannelTab({ host, audioKey, isSuspended = false }) {
         disabled={isLive}
       />
       )}
+      */}
 
       {/* ── Multistream Destinations ── */}
       {maxChannels > 0 ? (
