@@ -91,10 +91,16 @@ function UsersTab({ token }) {
       })
       if (res.ok) {
         const data = await res.json()
+        console.log('Loaded users:', data)
         setUsers(data)
+      } else {
+        const error = await res.text()
+        console.error('Failed to load users - HTTP', res.status, error)
+        alert(`Failed to load users: ${res.status} - ${error}`)
       }
     } catch (err) {
       console.error('Failed to load users:', err)
+      alert(`Error loading users: ${err.message}`)
     }
     setLoading(false)
   }
@@ -383,7 +389,8 @@ function PricingTab({ token }) {
 function EditPlanModal({ plan, onClose, onSave }) {
   const [monthlyPrice, setMonthlyPrice] = useState(plan.monthlyPrice || 0)
   const [yearlyPrice, setYearlyPrice] = useState(plan.yearlyPrice || 0)
-  const [salePercent, setSalePercent] = useState(plan.salePercent || 0)
+  const [monthlySalePercent, setMonthlySalePercent] = useState(plan.monthlySalePercent || 0)
+  const [yearlySalePercent, setYearlySalePercent] = useState(plan.yearlySalePercent || 0)
   const [isFeatured, setIsFeatured] = useState(plan.isFeatured || false)
 
   function handleSubmit(e) {
@@ -393,7 +400,8 @@ function EditPlanModal({ plan, onClose, onSave }) {
       monthlyPrice: parseFloat(monthlyPrice),
       yearlyPrice: parseFloat(yearlyPrice),
       features: plan.features || [],
-      salePercent: parseInt(salePercent),
+      monthlySalePercent: parseInt(monthlySalePercent),
+      yearlySalePercent: parseInt(yearlySalePercent),
       isFeatured,
     })
   }
@@ -427,16 +435,29 @@ function EditPlanModal({ plan, onClose, onSave }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Sale Discount (%)</label>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Monthly Sale Discount (%)</label>
             <input
               type="number"
               min="0"
               max="80"
-              value={salePercent}
-              onChange={(e) => setSalePercent(e.target.value)}
+              value={monthlySalePercent}
+              onChange={(e) => setMonthlySalePercent(e.target.value)}
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
             />
-            <p className="text-xs text-gray-500 mt-1">0 = no sale</p>
+            <p className="text-xs text-gray-500 mt-1">0 = no sale, shows original price with slash</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Yearly Sale Discount (%)</label>
+            <input
+              type="number"
+              min="0"
+              max="80"
+              value={yearlySalePercent}
+              onChange={(e) => setYearlySalePercent(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+            />
+            <p className="text-xs text-gray-500 mt-1">0 = no sale, shows original price with slash</p>
           </div>
 
           <div className="flex items-center gap-3">
