@@ -340,10 +340,66 @@ function CreateCampaignTab({ placements, onSuccess, token, onCancel }) {
     discountPercent: 0,
   })
   const [saving, setSaving] = useState(false)
+  const [uploadFile, setUploadFile] = useState(null)
+  const [uploadPreview, setUploadPreview] = useState(null)
+  const [dragOver, setDragOver] = useState(false)
 
   function handleChange(e) {
     const { name, value } = e.target
     setForm(prev => ({ ...prev, [name]: value }))
+  }
+
+  function handleFileChange(e) {
+    const file = e.target.files?.[0]
+    if (file) {
+      setUploadFile(file)
+      setForm(prev => ({ ...prev, assetName: file.name, assetUrl: '' }))
+      
+      // Generate preview for images
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader()
+        reader.onload = (e) => setUploadPreview(e.target.result)
+        reader.readAsDataURL(file)
+      } else {
+        setUploadPreview(null)
+      }
+    }
+  }
+
+  function handleDragOver(e) {
+    e.preventDefault()
+    setDragOver(true)
+  }
+
+  function handleDragLeave(e) {
+    e.preventDefault()
+    setDragOver(false)
+  }
+
+  function handleDrop(e) {
+    e.preventDefault()
+    setDragOver(false)
+    
+    const file = e.dataTransfer.files?.[0]
+    if (file) {
+      setUploadFile(file)
+      setForm(prev => ({ ...prev, assetName: file.name, assetUrl: '' }))
+      
+      // Generate preview for images
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader()
+        reader.onload = (e) => setUploadPreview(e.target.result)
+        reader.readAsDataURL(file)
+      } else {
+        setUploadPreview(null)
+      }
+    }
+  }
+
+  function clearFile() {
+    setUploadFile(null)
+    setUploadPreview(null)
+    setForm(prev => ({ ...prev, assetName: '', assetUrl: '' }))
   }
 
   async function handleSubmit(e) {
@@ -351,14 +407,38 @@ function CreateCampaignTab({ placements, onSuccess, token, onCancel }) {
     setSaving(true)
 
     try {
-      const res = await fetch('/api/ads/campaigns', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(form),
-      })
+      let res
+      
+      if (uploadFile) {
+        // Use FormData for file upload
+        const formData = new FormData()
+        formData.append('assetFile', uploadFile)
+        formData.append('placementId', form.placementId)
+        formData.append('advertiserName', form.advertiserName)
+        formData.append('targetUrl', form.targetUrl)
+        formData.append('assetType', form.assetType)
+        formData.append('assetName', form.assetName)
+        formData.append('price', form.price.toString())
+        formData.append('discountPercent', form.discountPercent.toString())
+
+        res = await fetch('/api/ads/campaigns', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        })
+      } else {
+        // Use JSON for URL-based assets
+        res = await fetch('/api/ads/campaigns', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(form),
+        })
+      }
 
       if (res.ok) {
         onSuccess()
@@ -432,16 +512,75 @@ function CreateCampaignTab({ placements, onSuccess, token, onCancel }) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">Asset URL (temporary)</label>
+          <label className="block text-sm font-medium text-gray-300 mb-2">Upload Asset File</label>
+          
+          {!uploadFile ? (
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                dragOver
+                  ? 'border-purple-500 bg-purple-500/10'
+                  : 'border-gray-700 bg-gray-800/50'
+              }`}
+            >
+              <input
+                type="file"
+                id="assetFile"
+                onChange={handleFileChange}
+                accept="image/*,video/*,audio/*"
+                className="hidden"
+              />
+              <label htmlFor="assetFile" className="cursor-pointer">
+                <svg className="w-12 h-12 mx-auto mb-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <p className="text-gray-300 font-medium mb-1">Click to upload or drag and drop</p>
+                <p className="text-gray-500 text-sm">Images, videos, or audio files</p>
+              </label>
+            </div>
+          ) : (
+            <div className="border border-gray-700 rounded-lg p-4 bg-gray-800">
+              {uploadPreview && (
+                <img src={uploadPreview} alt="Preview" className="w-full max-h-40 object-contain mb-3 rounded" />
+              )}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <svg className="w-8 h-8 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
+                  </svg>
+                  <div>
+                    <p className="text-white font-medium">{uploadFile.name}</p>
+                    <p className="text-gray-500 text-sm">{(uploadFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearFile}
+                  className="text-red-500 hover:text-red-400 font-medium"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          )}
+          
+          <div className="mt-3 text-center text-gray-500 text-sm">— OR —</div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">Asset URL (alternative)</label>
           <input
             type="text"
             name="assetUrl"
             value={form.assetUrl}
             onChange={handleChange}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500"
+            disabled={!!uploadFile}
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 disabled:opacity-50"
             placeholder="https://example.com/ad-image.jpg"
           />
-          <p className="text-xs text-gray-500 mt-1">File upload coming soon - use external URL for now</p>
+          <p className="text-xs text-gray-500 mt-1">Use external URL if not uploading a file</p>
         </div>
 
         <div>
