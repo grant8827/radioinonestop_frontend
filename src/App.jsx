@@ -13,6 +13,7 @@ import ConferenceRoom from './pages/ConferenceRoom'
 import SettingsPage from './components/SettingsPage'
 import ProfileSettings from './components/ProfileSettings'
 import AdsManager from './components/AdsManager'
+import { HeaderBannerAd, SidebarAd } from './components/AdDisplay'
 import LandingPage from './pages/LandingPage'
 import PricingPage from './pages/PricingPage'
 import RegisterPage from './pages/RegisterPage'
@@ -202,6 +203,9 @@ function MainApp() {
           {mode === 'profile' && <ProfileSettings />}
           {mode === 'settings' && <SettingsPage />}
 
+          {/* Header Banner Ad - only show on radio/video mode */}
+          {(mode === 'radio' || mode === 'video') && <HeaderBannerAd />}
+
           {/* Player + NowPlaying + Chat — always mounted so audio elements survive
               mode switches. Hidden (display:none) when not in radio/video mode. */}
           <div className={`flex flex-col lg:flex-row gap-4 w-full${
@@ -213,6 +217,7 @@ function MainApp() {
             </div>
             <div className="lg:w-80 xl:w-96 shrink-0 flex flex-col gap-3 min-h-0">
               <SocialLive />
+              <SidebarAd />
               <div className="min-h-0 overflow-hidden" style={{ height: 530 }}>
                 <TrackLibrary onTrackLoadA={setTrackA} onTrackLoadB={setTrackB} queue={queue} onQueueChange={setQueue} repeatPlaylist={repeatPlaylist} onRepeatChange={setRepeatPlaylist} nowPlayingA={trackA} nowPlayingB={trackB} />
               </div>
