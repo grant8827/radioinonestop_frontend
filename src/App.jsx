@@ -12,6 +12,7 @@ import TrackLibrary from './components/TrackLibrary'
 import ConferenceRoom from './pages/ConferenceRoom'
 import SettingsPage from './components/SettingsPage'
 import ProfileSettings from './components/ProfileSettings'
+import AdsManager from './components/AdsManager'
 import LandingPage from './pages/LandingPage'
 import PricingPage from './pages/PricingPage'
 import RegisterPage from './pages/RegisterPage'
@@ -197,6 +198,7 @@ function MainApp() {
           {mode === 'conference' && (
             <ConferenceRoom roomId="studio" username={user?.stationName} onLeave={() => handleModeChange('radio')} />
           )}
+          {mode === 'ads' && <AdsManager />}
           {mode === 'profile' && <ProfileSettings />}
           {mode === 'settings' && <SettingsPage />}
 
