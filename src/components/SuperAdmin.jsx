@@ -286,10 +286,38 @@ function PricingTab({ token }) {
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
   const [editPlan, setEditPlan] = useState(null)
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState(null)
 
   useEffect(() => {
     loadPlans()
   }, [])
+
+  async function handleSyncPayPal() {
+    if (!confirm('This will create subscription plans in your PayPal account for any plan missing a PayPal Plan ID. Continue?')) {
+      return
+    }
+    setSyncing(true)
+    setSyncResult(null)
+    try {
+      const res = await fetch('/api/admin/paypal/sync-plans', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const text = await res.text()
+      let data
+      try { data = JSON.parse(text) } catch { data = { error: text } }
+      if (!res.ok) {
+        setSyncResult({ error: data.error || text || `Request failed (${res.status})` })
+      } else {
+        setSyncResult(data)
+        loadPlans()
+      }
+    } catch (err) {
+      setSyncResult({ error: err.message })
+    }
+    setSyncing(false)
+  }
 
   async function loadPlans() {
     setLoading(true)
@@ -332,6 +360,55 @@ function PricingTab({ token }) {
 
   return (
     <div className="space-y-4">
+      <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-800/40 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h3 className="text-white font-semibold mb-1">PayPal Plan Sync</h3>
+          <p className="text-sm text-gray-300">
+            Auto-create PayPal subscription plans for any package missing a Plan ID. Uses current prices and sale percentages.
+          </p>
+        </div>
+        <button
+          onClick={handleSyncPayPal}
+          disabled={syncing}
+          className="bg-blue-600 hover:bg-blue-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg whitespace-nowrap"
+        >
+          {syncing ? 'Syncing...' : 'Sync to PayPal'}
+        </button>
+      </div>
+
+      {syncResult && (
+        <div className={`rounded-xl p-4 border ${syncResult.error ? 'bg-red-900/20 border-red-800/40' : 'bg-green-900/20 border-green-800/40'}`}>
+          {syncResult.error ? (
+            <div className="text-sm text-red-300">Error: {syncResult.error}</div>
+          ) : (
+            <div className="space-y-2">
+              <div className="text-sm text-green-300">
+                Sync complete ({syncResult.mode} mode) — Product: <code className="text-xs">{syncResult.product_id}</code>
+              </div>
+              <div className="space-y-1 text-xs">
+                {(syncResult.plans || []).map(p => (
+                  <div key={p.id} className="flex flex-wrap gap-x-3 text-gray-300">
+                    <span className="text-white font-medium capitalize">{p.id}</span>
+                    <span className={p.status === 'error' ? 'text-red-400' : p.status === 'created' ? 'text-green-400' : 'text-gray-500'}>
+                      {p.status}
+                    </span>
+                    {p.monthly_plan_id && <span>M: <code>{p.monthly_plan_id}</code></span>}
+                    {p.yearly_plan_id && <span>Y: <code>{p.yearly_plan_id}</code></span>}
+                    {p.error && <span className="text-red-400 w-full">{p.error}</span>}
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => setSyncResult(null)}
+                className="text-xs text-gray-400 hover:text-white mt-2"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {plans.map((plan) => (
           <div
