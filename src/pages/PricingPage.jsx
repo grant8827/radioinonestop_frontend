@@ -1,95 +1,60 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-const PLANS = [
-  {
-    id: 'starter',
-    name: 'Starter',
-    price: 29,
-    description: 'Perfect for getting started with radio broadcasting',
-    features: [
-      'Radio DJ & Mixer',
-      'Custom stream URL',
-      'Embeddable player widget',
-      'Listeners analytics',
-      'Up to 500 concurrent listeners',
-      'Record sessions',
-      //'Basic support',
-    ],
-    highlighted: false,
-  },
-  {
-    id: 'professional',
-    name: 'Professional',
-    price: 39,
-    description: 'All Starter features plus conference calling',
-    features: [
-      'Everything in Starter',
-      'Conference call rooms',
-      'Screen sharing',
-      'Up to 10 participants per call',
-      'Up to 1000 concurrent listeners',
-      //'Priority support',
-    ],
-    highlighted: true,
-  },
-  {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price: 59,
-    description: 'Complete solution with video streaming',
-    features: [
-      'Everything in Professional',
-      'Video live streaming',
-      'Multistream up to 3 channels',
-      'Social media live streaming',
-      'Up to 2000 concurrent listeners',
-      //'Dedicated support',
-    ],
-    highlighted: false,
-  },
-  {
-    id: 'ultimate',
-    name: 'Ultimate',
-    price: 99,
-    description: 'Maximum power for professional broadcasters',
-    features: [
-      'Everything in Enterprise',
-      'Multistream up to 6 channels',
-      'Advanced analytics dashboard',
-      'Custom branding options',
-      'Unlimited concurrent listeners',
-      //'24/7 dedicated support',
-    ],
-    highlighted: false,
-  },
-]
+const API_BASE = import.meta.env.VITE_API_BASE || 'https://radioinonestop-backend-production.up.railway.app'
 
 export default function PricingPage() {
   const navigate = useNavigate()
   const { isAuthenticated, logout } = useAuth()
   const [billingCycle, setBillingCycle] = useState('monthly') // 'monthly' or 'yearly'
+  const [plans, setPlans] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchPricing() {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/pricing`)
+        if (res.ok) {
+          const data = await res.json()
+          setPlans(data)
+        }
+      } catch (err) {
+        console.error('Failed to fetch pricing:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchPricing()
+  }, [])
 
   function selectPlan(planId) {
     const checkoutPath = `/payment?plan=${planId}&billing=${billingCycle}`
     navigate(isAuthenticated ? checkoutPath : `/register?plan=${planId}&billing=${billingCycle}`)
   }
 
-  // Calculate price based on billing cycle (yearly gets 2 months free)
-  function getPrice(monthlyPrice) {
-    if (billingCycle === 'yearly') {
-      return Math.round(monthlyPrice * 10) // 10 months price for 12 months
+  // Calculate price with sale discount
+  function getDisplayPrice(plan) {
+    const basePrice = billingCycle === 'yearly' ? plan.yearlyPrice : plan.monthlyPrice
+    const salePercent = billingCycle === 'yearly' ? plan.yearlySalePercent : plan.monthlySalePercent
+    
+    const hasSale = salePercent > 0
+    const discountedPrice = hasSale ? basePrice * (1 - salePercent / 100) : basePrice
+    
+    return {
+      original: basePrice,
+      discounted: Math.round(discountedPrice * 100) / 100,
+      hasSale,
+      salePercent
     }
-    return monthlyPrice
   }
 
-  function getPriceLabel(monthlyPrice) {
-    if (billingCycle === 'yearly') {
-      const yearlyTotal = Math.round(monthlyPrice * 10)
-      return { amount: yearlyTotal, period: '/year', monthly: monthlyPrice }
-    }
-    return { amount: monthlyPrice, period: '/month', monthly: null }
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0f] text-white flex items-center justify-center">
+        <div className="text-gray-400">Loading pricing...</div>
+      </div>
+    )
   }
 
   return (
@@ -192,11 +157,6 @@ export default function PricingPage() {
             <span className={`text-sm font-medium transition-colors ${billingCycle === 'yearly' ? 'text-white' : 'text-gray-500'}`}>
               Yearly
             </span>
-            {billingCycle === 'yearly' && (
-              <span className="inline-block text-xs font-bold bg-green-900/30 text-green-400 border border-green-800/40 rounded-full px-2 py-0.5">
-                Save 17%
-              </span>
-            )}
           </div>
         </div>
       </section>
@@ -204,68 +164,90 @@ export default function PricingPage() {
       {/* ── Pricing Cards ── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {PLANS.map((plan) => (
-            <div
-              key={plan.id}
-              className={`relative rounded-2xl border ${
-                plan.highlighted
-                  ? 'border-purple-500/60 bg-purple-900/10 shadow-xl shadow-purple-900/20'
-                  : 'border-white/10 bg-white/3'
-              } p-8 transition-all hover:border-purple-500/40 hover:shadow-lg`}
-            >
-              {plan.highlighted && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <span className="inline-block bg-linear-to-r from-purple-600 to-blue-600 text-white text-xs font-bold uppercase tracking-wider px-4 py-1 rounded-full">
-                    Most Popular
-                  </span>
-                </div>
-              )}
+          {plans.map((plan) => {
+            const pricing = getDisplayPrice(plan)
+            const isHighlighted = plan.isFeatured
 
-              <div className="mb-6">
-                <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
-                <p className="text-sm text-gray-400 mb-4">{plan.description}</p>
-                <div className="flex items-baseline gap-1 mb-1">
-                  <span className="text-5xl font-extrabold">${getPriceLabel(plan.price).amount}</span>
-                  <span className="text-gray-400 text-sm">{getPriceLabel(plan.price).period}</span>
-                </div>
-                {billingCycle === 'yearly' && (
-                  <p className="text-xs text-gray-500">
-                    ${plan.price}/month billed annually
-                  </p>
-                )}
-              </div>
-
-              <button
-                onClick={() => selectPlan(plan.id)}
-                className={`w-full py-3 rounded-xl font-semibold text-sm transition-all mb-6 ${
-                  plan.highlighted
-                    ? 'bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-lg shadow-purple-900/40'
-                    : 'bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-white/20'
-                }`}
+            return (
+              <div
+                key={plan.id}
+                className={`relative rounded-2xl border ${
+                  isHighlighted
+                    ? 'border-purple-500/60 bg-purple-900/10 shadow-xl shadow-purple-900/20'
+                    : 'border-white/10 bg-white/3'
+                } p-8 transition-all hover:border-purple-500/40 hover:shadow-lg`}
               >
-                Select {plan.name}
-              </button>
-
-              <div className="space-y-3">
-                {plan.features.map((feature, idx) => (
-                  <div key={idx} className="flex items-start gap-3">
-                    <svg
-                      className={`w-5 h-5 shrink-0 mt-0.5 ${
-                        plan.highlighted ? 'text-purple-400' : 'text-gray-500'
-                      }`}
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                    </svg>
-                    <span className="text-sm text-gray-300">{feature}</span>
+                {isHighlighted && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="inline-block bg-linear-to-r from-purple-600 to-blue-600 text-white text-xs font-bold uppercase tracking-wider px-4 py-1 rounded-full">
+                      Most Popular
+                    </span>
                   </div>
-                ))}
+                )}
+
+                <div className="mb-6">
+                  <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
+                  
+                  {/* Price Display with Sale */}
+                  <div className="mb-4">
+                    {pricing.hasSale && (
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-lg font-medium text-gray-500 line-through">
+                          ${pricing.original}
+                        </span>
+                        <span className="inline-block text-xs font-bold bg-green-900/30 text-green-400 border border-green-800/40 rounded-full px-2 py-0.5">
+                          {pricing.salePercent}% OFF
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-5xl font-extrabold">
+                        ${pricing.discounted}
+                      </span>
+                      <span className="text-gray-400 text-sm">
+                        /{billingCycle === 'yearly' ? 'year' : 'month'}
+                      </span>
+                    </div>
+                    {billingCycle === 'yearly' && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        ${(pricing.discounted / 12).toFixed(2)}/month billed annually
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => selectPlan(plan.id)}
+                  className={`w-full py-3 rounded-xl font-semibold text-sm transition-all mb-6 ${
+                    isHighlighted
+                      ? 'bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-lg shadow-purple-900/40'
+                      : 'bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-white/20'
+                  }`}
+                >
+                  Select {plan.name}
+                </button>
+
+                <div className="space-y-3">
+                  {plan.features && plan.features.map((feature, idx) => (
+                    <div key={idx} className="flex items-start gap-3">
+                      <svg
+                        className={`w-5 h-5 shrink-0 mt-0.5 ${
+                          isHighlighted ? 'text-purple-400' : 'text-gray-500'
+                        }`}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                      </svg>
+                      <span className="text-sm text-gray-300">{feature}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         {/* FAQ or additional info */}
