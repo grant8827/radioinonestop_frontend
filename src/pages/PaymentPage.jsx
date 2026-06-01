@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://radioinonestop-backend-production.up.railway.app'
+const API_BASE = import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_BASE_URL || ''
 
 const PLAN_INFO = {
     starter: { name: 'Starter', monthly: 29, yearly: 290 },
