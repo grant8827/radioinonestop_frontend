@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://radioinonestop-backend-production.up.railway.app'
+const API_BASE = import.meta.env.VITE_API_BASE || ''
 
 export default function PricingPage() {
   const navigate = useNavigate()
