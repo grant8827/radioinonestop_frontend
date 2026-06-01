@@ -56,7 +56,8 @@ export default function PaymentPage() {
           }
         })
         if (!response.ok) {
-          throw new Error('Failed to fetch PayPal plan ID')
+          const message = await response.text()
+          throw new Error(message || 'Failed to fetch PayPal plan ID')
         }
         const data = await response.json()
         setPaypalPlanId(data.plan_id)
@@ -95,7 +96,8 @@ export default function PaymentPage() {
               })
             })
             if (!response.ok) {
-              throw new Error('Failed to activate subscription')
+              const message = await response.text()
+              throw new Error(message || 'Failed to activate subscription')
             }
             await refreshProfile()
             navigate('/app')
