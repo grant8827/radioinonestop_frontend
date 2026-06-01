@@ -210,6 +210,20 @@ export default function PaymentPage() {
           </div>
         </div>
 
+        {/* Payment Info Banner */}
+        <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-800/40 rounded-xl p-4 mb-4">
+          <div className="flex items-start gap-3">
+            <svg className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+            </svg>
+            <div className="flex-1">
+              <p className="text-sm text-blue-200">
+                <span className="font-semibold text-blue-300">PayPal</span> accepts credit/debit cards <span className="font-semibold">without</span> needing a PayPal account. Click either tab to proceed.
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Payment Method Tabs */}
         <div className="bg-white/5 border border-white/10 rounded-xl p-2 mb-6 flex gap-2">
           <button
@@ -224,7 +238,7 @@ export default function PaymentPage() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
               </svg>
-              Credit Card
+Credit Card (Test Mode)
             </div>
           </button>
           <button
@@ -240,7 +254,7 @@ export default function PaymentPage() {
                 <path d="M20.067 8.478c.492.88.556 2.014.3 3.327-.74 3.806-3.276 5.12-6.514 5.12h-.5a.805.805 0 00-.794.68l-.04.22-.63 3.993-.029.17a.804.804 0 01-.794.679H7.72a.483.483 0 01-.477-.558L7.418 21h1.518l.95-6.02h1.385c4.678 0 7.75-2.203 8.796-6.502z" />
                 <path d="M2.197 21.99a.525.525 0 01-.518-.606L3.546 9.838a.972.972 0 01.96-.814h4.64c1.838 0 3.106.365 3.773 1.087.334.362.572.792.730 1.297.15.486.218 1.074.203 1.769l-.006.157.45.265c.382.2.675.43.898.704.476.581.633 1.393.467 2.417-.19.933-.517 1.726-1.017 2.367a4.81 4.81 0 01-1.618 1.32c-.617.309-1.316.47-2.095.47H9.23a.776.776 0 00-.768.655l-.031.17-.63 3.994-.024.143a.53.53 0 01-.525.456H2.197z" />
               </svg>
-              PayPal
+              PayPal or Card
             </div>
           </button>
         </div>
@@ -382,9 +396,12 @@ export default function PaymentPage() {
                 </div>
               ) : (
                 <div>
+                  <p className="text-sm text-gray-400 mb-4 text-center">
+                    Pay with PayPal account or any credit/debit card (no PayPal account required)
+                  </p>
                   <div ref={paypalRef} className="min-h-[200px]"></div>
                   <p className="text-xs text-gray-500 text-center mt-4">
-                    🔒 Secure payment powered by PayPal
+                    🔒 Secure payment processed by PayPal
                   </p>
                 </div>
               )}
