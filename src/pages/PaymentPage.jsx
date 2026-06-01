@@ -49,8 +49,9 @@ export default function PaymentPage() {
 
   // Load PayPal SDK
   useEffect(() => {
+    const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID || 'AU8pGj0hF09PcmBnAskqmFW3TDCP5VC50Sku0vCyup8xqZyTJdb69jx0pdw4iSQNGk0WH1NGV2jU6gSj'
     const script = document.createElement('script')
-    script.src = 'https://www.paypal.com/sdk/js?client-id=AU8pGj0hF09PcmBnAskqmFW3TDCP5VC50Sku0vCyup8xqZyTJdb69jx0pdw4iSQNGk0WH1NGV2jU6gSj&vault=true&intent=subscription'
+    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&vault=true&intent=subscription`
     script.addEventListener('load', () => setPaypalLoaded(true))
     document.body.appendChild(script)
     return () => {
