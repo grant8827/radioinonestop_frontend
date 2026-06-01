@@ -14,7 +14,7 @@ export default function PricingPage() {
   useEffect(() => {
     async function fetchPricing() {
       try {
-        const res = await fetch(`${API_BASE}/api/admin/pricing`)
+        const res = await fetch(`${API_BASE}/api/public/pricing`)
         if (res.ok) {
           const data = await res.json()
           setPlans(data)
