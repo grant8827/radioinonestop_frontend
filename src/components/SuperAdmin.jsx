@@ -391,6 +391,8 @@ function EditPlanModal({ plan, onClose, onSave }) {
   const [yearlyPrice, setYearlyPrice] = useState(plan.yearlyPrice || 0)
   const [monthlySalePercent, setMonthlySalePercent] = useState(plan.monthlySalePercent || 0)
   const [yearlySalePercent, setYearlySalePercent] = useState(plan.yearlySalePercent || 0)
+  const [paypalPlanIdMonthly, setPaypalPlanIdMonthly] = useState(plan.paypalPlanIdMonthly || '')
+  const [paypalPlanIdYearly, setPaypalPlanIdYearly] = useState(plan.paypalPlanIdYearly || '')
   const [isFeatured, setIsFeatured] = useState(plan.isFeatured || false)
 
   function handleSubmit(e) {
@@ -402,6 +404,8 @@ function EditPlanModal({ plan, onClose, onSave }) {
       features: plan.features || [],
       monthlySalePercent: parseInt(monthlySalePercent),
       yearlySalePercent: parseInt(yearlySalePercent),
+      paypalPlanIdMonthly,
+      paypalPlanIdYearly,
       isFeatured,
     })
   }
@@ -458,6 +462,30 @@ function EditPlanModal({ plan, onClose, onSave }) {
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
             />
             <p className="text-xs text-gray-500 mt-1">0 = no sale, shows original price with slash</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">PayPal Monthly Plan ID</label>
+            <input
+              type="text"
+              value={paypalPlanIdMonthly}
+              onChange={(e) => setPaypalPlanIdMonthly(e.target.value)}
+              placeholder="P-XXXXXXXXXXXXXXXXXXXX"
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white font-mono text-sm"
+            />
+            <p className="text-xs text-gray-500 mt-1">Create in PayPal Dashboard → Subscriptions</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">PayPal Yearly Plan ID</label>
+            <input
+              type="text"
+              value={paypalPlanIdYearly}
+              onChange={(e) => setPaypalPlanIdYearly(e.target.value)}
+              placeholder="P-XXXXXXXXXXXXXXXXXXXX"
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white font-mono text-sm"
+            />
+            <p className="text-xs text-gray-500 mt-1">Create in PayPal Dashboard → Subscriptions</p>
           </div>
 
           <div className="flex items-center gap-3">
