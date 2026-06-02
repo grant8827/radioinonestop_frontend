@@ -242,7 +242,19 @@ export function AudioEngineProvider({ children }) {
       confSendNode.connect(conferenceSendBusRef.current)
     }
 
-    channelNodes.current[channelId] = { gainNode, hiEQ, midEQ, loEQ, panNode, faderNode, analyserNode, duckNode, confSendNode }
+    const nodes = { gainNode, hiEQ, midEQ, loEQ, panNode, faderNode, analyserNode, duckNode, confSendNode }
+    channelNodes.current[channelId] = nodes
+
+    // If this channel is the conference return, rebuilding the channel must not
+    // leave already-subscribed caller tracks connected to the old gain node.
+    if (confChannelIdRef.current === channelId) {
+      confSourcesRef.current.forEach((entry, sid) => {
+        if (entry.sourceNode) { try { entry.sourceNode.disconnect() } catch { /* ignore */ } }
+        const sourceNode = ac.createMediaStreamSource(entry.stream)
+        sourceNode.connect(nodes.gainNode)
+        confSourcesRef.current.set(sid, { stream: entry.stream, sourceNode })
+      })
+    }
   }, [getAC])
 
   // ── Smooth-update a single parameter on an existing channel ──────────────
@@ -607,16 +619,14 @@ export function AudioEngineProvider({ children }) {
     confSourcesRef.current.delete(sid)
   }, [])
 
-  // Disconnect all streams — called when the user leaves the conference room
+  // Disconnect all remote tracks, but keep the selected mixer return channel.
+  // The channel assignment belongs to Mixer state; clearing it here makes the UI
+  // say "Conference Room" while AudioEngine has no route for incoming callers.
   const disconnectAllConferenceStreams = useCallback(() => {
     confSourcesRef.current.forEach(({ sourceNode }) => {
       if (sourceNode) { try { sourceNode.disconnect() } catch {} }
     })
     confSourcesRef.current.clear()
-    if (confChannelIdRef.current !== null && channelNodes.current[confChannelIdRef.current]?.confSendNode && acRef.current) {
-      channelNodes.current[confChannelIdRef.current].confSendNode.gain.setTargetAtTime(1, acRef.current.currentTime, 0.02)
-    }
-    confChannelIdRef.current = null
   }, [])
 
   // Disconnect conference from a channel (called when sourceType changes away)
