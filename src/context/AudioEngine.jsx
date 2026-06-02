@@ -8,6 +8,7 @@ export function AudioEngineProvider({ children }) {
   const streamDestRef = useRef(null)   // MediaStreamDestinationNode
   const conferenceSendDestRef = useRef(null) // MediaStreamDestinationNode (mix-minus send to conference)
   const conferenceSendBusRef = useRef(null)  // GainNode fed by channel send taps
+  const conferenceSendMutedRef = useRef(false)
 
   // channelId → { gainNode, hiEQ, midEQ, loEQ, panNode, faderNode, analyserNode }
   const channelNodes  = useRef({})
@@ -641,6 +642,17 @@ export function AudioEngineProvider({ children }) {
     return conferenceSendDestRef.current?.stream ?? null
   }, [getAC])
 
+  const setConferenceSendMuted = useCallback((muted) => {
+    getAC()
+    conferenceSendMutedRef.current = !!muted
+    if (!conferenceSendBusRef.current || !acRef.current) return
+    conferenceSendBusRef.current.gain.setTargetAtTime(muted ? 0 : 1, acRef.current.currentTime, 0.02)
+  }, [getAC])
+
+  const getConferenceSendMuted = useCallback(() => {
+    return !!conferenceSendMutedRef.current
+  }, [])
+
   // ── On-Air mic tracking (shared across NowPlaying + Mixer) ───────────────
   const [micOnAirMap, setMicOnAirMap] = useState({})
 
@@ -762,6 +774,8 @@ export function AudioEngineProvider({ children }) {
       connectLineInToChannel,
       getStreamTrack,
       getConferenceSendTrack,
+      setConferenceSendMuted,
+      getConferenceSendMuted,
       resume,
       djConnected,
       getAnalyser,

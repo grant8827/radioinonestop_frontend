@@ -25,38 +25,44 @@ function nameFromEmail(email) {
 }
 
 // ── Mute / unmute control ──────────────────────────────────────────────────────
-function MuteButton() {
+function MuteButton({ useMixerSend = false, muted: forcedMuted = false, onToggleSend }) {
   const { localParticipant } = useLocalParticipant()
   const [muted, setMuted] = useState(false)
 
   const toggle = useCallback(async () => {
+    if (useMixerSend) {
+      onToggleSend?.()
+      return
+    }
     if (!localParticipant) return
     await localParticipant.setMicrophoneEnabled(muted)
     setMuted(!muted)
-  }, [localParticipant, muted])
+  }, [localParticipant, muted, useMixerSend, onToggleSend])
+
+  const isMuted = useMixerSend ? forcedMuted : muted
 
   return (
     <button
       onClick={toggle}
       className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold transition-all ${
-        muted
+        isMuted
           ? 'bg-red-600 hover:bg-red-500 text-white'
           : 'bg-gray-700 hover:bg-gray-600 text-white'
       }`}
     >
-      {muted ? (
+      {isMuted ? (
         <>
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
             <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z" />
           </svg>
-          Unmute
+          {useMixerSend ? 'Unmute Send' : 'Unmute'}
         </>
       ) : (
         <>
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z" />
           </svg>
-          Mute
+          {useMixerSend ? 'Mute Send' : 'Mute'}
         </>
       )}
     </button>
@@ -270,22 +276,54 @@ function ConferenceAudioBridge() {
 }
 
 // ── Publish mixer program output to conference (host mode) ───────────────────
-function ConferenceOutboundPublisher() {
+function ConferenceOutboundPublisher({ onStatusChange }) {
   const audioEngine = useAudioEngine()
   const room = useRoomContext()
   const publishedTrackRef = useRef(null)
+  const retryTimerRef = useRef(null)
+  const retryCountRef = useRef(0)
 
   useEffect(() => {
     if (!audioEngine || !room?.localParticipant) return
 
     let cancelled = false
 
+    const updateStatus = (status, message = '') => {
+      onStatusChange?.({ status, message })
+    }
+
+    const cleanupPublishedTrack = () => {
+      const t = publishedTrackRef.current
+      if (!t) return
+      try { room.localParticipant.unpublishTrack(t) } catch {}
+      try { t.stop() } catch {}
+      publishedTrackRef.current = null
+    }
+
+    const scheduleRetry = () => {
+      if (cancelled) return
+      if (retryCountRef.current >= 5) {
+        updateStatus('error', 'Conference send unavailable')
+        return
+      }
+      retryCountRef.current += 1
+      updateStatus('retrying', `Retry ${retryCountRef.current}/5`)
+      retryTimerRef.current = setTimeout(() => {
+        publishMixerTrack()
+      }, 1500)
+    }
+
     const publishMixerTrack = async () => {
       try {
+        cleanupPublishedTrack()
+        updateStatus('connecting', 'Connecting mixer send...')
         await audioEngine.resume?.()
         const conferenceStream = audioEngine.getConferenceSendTrack?.() || audioEngine.getStreamTrack?.()
         const mediaTrack = conferenceStream?.getAudioTracks?.()?.[0]
-        if (!mediaTrack || cancelled) return
+        if (!mediaTrack || cancelled) {
+          scheduleRetry()
+          return
+        }
 
         const localTrack = new LocalAudioTrack(mediaTrack)
         await room.localParticipant.publishTrack(localTrack, {
@@ -298,23 +336,29 @@ function ConferenceOutboundPublisher() {
           return
         }
         publishedTrackRef.current = localTrack
+        retryCountRef.current = 0
+        updateStatus('live', audioEngine.getConferenceSendMuted?.() ? 'Muted' : 'Live')
       } catch (err) {
         console.warn('[conference] failed to publish mixer output:', err)
+        scheduleRetry()
       }
     }
 
+    const handleReconnected = () => {
+      if (cancelled) return
+      publishMixerTrack()
+    }
+
+    room.on(RoomEvent.Reconnected, handleReconnected)
     publishMixerTrack()
 
     return () => {
       cancelled = true
-      const t = publishedTrackRef.current
-      if (t) {
-        try { room.localParticipant.unpublishTrack(t) } catch {}
-        try { t.stop() } catch {}
-        publishedTrackRef.current = null
-      }
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
+      room.off(RoomEvent.Reconnected, handleReconnected)
+      cleanupPublishedTrack()
     }
-  }, [audioEngine, room])
+  }, [audioEngine, room, onStatusChange])
 
   return null
 }
@@ -324,17 +368,48 @@ function RoomView({ onLeave, inviteUrl }) {
   const [tab, setTab] = useState('group')
   const participants = useParticipants()
   const audioEngine = useAudioEngine()
+  const [sendMuted, setSendMuted] = useState(false)
+  const [outboundStatus, setOutboundStatus] = useState({ status: audioEngine ? 'connecting' : 'mic', message: '' })
+
+  useEffect(() => {
+    if (!audioEngine) {
+      setOutboundStatus({ status: 'mic', message: 'Microphone mode' })
+      return
+    }
+    setSendMuted(audioEngine.getConferenceSendMuted?.() || false)
+    setOutboundStatus((s) => (s.status === 'live' ? s : { status: 'connecting', message: 'Connecting mixer send...' }))
+  }, [audioEngine])
+
+  const toggleSendMute = useCallback(() => {
+    if (!audioEngine) return
+    const next = !sendMuted
+    audioEngine.setConferenceSendMuted?.(next)
+    setSendMuted(next)
+    setOutboundStatus((s) => ({ ...s, message: next ? 'Muted' : 'Live' }))
+  }, [audioEngine, sendMuted])
+
+  const statusDotClass = outboundStatus.status === 'live'
+    ? 'bg-green-400'
+    : outboundStatus.status === 'error'
+    ? 'bg-red-400'
+    : outboundStatus.status === 'mic'
+    ? 'bg-blue-400'
+    : 'bg-yellow-400'
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
       {/* Top bar */}
       <header className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
           <span className="text-sm font-semibold">Conference</span>
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-gray-700 bg-gray-800 text-[10px] text-gray-300">
+            <span className={`w-1.5 h-1.5 rounded-full ${statusDotClass}`} />
+            {audioEngine ? `Send: ${outboundStatus.message || outboundStatus.status}` : 'Send: Mic'}
+          </span>
         </div>
         <div className="flex items-center gap-2">
-          <MuteButton />
+          <MuteButton useMixerSend={!!audioEngine} muted={sendMuted} onToggleSend={toggleSendMute} />
           <LeaveButton onLeave={onLeave} />
         </div>
       </header>
@@ -387,7 +462,7 @@ function RoomView({ onLeave, inviteUrl }) {
       {audioEngine ? (
         <>
           <ConferenceAudioBridge />
-          <ConferenceOutboundPublisher />
+          <ConferenceOutboundPublisher onStatusChange={setOutboundStatus} />
         </>
       ) : <RoomAudioRenderer />}
     </div>
