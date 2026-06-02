@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useAudioEngine } from '../context/AudioEngine'
-import { RoomEvent, Track } from 'livekit-client'
+import { LocalAudioTrack, RoomEvent, Track } from 'livekit-client'
 import {
   LiveKitRoom,
   RoomAudioRenderer,
@@ -269,6 +269,56 @@ function ConferenceAudioBridge() {
   return null
 }
 
+// ── Publish mixer program output to conference (host mode) ───────────────────
+function ConferenceOutboundPublisher() {
+  const audioEngine = useAudioEngine()
+  const room = useRoomContext()
+  const publishedTrackRef = useRef(null)
+
+  useEffect(() => {
+    if (!audioEngine || !room?.localParticipant) return
+
+    let cancelled = false
+
+    const publishMixerTrack = async () => {
+      try {
+        await audioEngine.resume?.()
+        const conferenceStream = audioEngine.getConferenceSendTrack?.() || audioEngine.getStreamTrack?.()
+        const mediaTrack = conferenceStream?.getAudioTracks?.()?.[0]
+        if (!mediaTrack || cancelled) return
+
+        const localTrack = new LocalAudioTrack(mediaTrack)
+        await room.localParticipant.publishTrack(localTrack, {
+          source: Track.Source.Microphone,
+          name: 'mixer-program',
+        })
+        if (cancelled) {
+          room.localParticipant.unpublishTrack(localTrack)
+          localTrack.stop()
+          return
+        }
+        publishedTrackRef.current = localTrack
+      } catch (err) {
+        console.warn('[conference] failed to publish mixer output:', err)
+      }
+    }
+
+    publishMixerTrack()
+
+    return () => {
+      cancelled = true
+      const t = publishedTrackRef.current
+      if (t) {
+        try { room.localParticipant.unpublishTrack(t) } catch {}
+        try { t.stop() } catch {}
+        publishedTrackRef.current = null
+      }
+    }
+  }, [audioEngine, room])
+
+  return null
+}
+
 // ── Main room view ─────────────────────────────────────────────────────────────
 function RoomView({ onLeave, inviteUrl }) {
   const [tab, setTab] = useState('group')
@@ -334,7 +384,12 @@ function RoomView({ onLeave, inviteUrl }) {
       {/* ConferenceAudioBridge routes remote audio through the AudioEngine mix bus.
           When inside the app (host), AudioEngine plays audio to speakers + broadcast.
           For guests (no AudioEngine), fall back to RoomAudioRenderer. */}
-      {audioEngine ? <ConferenceAudioBridge /> : <RoomAudioRenderer />}
+      {audioEngine ? (
+        <>
+          <ConferenceAudioBridge />
+          <ConferenceOutboundPublisher />
+        </>
+      ) : <RoomAudioRenderer />}
     </div>
   )
 }
@@ -446,7 +501,7 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
     <LiveKitRoom
       serverUrl={livekitUrl}
       token={token}
-      audio={true}
+      audio={!propRoomId}
       video={false}
       connect={true}
       onDisconnected={() => { if (onLeave) onLeave(); else window.location.href = '/' }}

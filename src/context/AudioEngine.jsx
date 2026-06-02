@@ -6,6 +6,8 @@ export function AudioEngineProvider({ children }) {
   const acRef         = useRef(null)   // AudioContext
   const masterRef     = useRef(null)   // GainNode → destination + streamDest
   const streamDestRef = useRef(null)   // MediaStreamDestinationNode
+  const conferenceSendDestRef = useRef(null) // MediaStreamDestinationNode (mix-minus send to conference)
+  const conferenceSendBusRef = useRef(null)  // GainNode fed by channel send taps
 
   // channelId → { gainNode, hiEQ, midEQ, loEQ, panNode, faderNode, analyserNode }
   const channelNodes  = useRef({})
@@ -75,6 +77,16 @@ export function AudioEngineProvider({ children }) {
 
       const streamDest = ac.createMediaStreamDestination()
       streamDestRef.current = streamDest
+
+      // Dedicated conference send bus (mix-minus). Channels tap into this bus,
+      // and the conference return channel is excluded dynamically.
+      const conferenceSendBus = ac.createGain()
+      conferenceSendBus.gain.value = 1.0
+      conferenceSendBusRef.current = conferenceSendBus
+
+      const conferenceSendDest = ac.createMediaStreamDestination()
+      conferenceSendDestRef.current = conferenceSendDest
+      conferenceSendBus.connect(conferenceSendDest)
 
       // 3-band master EQ — inserted between master gain and master analyser
       const masterHi  = ac.createBiquadFilter()
@@ -213,7 +225,15 @@ export function AudioEngineProvider({ children }) {
     analyserNode.connect(duckNode)
     duckNode.connect(masterRef.current)
 
-    channelNodes.current[channelId] = { gainNode, hiEQ, midEQ, loEQ, panNode, faderNode, analyserNode, duckNode }
+    // Per-channel tap into conference send bus; excluded for conference return channel.
+    const confSendNode = ac.createGain()
+    confSendNode.gain.value = confChannelIdRef.current === channelId ? 0 : 1
+    duckNode.connect(confSendNode)
+    if (conferenceSendBusRef.current) {
+      confSendNode.connect(conferenceSendBusRef.current)
+    }
+
+    channelNodes.current[channelId] = { gainNode, hiEQ, midEQ, loEQ, panNode, faderNode, analyserNode, duckNode, confSendNode }
   }, [getAC])
 
   // ── Smooth-update a single parameter on an existing channel ──────────────
@@ -419,6 +439,7 @@ export function AudioEngineProvider({ children }) {
 
     // Conference: route all remote participant streams through this line channel
     if (sourceType === 'conference') {
+      const prevConfChannel = confChannelIdRef.current
       if (confChannelIdRef.current !== null && confChannelIdRef.current !== channelId) {
         // Disconnect from the old channel first
         confSourcesRef.current.forEach((entry) => {
@@ -427,6 +448,15 @@ export function AudioEngineProvider({ children }) {
         })
       }
       confChannelIdRef.current = channelId
+
+      // Mix-minus: exclude conference return channel from conference outbound send.
+      if (prevConfChannel !== null && channelNodes.current[prevConfChannel]?.confSendNode) {
+        channelNodes.current[prevConfChannel].confSendNode.gain.setTargetAtTime(1, getAC().currentTime, 0.02)
+      }
+      if (channelNodes.current[channelId]?.confSendNode) {
+        channelNodes.current[channelId].confSendNode.gain.setTargetAtTime(0, getAC().currentTime, 0.02)
+      }
+
       const ac = getAC()
       confSourcesRef.current.forEach((entry, sid) => {
         if (entry.sourceNode) { try { entry.sourceNode.disconnect() } catch {} }
@@ -567,6 +597,9 @@ export function AudioEngineProvider({ children }) {
       if (sourceNode) { try { sourceNode.disconnect() } catch {} }
     })
     confSourcesRef.current.clear()
+    if (confChannelIdRef.current !== null && channelNodes.current[confChannelIdRef.current]?.confSendNode && acRef.current) {
+      channelNodes.current[confChannelIdRef.current].confSendNode.gain.setTargetAtTime(1, acRef.current.currentTime, 0.02)
+    }
     confChannelIdRef.current = null
   }, [])
 
@@ -577,6 +610,9 @@ export function AudioEngineProvider({ children }) {
       if (entry.sourceNode) { try { entry.sourceNode.disconnect() } catch {} }
       entry.sourceNode = null
     })
+    if (channelNodes.current[channelId]?.confSendNode && acRef.current) {
+      channelNodes.current[channelId].confSendNode.gain.setTargetAtTime(1, acRef.current.currentTime, 0.02)
+    }
     confChannelIdRef.current = null
   }, [])
 
@@ -597,6 +633,12 @@ export function AudioEngineProvider({ children }) {
   const getStreamTrack = useCallback(() => {
     getAC()
     return streamDestRef.current?.stream ?? null
+  }, [getAC])
+
+  // Separate mix-minus stream for conference publishing.
+  const getConferenceSendTrack = useCallback(() => {
+    getAC()
+    return conferenceSendDestRef.current?.stream ?? null
   }, [getAC])
 
   // ── On-Air mic tracking (shared across NowPlaying + Mixer) ───────────────
@@ -719,6 +761,7 @@ export function AudioEngineProvider({ children }) {
       connectMicToChannel,
       connectLineInToChannel,
       getStreamTrack,
+      getConferenceSendTrack,
       resume,
       djConnected,
       getAnalyser,
