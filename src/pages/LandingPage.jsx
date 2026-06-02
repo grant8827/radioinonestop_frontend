@@ -109,7 +109,6 @@ export default function LandingPage() {
   const [showRegister, setShowRegister] = useState(false)
   const [selectedStation, setSelectedStation] = useState(null)
   const [stations, setStations] = useState(DEMO_STATIONS)
-  const [showAllStations, setShowAllStations] = useState(false)
 
   // Fetch stations on mount, refresh every 30s
   useEffect(() => {
@@ -265,15 +264,15 @@ export default function LandingPage() {
             </div>
             {stations.length > 8 && (
               <button
-                onClick={() => setShowAllStations(v => !v)}
+                onClick={() => navigate('/stations')}
                 className="shrink-0 text-sm font-semibold text-purple-400 hover:text-purple-300 transition-colors"
               >
-                {showAllStations ? 'Show Less ↑' : `Browse All ${stations.length} →`}
+                {`Browse All ${stations.length} →`}
               </button>
             )}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {(showAllStations ? stations : stations.slice(0, 8)).map(station => (
+            {stations.slice(0, 8).map(station => (
               <div
                 key={station.slug}
                 className="group relative rounded-xl border border-white/5 bg-white/3 hover:border-purple-800/60 hover:bg-white/5 transition-all duration-200 overflow-hidden cursor-pointer"
@@ -327,10 +326,10 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
-          {!showAllStations && stations.length > 8 && (
+          {stations.length > 8 && (
             <div className="mt-8 text-center">
               <button
-                onClick={() => setShowAllStations(true)}
+                onClick={() => navigate('/stations')}
                 className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl border border-white/10 hover:border-purple-800/60 text-gray-300 hover:text-white text-sm font-semibold transition-all hover:bg-white/5"
               >
                 Browse All {stations.length} Stations
