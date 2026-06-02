@@ -578,7 +578,14 @@ export function AudioEngineProvider({ children }) {
   // Connect one remote participant track (keyed by sid to prevent duplicates)
   const connectConferenceStream = useCallback((sid, mediaStreamTrack) => {
     if (!sid || !mediaStreamTrack) return
-    if (confSourcesRef.current.has(sid)) return
+
+    // LiveKit can re-deliver a track with the same SID after reconnects.
+    // Replace existing wiring so we don't keep a stale/silent source node.
+    const existing = confSourcesRef.current.get(sid)
+    if (existing?.sourceNode) {
+      try { existing.sourceNode.disconnect() } catch {}
+    }
+
     const stream = new MediaStream([mediaStreamTrack])
     let sourceNode = null
     if (confChannelIdRef.current !== null) {
