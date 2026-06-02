@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import UpgradeModal from './UpgradeModal'
 
@@ -78,36 +78,13 @@ function LockIcon({ className }) {
   )
 }
 
-function StreamDot({ live }) {
-  return (
-    <span
-      className={`w-2 h-2 rounded-full flex-shrink-0 ${
-        live ? 'bg-red-500 animate-pulse' : 'bg-gray-600'
-      }`}
-    />
-  )
-}
-
 export default function Sidebar({ stationName, mode, onModeChange, onSettingsClick }) {
-  const [streams, setStreams] = useState([])
   const [open, setOpen] = useState(false) // mobile drawer
   const [upgradeModal, setUpgradeModal] = useState({ show: false, feature: null, requiredPlan: null })
   const { logout, user } = useAuth()
 
   const userPlan = user?.plan || 'starter'
   const allowedFeatures = PLAN_FEATURES[userPlan] || PLAN_FEATURES.starter
-
-  useEffect(() => {
-    const load = () =>
-      fetch('/api/streams')
-        .then((r) => r.json())
-        .then((data) => setStreams(Array.isArray(data) ? data : []))
-        .catch(() => {})
-
-    load()
-    const id = setInterval(load, 8000)
-    return () => clearInterval(id)
-  }, [])
 
   const content = (
     <div className="flex flex-col h-full">
@@ -171,6 +148,25 @@ export default function Sidebar({ stationName, mode, onModeChange, onSettingsCli
           )
         })}
         
+        {/* Settings */}
+        <button
+          onClick={() => { onModeChange('settings'); setOpen(false) }}
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all mb-1 ${
+            mode === 'settings'
+              ? 'bg-red-600 text-white'
+              : 'text-gray-400 hover:text-white hover:bg-gray-800'
+          }`}
+        >
+          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          Settings
+          {mode === 'settings' && (
+            <span className="ml-auto text-[10px] font-semibold bg-white/20 rounded px-1.5 py-0.5 leading-none">ON</span>
+          )}
+        </button>
+        
         {/* Admin Navigation - Only for admin users */}
         {user?.role === 'admin' && (
           <div className="mt-3 pt-3 border-t border-gray-800">
@@ -200,46 +196,22 @@ export default function Sidebar({ stationName, mode, onModeChange, onSettingsCli
         )}
       </nav>
 
-      {/* Live Streams */}
-      <div className="px-3 pt-3 pb-2">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-2 mb-2">
-          Live Streams
-        </p>
-        {streams.length === 0 ? (
-          <p className="text-xs text-gray-600 px-2 py-1.5">No active streams</p>
-        ) : (
-          streams.map((s) => (
-            <div
-              key={s.key}
-              className="flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-gray-800 transition-colors cursor-default"
-            >
-              <StreamDot live={s.live} />
-              <div className="min-w-0">
-                <p className="text-sm text-gray-200 truncate font-medium">{s.key}</p>
-                {s.startedAt && (
-                  <p className="text-xs text-gray-500 truncate">
-                    {new Date(s.startedAt).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </p>
-                )}
-              </div>
-              {s.live && (
-                <span className="ml-auto text-[10px] font-bold text-red-400 flex-shrink-0">
-                  LIVE
-                </span>
-              )}
-            </div>
-          ))
-        )}
-      </div>
-
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Settings area */}
+      {/* User area */}
       <div className="px-3 pb-5 border-t border-gray-800 pt-3 space-y-0.5">
+        {/* Upgrade Plan */}
+        <a
+          href="/pricing"
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-lg"
+        >
+          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+          </svg>
+          Upgrade Plan
+        </a>
+
         {/* Profile */}
         <button
           onClick={() => { onModeChange('profile'); setOpen(false) }}
@@ -254,25 +226,6 @@ export default function Sidebar({ stationName, mode, onModeChange, onSettingsCli
           </svg>
           Profile
           {mode === 'profile' && (
-            <span className="ml-auto text-[10px] font-semibold bg-white/20 rounded px-1.5 py-0.5 leading-none">ON</span>
-          )}
-        </button>
-
-        {/* Settings */}
-        <button
-          onClick={() => { onModeChange('settings'); setOpen(false) }}
-          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-            mode === 'settings'
-              ? 'bg-red-600 text-white'
-              : 'text-gray-400 hover:text-white hover:bg-gray-800'
-          }`}
-        >
-          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          Settings
-          {mode === 'settings' && (
             <span className="ml-auto text-[10px] font-semibold bg-white/20 rounded px-1.5 py-0.5 leading-none">ON</span>
           )}
         </button>
