@@ -197,6 +197,53 @@ function ParticipantTile({ participant, isLocal }) {
   )
 }
 
+function ConferenceSendMeter({ audioEngine, muted }) {
+  const [level, setLevel] = useState(0)
+
+  useEffect(() => {
+    if (!audioEngine) return
+    const analyser = audioEngine.getConferenceSendAnalyser?.()
+    if (!analyser) return
+
+    const data = new Uint8Array(analyser.frequencyBinCount)
+    let rafId = 0
+
+    const tick = () => {
+      analyser.getByteTimeDomainData(data)
+      let peak = 0
+      for (let i = 0; i < data.length; i += 1) {
+        const value = Math.abs(data[i] - 128) / 128
+        if (value > peak) peak = value
+      }
+      setLevel(muted ? 0 : Math.min(1, peak * 2.2))
+      rafId = requestAnimationFrame(tick)
+    }
+
+    tick()
+    return () => cancelAnimationFrame(rafId)
+  }, [audioEngine, muted])
+
+  return (
+    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-gray-700 bg-gray-800">
+      <span className="text-[10px] text-gray-400">Lvl</span>
+      <div className="flex items-end gap-0.5 h-3">
+        {Array.from({ length: 8 }).map((_, idx) => {
+          const threshold = (idx + 1) / 8
+          const active = level >= threshold
+          const color = idx < 4 ? 'bg-green-400' : idx < 6 ? 'bg-yellow-400' : 'bg-red-400'
+          return (
+            <span
+              key={idx}
+              className={`w-1 rounded-sm transition-all ${active ? color : 'bg-gray-700'}`}
+              style={{ height: `${4 + idx}px` }}
+            />
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ── Participant grid ───────────────────────────────────────────────────────────
 function GroupTab() {
   const { localParticipant } = useLocalParticipant()
@@ -370,6 +417,7 @@ function RoomView({ onLeave, inviteUrl }) {
   const audioEngine = useAudioEngine()
   const [sendMuted, setSendMuted] = useState(false)
   const [outboundStatus, setOutboundStatus] = useState({ status: audioEngine ? 'connecting' : 'mic', message: '' })
+  const [conferenceChannelId, setConferenceChannelId] = useState(null)
 
   useEffect(() => {
     if (!audioEngine) {
@@ -377,7 +425,16 @@ function RoomView({ onLeave, inviteUrl }) {
       return
     }
     setSendMuted(audioEngine.getConferenceSendMuted?.() || false)
+    setConferenceChannelId(audioEngine.getConferenceChannelId?.() ?? null)
     setOutboundStatus((s) => (s.status === 'live' ? s : { status: 'connecting', message: 'Connecting mixer send...' }))
+  }, [audioEngine])
+
+  useEffect(() => {
+    if (!audioEngine) return
+    const id = setInterval(() => {
+      setConferenceChannelId(audioEngine.getConferenceChannelId?.() ?? null)
+    }, 1000)
+    return () => clearInterval(id)
   }, [audioEngine])
 
   const toggleSendMute = useCallback(() => {
@@ -407,6 +464,7 @@ function RoomView({ onLeave, inviteUrl }) {
             <span className={`w-1.5 h-1.5 rounded-full ${statusDotClass}`} />
             {audioEngine ? `Send: ${outboundStatus.message || outboundStatus.status}` : 'Send: Mic'}
           </span>
+          {audioEngine && <ConferenceSendMeter audioEngine={audioEngine} muted={sendMuted} />}
         </div>
         <div className="flex items-center gap-2">
           <MuteButton useMixerSend={!!audioEngine} muted={sendMuted} onToggleSend={toggleSendMute} />
@@ -452,6 +510,11 @@ function RoomView({ onLeave, inviteUrl }) {
 
       {/* Tab content */}
       <main className="flex-1 overflow-y-auto">
+        {audioEngine && conferenceChannelId === null && (
+          <div className="mx-4 mt-4 rounded-xl border border-amber-700/40 bg-amber-900/20 px-4 py-3 text-sm text-amber-200">
+            Conference return is not assigned to a mixer channel. Go to Mixer and set one line channel source to Conference so incoming callers can be heard and sent on-air.
+          </div>
+        )}
         {tab === 'group' && <GroupTab />}
         {tab === 'settings' && <SettingsPanel inviteUrl={inviteUrl} />}
       </main>

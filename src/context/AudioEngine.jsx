@@ -8,6 +8,7 @@ export function AudioEngineProvider({ children }) {
   const streamDestRef = useRef(null)   // MediaStreamDestinationNode
   const conferenceSendDestRef = useRef(null) // MediaStreamDestinationNode (mix-minus send to conference)
   const conferenceSendBusRef = useRef(null)  // GainNode fed by channel send taps
+  const conferenceSendAnalyserRef = useRef(null)
   const conferenceSendMutedRef = useRef(false)
 
   // channelId → { gainNode, hiEQ, midEQ, loEQ, panNode, faderNode, analyserNode }
@@ -87,7 +88,14 @@ export function AudioEngineProvider({ children }) {
 
       const conferenceSendDest = ac.createMediaStreamDestination()
       conferenceSendDestRef.current = conferenceSendDest
-      conferenceSendBus.connect(conferenceSendDest)
+
+      const conferenceSendAnalyser = ac.createAnalyser()
+      conferenceSendAnalyser.fftSize = 256
+      conferenceSendAnalyser.smoothingTimeConstant = 0.85
+      conferenceSendAnalyserRef.current = conferenceSendAnalyser
+
+      conferenceSendBus.connect(conferenceSendAnalyser)
+      conferenceSendAnalyser.connect(conferenceSendDest)
 
       // 3-band master EQ — inserted between master gain and master analyser
       const masterHi  = ac.createBiquadFilter()
@@ -642,6 +650,11 @@ export function AudioEngineProvider({ children }) {
     return conferenceSendDestRef.current?.stream ?? null
   }, [getAC])
 
+  const getConferenceSendAnalyser = useCallback(() => {
+    getAC()
+    return conferenceSendAnalyserRef.current
+  }, [getAC])
+
   const setConferenceSendMuted = useCallback((muted) => {
     getAC()
     conferenceSendMutedRef.current = !!muted
@@ -651,6 +664,10 @@ export function AudioEngineProvider({ children }) {
 
   const getConferenceSendMuted = useCallback(() => {
     return !!conferenceSendMutedRef.current
+  }, [])
+
+  const getConferenceChannelId = useCallback(() => {
+    return confChannelIdRef.current
   }, [])
 
   // ── On-Air mic tracking (shared across NowPlaying + Mixer) ───────────────
@@ -774,8 +791,10 @@ export function AudioEngineProvider({ children }) {
       connectLineInToChannel,
       getStreamTrack,
       getConferenceSendTrack,
+      getConferenceSendAnalyser,
       setConferenceSendMuted,
       getConferenceSendMuted,
+      getConferenceChannelId,
       resume,
       djConnected,
       getAnalyser,
