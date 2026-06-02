@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useAudioEngine } from '../context/AudioEngine'
-import { LocalAudioTrack, RoomEvent, Track } from 'livekit-client'
+import { RoomEvent, Track } from 'livekit-client'
 import {
   LiveKitRoom,
   RoomAudioRenderer,
@@ -366,23 +366,23 @@ function ConferenceOutboundPublisher({ onStatusChange }) {
         updateStatus('connecting', 'Connecting mixer send...')
         await audioEngine.resume?.()
         const conferenceStream = audioEngine.getConferenceSendTrack?.() || audioEngine.getStreamTrack?.()
-        const mediaTrack = conferenceStream?.getAudioTracks?.()?.[0]
+        const sourceTrack = conferenceStream?.getAudioTracks?.()?.[0]
+        const mediaTrack = sourceTrack?.clone?.() || null
         if (!mediaTrack || cancelled) {
           scheduleRetry()
           return
         }
 
-        const localTrack = new LocalAudioTrack(mediaTrack)
-        await room.localParticipant.publishTrack(localTrack, {
+        const publication = await room.localParticipant.publishTrack(mediaTrack, {
           source: Track.Source.Microphone,
           name: 'mixer-program',
         })
         if (cancelled) {
-          room.localParticipant.unpublishTrack(localTrack)
-          localTrack.stop()
+          room.localParticipant.unpublishTrack(mediaTrack)
+          mediaTrack.stop()
           return
         }
-        publishedTrackRef.current = localTrack
+        publishedTrackRef.current = publication.track || mediaTrack
         retryCountRef.current = 0
         updateStatus('live', audioEngine.getConferenceSendMuted?.() ? 'Muted' : 'Live')
       } catch (err) {
