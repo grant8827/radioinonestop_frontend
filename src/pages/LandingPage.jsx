@@ -159,6 +159,12 @@ export default function LandingPage() {
           
           <div className="flex items-center gap-1">
             <button
+              onClick={() => navigate('/stations')}
+              className="text-sm font-medium text-gray-300 hover:text-white transition-colors px-4 py-1.5 rounded-lg hover:bg-white/5"
+            >
+              Stations
+            </button>
+            <button
               onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
               className="text-sm font-medium text-gray-300 hover:text-white transition-colors px-4 py-1.5 rounded-lg hover:bg-white/5"
             >
