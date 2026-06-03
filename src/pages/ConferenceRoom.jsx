@@ -24,10 +24,20 @@ function nameFromEmail(email) {
     .join(' ')
 }
 
+function microphoneErrorMessage(error) {
+  const message = error?.message || String(error || '')
+  if (/permission|denied|notallowed/i.test(message)) return 'Microphone access was denied. Allow microphone access in your browser and try again.'
+  if (/notfound|device|requested device/i.test(message)) return 'No usable microphone was found. Check the microphone connection and try again.'
+  return message ? `Microphone could not start: ${message}` : 'Microphone could not start. Check browser microphone access and try again.'
+}
+
 // ── Mute / unmute control ──────────────────────────────────────────────────────
-function MuteButton({ useMixerSend = false, muted: forcedMuted = false, onToggleSend }) {
-  const { localParticipant } = useLocalParticipant()
-  const [muted, setMuted] = useState(false)
+function MuteButton({ useMixerSend = false, muted: forcedMuted = false, onToggleSend, onMicrophoneError }) {
+  const { localParticipant, isMicrophoneEnabled, lastMicrophoneError } = useLocalParticipant()
+
+  useEffect(() => {
+    if (lastMicrophoneError) onMicrophoneError?.(microphoneErrorMessage(lastMicrophoneError))
+  }, [lastMicrophoneError, onMicrophoneError])
 
   const toggle = useCallback(async () => {
     if (useMixerSend) {
@@ -35,11 +45,15 @@ function MuteButton({ useMixerSend = false, muted: forcedMuted = false, onToggle
       return
     }
     if (!localParticipant) return
-    await localParticipant.setMicrophoneEnabled(muted)
-    setMuted(!muted)
-  }, [localParticipant, muted, useMixerSend, onToggleSend])
+    try {
+      await localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)
+      onMicrophoneError?.('')
+    } catch (err) {
+      onMicrophoneError?.(microphoneErrorMessage(err))
+    }
+  }, [isMicrophoneEnabled, localParticipant, onMicrophoneError, onToggleSend, useMixerSend])
 
-  const isMuted = useMixerSend ? forcedMuted : muted
+  const isMuted = useMixerSend ? forcedMuted : !isMicrophoneEnabled
 
   return (
     <button
@@ -197,12 +211,10 @@ function ParticipantTile({ participant, isLocal }) {
   )
 }
 
-function ConferenceSendMeter({ audioEngine, muted }) {
+function AudioLevelMeter({ analyser, label, muted = false }) {
   const [level, setLevel] = useState(0)
 
   useEffect(() => {
-    if (!audioEngine) return
-    const analyser = audioEngine.getConferenceSendAnalyser?.()
     if (!analyser) return
 
     const data = new Uint8Array(analyser.frequencyBinCount)
@@ -221,15 +233,17 @@ function ConferenceSendMeter({ audioEngine, muted }) {
 
     tick()
     return () => cancelAnimationFrame(rafId)
-  }, [audioEngine, muted])
+  }, [analyser, muted])
+
+  const displayedLevel = analyser ? level : 0
 
   return (
     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-gray-700 bg-gray-800">
-      <span className="text-[10px] text-gray-400">Lvl</span>
+      <span className="text-[10px] text-gray-400">{label}</span>
       <div className="flex items-end gap-0.5 h-3">
         {Array.from({ length: 8 }).map((_, idx) => {
           const threshold = (idx + 1) / 8
-          const active = level >= threshold
+          const active = displayedLevel >= threshold
           const color = idx < 4 ? 'bg-green-400' : idx < 6 ? 'bg-yellow-400' : 'bg-red-400'
           return (
             <span
@@ -242,6 +256,14 @@ function ConferenceSendMeter({ audioEngine, muted }) {
       </div>
     </div>
   )
+}
+
+function ConferenceSendMeter({ audioEngine, muted }) {
+  return <AudioLevelMeter analyser={audioEngine?.getConferenceSendAnalyser?.()} label="Send" muted={muted} />
+}
+
+function ConferenceReturnMeter({ audioEngine, channelId }) {
+  return <AudioLevelMeter analyser={channelId === null ? null : audioEngine?.getAnalyser?.(channelId)} label="Return" />
 }
 
 // ── Participant grid ───────────────────────────────────────────────────────────
@@ -411,7 +433,7 @@ function ConferenceOutboundPublisher({ onStatusChange }) {
 }
 
 // ── Main room view ─────────────────────────────────────────────────────────────
-function RoomView({ onLeave, inviteUrl }) {
+function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError }) {
   const [tab, setTab] = useState('group')
   const participants = useParticipants()
   const audioEngine = useAudioEngine()
@@ -465,9 +487,15 @@ function RoomView({ onLeave, inviteUrl }) {
             {audioEngine ? `Send: ${outboundStatus.message || outboundStatus.status}` : 'Send: Mic'}
           </span>
           {audioEngine && <ConferenceSendMeter audioEngine={audioEngine} muted={sendMuted} />}
+          {audioEngine && <ConferenceReturnMeter audioEngine={audioEngine} channelId={conferenceChannelId} />}
         </div>
         <div className="flex items-center gap-2">
-          <MuteButton useMixerSend={!!audioEngine} muted={sendMuted} onToggleSend={toggleSendMute} />
+          <MuteButton
+            useMixerSend={!!audioEngine}
+            muted={sendMuted}
+            onToggleSend={toggleSendMute}
+            onMicrophoneError={onMicrophoneError}
+          />
           <LeaveButton onLeave={onLeave} />
         </div>
       </header>
@@ -510,6 +538,11 @@ function RoomView({ onLeave, inviteUrl }) {
 
       {/* Tab content */}
       <main className="flex-1 overflow-y-auto">
+        {microphoneError && (
+          <div className="mx-4 mt-4 rounded-xl border border-red-700/40 bg-red-900/20 px-4 py-3 text-sm text-red-200">
+            {microphoneError}
+          </div>
+        )}
         {audioEngine && conferenceChannelId === null && (
           <div className="mx-4 mt-4 rounded-xl border border-amber-700/40 bg-amber-900/20 px-4 py-3 text-sm text-amber-200">
             Conference return is not assigned to a mixer channel. Go to Mixer and set one line channel source to Conference so incoming callers can be heard and sent on-air.
@@ -552,6 +585,7 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
   const [token, setToken] = useState(null)
   const [livekitUrl, setLivekitUrl] = useState(null)
   const [error, setError] = useState(null)
+  const [microphoneError, setMicrophoneError] = useState('')
 
   // Don't fetch token until guest has submitted their name
   const readyToJoin = !isGuest || guestNameSubmitted
@@ -642,9 +676,17 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
       audio={!propRoomId}
       video={false}
       connect={true}
+      onMediaDeviceFailure={(failure, kind) => {
+        if (!kind || kind === 'audioinput') setMicrophoneError(microphoneErrorMessage(failure))
+      }}
       onDisconnected={() => { if (onLeave) onLeave(); else window.location.href = '/' }}
     >
-      <RoomView onLeave={onLeave} inviteUrl={inviteUrl} />
+      <RoomView
+        onLeave={onLeave}
+        inviteUrl={inviteUrl}
+        microphoneError={microphoneError}
+        onMicrophoneError={setMicrophoneError}
+      />
     </LiveKitRoom>
   )
 }

@@ -227,10 +227,12 @@ export function AudioEngineProvider({ children }) {
     analyserNode.smoothingTimeConstant = 0.8
     faderNode.connect(analyserNode)
 
-    // Duck node — sits between analyser and master; muted during mic on-air for non-mic channels
+    // Duck node — sits between analyser and master; reduced during mic on-air for
+    // non-mic channels, except the conference return which must stay conversational.
     const isMicChannel = channelId <= 3
+    const isConferenceChannel = confChannelIdRef.current === channelId
     const duckNode = ac.createGain()
-    duckNode.gain.value = (!isMicChannel && isDuckedRef.current) ? 0.1 : 1.0
+    duckNode.gain.value = (!isMicChannel && !isConferenceChannel && isDuckedRef.current) ? 0.1 : 1.0
     analyserNode.connect(duckNode)
     duckNode.connect(masterRef.current)
 
@@ -448,6 +450,7 @@ export function AudioEngineProvider({ children }) {
         }
         if (!isMic && ch.sourceType === 'conference') {
           confChannelIdRef.current = id  // tracks connect when ConferenceAudioBridge mounts
+          channelNodes.current[id]?.duckNode?.gain.setTargetAtTime(1, getAC().currentTime, 0.02)
         }
       })
     } catch { /* ignore */ }
@@ -476,6 +479,9 @@ export function AudioEngineProvider({ children }) {
       }
       if (channelNodes.current[channelId]?.confSendNode) {
         channelNodes.current[channelId].confSendNode.gain.setTargetAtTime(0, getAC().currentTime, 0.02)
+      }
+      if (channelNodes.current[channelId]?.duckNode) {
+        channelNodes.current[channelId].duckNode.gain.setTargetAtTime(1, getAC().currentTime, 0.02)
       }
 
       const ac = getAC()
@@ -639,6 +645,9 @@ export function AudioEngineProvider({ children }) {
     if (channelNodes.current[channelId]?.confSendNode && acRef.current) {
       channelNodes.current[channelId].confSendNode.gain.setTargetAtTime(1, acRef.current.currentTime, 0.02)
     }
+    if (channelNodes.current[channelId]?.duckNode && acRef.current) {
+      channelNodes.current[channelId].duckNode.gain.setTargetAtTime(isDuckedRef.current ? 0.1 : 1, acRef.current.currentTime, 0.02)
+    }
     confChannelIdRef.current = null
   }, [])
 
@@ -690,13 +699,15 @@ export function AudioEngineProvider({ children }) {
   // ── On-Air mic tracking (shared across NowPlaying + Mixer) ───────────────
   const [micOnAirMap, setMicOnAirMap] = useState({})
 
-  // Duck/unduck all non-mic channels (smooth 200ms ramp)
+  // Duck/unduck non-mic program channels. The conference return stays full
+  // level so callers remain audible while the station microphone is open.
   const duckLineChannels = useCallback((duck) => {
     isDuckedRef.current = duck
     if (!acRef.current) return
     const t = acRef.current.currentTime
     Object.entries(channelNodes.current).forEach(([id, nodes]) => {
       if (parseInt(id) <= 3) return // mic channels — never duck
+      if (parseInt(id) === confChannelIdRef.current) return
       nodes.duckNode?.gain.setTargetAtTime(duck ? 0.1 : 1.0, t, 0.08)
     })
   }, [])
