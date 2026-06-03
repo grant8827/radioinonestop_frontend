@@ -17,10 +17,14 @@ export default function PaymentPage() {
   const [searchParams] = useSearchParams()
   const requestedPlan = (searchParams.get('plan') || 'starter').toLowerCase()
   const requestedBilling = (searchParams.get('billing') || 'monthly').toLowerCase()
+  const requestedProvider = (searchParams.get('provider') || 'paypal').toLowerCase()
+  const requestedStatus = (searchParams.get('status') || '').toLowerCase()
+  const stripeSessionId = searchParams.get('session_id') || ''
   const planId = PLAN_INFO[requestedPlan] ? requestedPlan : 'starter'
   const billingCycle = ['monthly', 'yearly'].includes(requestedBilling) ? requestedBilling : 'monthly'
   const planInfo = PLAN_INFO[planId] || PLAN_INFO.starter
   const planPrice = planInfo[billingCycle] || planInfo.monthly
+  const [provider, setProvider] = useState(requestedProvider === 'stripe' ? 'stripe' : 'paypal')
 
   // PayPal states
   const paypalRef = useRef(null)
@@ -30,6 +34,8 @@ export default function PaymentPage() {
 
   // General states
   const [error, setError] = useState('')
+  const [stripeLoading, setStripeLoading] = useState(false)
+  const [stripeVerifying, setStripeVerifying] = useState(false)
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -37,9 +43,40 @@ export default function PaymentPage() {
     }
   }, [isAuthenticated, navigate])
 
+  // Finalize Stripe purchase after redirect back from Checkout.
+  useEffect(() => {
+    async function finalizeStripeSuccess() {
+      if (!token || requestedProvider !== 'stripe' || requestedStatus !== 'success' || !stripeSessionId) return
+      setStripeVerifying(true)
+      setError('')
+      try {
+        const response = await fetch(`${API_BASE}/api/stripe/success`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ session_id: stripeSessionId }),
+        })
+        if (!response.ok) {
+          const message = await response.text()
+          throw new Error(message || 'Failed to activate Stripe subscription')
+        }
+        await refreshProfile()
+        navigate('/app')
+      } catch (err) {
+        setError(err.message || 'Failed to complete Stripe subscription')
+      } finally {
+        setStripeVerifying(false)
+      }
+    }
+    finalizeStripeSuccess()
+  }, [token, requestedProvider, requestedStatus, stripeSessionId, refreshProfile, navigate])
+
   // Load PayPal SDK
   useEffect(() => {
     const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID || 'AU8pGj0hF09PcmBnAskqmFW3TDCP5VC50Sku0vCyup8xqZyTJdb69jx0pdw4iSQNGk0WH1NGV2jU6gSj'
+    if (!clientId) return undefined
     const script = document.createElement('script')
     script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&vault=true&intent=subscription`
     script.addEventListener('load', () => setPaypalLoaded(true))
@@ -49,12 +86,18 @@ export default function PaymentPage() {
         document.body.removeChild(script)
       }
     }
+    return undefined
   }, [])
 
   // Fetch PayPal plan ID from backend
   useEffect(() => {
     async function fetchPlanId() {
+      if (provider !== 'paypal') {
+        setLoadingPayPal(false)
+        return
+      }
       try {
+        setLoadingPayPal(true)
         const response = await fetch(`${API_BASE}/api/paypal/create-subscription?plan=${planId}&billing=${billingCycle}`, {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -76,11 +119,12 @@ export default function PaymentPage() {
     if (isAuthenticated && token) {
       fetchPlanId()
     }
-  }, [planId, billingCycle, token, isAuthenticated])
+  }, [planId, billingCycle, token, isAuthenticated, provider])
 
   // Render PayPal buttons
   useEffect(() => {
-    if (paypalLoaded && paypalPlanId && paypalRef.current) {
+    if (provider !== 'paypal') return
+    if (paypalLoaded && paypalPlanId && paypalRef.current && window.paypal?.Buttons) {
       paypalRef.current.innerHTML = ''
       window.paypal.Buttons({
         createSubscription: function(data, actions) {
@@ -118,7 +162,38 @@ export default function PaymentPage() {
         }
       }).render(paypalRef.current)
     }
-  }, [paypalLoaded, paypalPlanId, token, planId, billingCycle, navigate, refreshProfile])
+  }, [paypalLoaded, paypalPlanId, token, planId, billingCycle, navigate, refreshProfile, provider])
+
+  async function startStripeCheckout() {
+    if (!token) return
+    setStripeLoading(true)
+    setError('')
+    try {
+      const response = await fetch(`${API_BASE}/api/stripe/create-checkout-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          plan: planId,
+          billing_cycle: billingCycle,
+        }),
+      })
+      if (!response.ok) {
+        const message = await response.text()
+        throw new Error(message || 'Failed to create Stripe checkout session')
+      }
+      const data = await response.json()
+      if (!data?.url) {
+        throw new Error('Stripe checkout URL missing')
+      }
+      window.location.href = data.url
+    } catch (err) {
+      setError(err.message || 'Failed to start Stripe checkout')
+      setStripeLoading(false)
+    }
+  }
 
   if (!isAuthenticated) {
     return null
@@ -174,7 +249,7 @@ export default function PaymentPage() {
             </svg>
             <div className="flex-1">
               <p className="text-sm text-blue-200">
-                <span className="font-semibold text-blue-300">PayPal</span> accepts credit/debit cards <span className="font-semibold">without</span> needing a PayPal account when that option is available.
+                Choose your payment provider. PayPal may show card checkout without a PayPal account, and Stripe supports cards directly.
               </p>
             </div>
           </div>
@@ -194,7 +269,32 @@ export default function PaymentPage() {
         <div className="bg-white/3 border border-white/10 rounded-xl p-6">
           <h2 className="font-semibold text-sm uppercase tracking-wider text-gray-400 mb-4">Complete Payment</h2>
 
-          {loadingPayPal ? (
+          <div className="grid grid-cols-2 gap-2 mb-5">
+            <button
+              type="button"
+              onClick={() => setProvider('paypal')}
+              className={`px-3 py-2 rounded-lg text-sm font-semibold transition-colors border ${
+                provider === 'paypal'
+                  ? 'bg-blue-600/20 border-blue-500 text-blue-300'
+                  : 'bg-transparent border-white/15 text-gray-300 hover:text-white'
+              }`}
+            >
+              PayPal
+            </button>
+            <button
+              type="button"
+              onClick={() => setProvider('stripe')}
+              className={`px-3 py-2 rounded-lg text-sm font-semibold transition-colors border ${
+                provider === 'stripe'
+                  ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300'
+                  : 'bg-transparent border-white/15 text-gray-300 hover:text-white'
+              }`}
+            >
+              Stripe
+            </button>
+          </div>
+
+          {provider === 'paypal' && loadingPayPal ? (
             <div className="flex flex-col items-center justify-center py-12">
               <svg className="animate-spin w-8 h-8 text-purple-400 mb-3" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -202,14 +302,34 @@ export default function PaymentPage() {
               </svg>
               <p className="text-sm text-gray-400">Loading PayPal...</p>
             </div>
-          ) : (
+          ) : provider === 'paypal' ? (
             <div>
               <p className="text-sm text-gray-400 mb-4 text-center">
                 Pay with a PayPal account or an eligible credit/debit card.
               </p>
               <div ref={paypalRef} className="min-h-[200px]"></div>
               <p className="text-xs text-gray-500 text-center mt-4">
-                🔒 Secure payment processed by PayPal
+                Secure payment processed by PayPal
+              </p>
+            </div>
+          ) : (
+            <div className="text-center">
+              <p className="text-sm text-gray-400 mb-4">
+                Pay securely with Stripe using your debit or credit card.
+              </p>
+              <button
+                type="button"
+                onClick={startStripeCheckout}
+                disabled={stripeLoading || stripeVerifying}
+                className="w-full max-w-xs mx-auto px-4 py-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-semibold transition-colors"
+              >
+                {stripeVerifying ? 'Finalizing payment...' : stripeLoading ? 'Redirecting to Stripe...' : 'Pay with Stripe'}
+              </button>
+              {requestedProvider === 'stripe' && requestedStatus === 'cancel' && !stripeLoading && !stripeVerifying && (
+                <p className="text-xs text-amber-300 mt-3">Stripe checkout was canceled. You can try again anytime.</p>
+              )}
+              <p className="text-xs text-gray-500 text-center mt-4">
+                Secure payment processed by Stripe
               </p>
             </div>
           )}
