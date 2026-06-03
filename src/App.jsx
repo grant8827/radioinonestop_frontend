@@ -199,7 +199,7 @@ function MainApp() {
           {/* Keep ConferenceRoom mounted so LiveKit session + conference audio bridge
               continue when user switches tabs (Mixer/Radio/Profile/etc). */}
           <div className={mode !== 'conference' ? 'hidden' : 'contents'}>
-            <ConferenceRoom roomId="studio" username={user?.stationName} onLeave={() => handleModeChange('radio')} />
+            <ConferenceRoom roomId="studio" username={user?.stationName} onLeave={() => handleModeChange('radio')} onGoToMixer={() => handleModeChange('mixer')} />
           </div>
           {mode === 'admin' && user?.role === 'admin' && <SuperAdmin />}
           {mode === 'profile' && <ProfileSettings />}

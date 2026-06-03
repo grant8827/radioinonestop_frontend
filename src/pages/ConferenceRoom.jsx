@@ -433,7 +433,7 @@ function ConferenceOutboundPublisher({ onStatusChange }) {
 }
 
 // ── Main room view ─────────────────────────────────────────────────────────────
-function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError }) {
+function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError, onGoToMixer }) {
   const [tab, setTab] = useState('group')
   const participants = useParticipants()
   const audioEngine = useAudioEngine()
@@ -547,11 +547,19 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError }) {
           <div className="mx-4 mt-4 border-2 border-amber-500 bg-amber-950 px-4 py-4 text-amber-100 shadow-lg shadow-amber-950/40">
             <div className="flex items-start gap-3">
               <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-500 text-sm font-black text-gray-950">!</div>
-              <div>
+              <div className="flex-1">
                 <p className="text-sm font-bold text-white">Incoming callers are not connected to the mixer</p>
                 <p className="mt-1 text-xs leading-5 text-amber-200">
-                  Open Mixer and set an available line channel source to Conference Room. Callers cannot be heard locally or sent on-air until a return channel is assigned.
+                  Set an available line channel source to <strong>Conference Room</strong> so callers can be heard locally and sent on-air.
                 </p>
+                {onGoToMixer && (
+                  <button
+                    onClick={onGoToMixer}
+                    className="mt-3 px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-gray-950 text-xs font-bold transition-colors"
+                  >
+                    Open Mixer
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -575,7 +583,7 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError }) {
 // ── Page entry point ───────────────────────────────────────────────────────────
 // roomId + onLeave props are used when rendered inline inside the app.
 // When loaded via the /conference/:roomId route (guest link), useParams() provides the roomId.
-export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: propUsername }) {
+export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: propUsername, onGoToMixer }) {
   const { roomId: routeRoomId } = useParams()
   const roomId = propRoomId ?? routeRoomId
   const inviteUrl = `${window.location.origin}/conference/${roomId}`
@@ -694,6 +702,7 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
         inviteUrl={inviteUrl}
         microphoneError={microphoneError}
         onMicrophoneError={setMicrophoneError}
+        onGoToMixer={onGoToMixer}
       />
     </LiveKitRoom>
   )

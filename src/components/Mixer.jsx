@@ -851,6 +851,12 @@ function loadSavedChannels() {
     const phone = channels.find(ch => ch.id === 7)
     if (!hasConferenceReturn && phone?.sourceType === 'none') {
       phone.sourceType = 'conference'
+      // Persist so AudioEngine init (which reads localStorage before Mixer mounts) finds it
+      try {
+        const raw = JSON.parse(localStorage.getItem('mixer_channels') || '{}')
+        raw[7] = { ...(raw[7] || {}), sourceType: 'conference' }
+        localStorage.setItem('mixer_channels', JSON.stringify(raw))
+      } catch { /* ignore */ }
     }
     return channels
   } catch {
