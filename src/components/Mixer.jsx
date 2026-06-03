@@ -473,7 +473,6 @@ function ChannelSettings({ anchorRef, ch, onUpdate, onClose }) {
             <option value="dj">DJ Player</option>
             <option value="podcast">Podcast / Video</option>
             <option value="line-in">External Line In / USB</option>
-            <option value="conference">Conference Room</option>
           </select>
           {(ch.sourceType === 'dj') && (
             <p style={{ fontSize: 8, color: '#38bdf8', margin: '4px 0 0', fontStyle: 'italic' }}>
@@ -483,11 +482,6 @@ function ChannelSettings({ anchorRef, ch, onUpdate, onClose }) {
           {(ch.sourceType === 'podcast') && (
             <p style={{ fontSize: 8, color: '#a78bfa', margin: '4px 0 0', fontStyle: 'italic' }}>
               Audio routed from Podcast / Video
-            </p>
-          )}
-          {(ch.sourceType === 'conference') && (
-            <p style={{ fontSize: 8, color: '#a78bfa', margin: '4px 0 0', fontStyle: 'italic' }}>
-              Conference audio routed to this channel
             </p>
           )}
           {ch.sourceType === 'line-in' && (
@@ -644,7 +638,6 @@ function ChannelStrip({ ch, onUpdate, level = 0 }) {
           const srcLabel = ch.sourceType === 'dj' ? 'DJ Player'
             : ch.sourceType === 'podcast' ? 'Podcast'
             : ch.sourceType === 'line-in' ? (ch.deviceLabel || 'Line In')
-            : ch.sourceType === 'conference' ? 'Conference'
             : null
           return srcLabel
             ? <div style={{ fontSize: 7, color: T.muted, width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center', padding: '2px 4px', background: T.bg, borderRadius: 4, border: `1px solid ${T.borderFaint}` }}>{srcLabel}</div>
@@ -847,33 +840,11 @@ function loadSavedChannels() {
       SAVED_CH_KEYS.forEach(k => { if (s[k] !== undefined) merged[k] = s[k] })
       return merged
     })
-    const hasConferenceReturn = channels.some(ch => !ch.isMic && ch.sourceType === 'conference')
-    const phone = channels.find(ch => ch.id === 7)
-    if (!hasConferenceReturn && phone?.sourceType === 'none') {
-      phone.sourceType = 'conference'
-      phone.on = true
-      phone.mute = false
-      // Persist so AudioEngine init (which reads localStorage before Mixer mounts) finds it
-      try {
-        const raw = JSON.parse(localStorage.getItem('mixer_channels') || '{}')
-        raw[7] = { ...(raw[7] || {}), sourceType: 'conference', on: true, mute: false }
-        localStorage.setItem('mixer_channels', JSON.stringify(raw))
-      } catch { /* ignore */ }
-    }
-
-    // Only one line channel can own the conference return. Keep the highest
-    // channel ID to match AudioEngine's restore behavior and clear stale UI
-    // assignments left by older builds.
-    const conferenceChannels = channels.filter(ch => !ch.isMic && ch.sourceType === 'conference')
-    if (conferenceChannels.length > 1) {
-      const keepId = Math.max(...conferenceChannels.map(ch => ch.id))
-      channels.forEach(ch => {
-        if (!ch.isMic && ch.sourceType === 'conference' && ch.id !== keepId) ch.sourceType = 'none'
-      })
-    }
+    channels.forEach(ch => {
+      if (!ch.isMic && ch.sourceType === 'conference') ch.sourceType = 'none'
+    })
     return channels
   } catch {
-    defaults[6].sourceType = 'conference'
     return defaults
   }
 }
@@ -978,8 +949,6 @@ export default function Mixer({ config, onOpenConference }) {
       } else if (!ch.isMic) {
         if (ch.sourceType === 'dj' || ch.sourceType === 'podcast') {
           audioEngine.connectSourceToChannel(ch.sourceType, ch.id)
-        } else if (ch.sourceType === 'conference') {
-          audioEngine.connectSourceToChannel('conference', ch.id)
         } else if (ch.sourceType === 'line-in' && ch.deviceId) {
           audioEngine.connectLineInToChannel(ch.id, ch.deviceId)
         }
@@ -989,18 +958,8 @@ export default function Mixer({ config, onOpenConference }) {
 
   const updateChannel = useCallback((id, key, value) => {
     setChannels(prev => {
-      const displacedConferenceIds = key === 'sourceType' && value === 'conference'
-        ? prev.filter(ch => ch.id !== id && !ch.isMic && ch.sourceType === 'conference').map(ch => ch.id)
-        : []
-      if (audioEngine) {
-        displacedConferenceIds.forEach(channelId => audioEngine.disconnectConferenceFromChannel?.(channelId))
-      }
-
       const updated = prev.map(ch => {
-        if (ch.id !== id) {
-          if (displacedConferenceIds.includes(ch.id)) return { ...ch, sourceType: 'none' }
-          return ch
-        }
+        if (ch.id !== id) return ch
         const next = { ...ch, [key]: value }
         if (audioEngine) {
           // Smooth param updates
@@ -1017,14 +976,8 @@ export default function Mixer({ config, onOpenConference }) {
           }
           // Source type change (line channels)
           if (key === 'sourceType' && !next.isMic) {
-            // Disconnect conference if switching away from it
-            if (ch.sourceType === 'conference' && value !== 'conference') {
-              audioEngine.disconnectConferenceFromChannel?.(id)
-            }
             if (value === 'dj' || value === 'podcast') {
               audioEngine.connectSourceToChannel(value, id)
-            } else if (value === 'conference') {
-              audioEngine.connectSourceToChannel('conference', id)
             } else {
               // If no other line channel has DJ/podcast source, clear djConnected
               const anyOtherDj = prev.some(ch => ch.id !== id && !ch.isMic && (ch.sourceType === 'dj' || ch.sourceType === 'podcast'))
@@ -1133,6 +1086,7 @@ export default function Mixer({ config, onOpenConference }) {
       for (let id = 1; id <= 7; id++) {
         newLevels[id] = readRms(audioEngine.getAnalyser?.(id), `ch${id}`)
       }
+      newLevels.conference = readRms(audioEngine.getConferenceAnalyser?.(), 'conference')
       setLevels(newLevels)
 
       const mRms = readRms(audioEngine.getMasterAnalyser?.(), 'master')
@@ -1154,7 +1108,7 @@ export default function Mixer({ config, onOpenConference }) {
             Mixing Board
           </h2>
           <p style={{ margin: '3px 0 0', fontSize: 11, color: T.muted }}>
-            {config?.stationName ?? 'Radio In One Stop'} — {channels.length}-channel console
+            {config?.stationName ?? 'Radio In One Stop'} — {channels.length + 1}-channel console
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1244,6 +1198,23 @@ export default function Mixer({ config, onOpenConference }) {
                   <ChannelStrip key={ch.id} ch={ch} onUpdate={(k, v) => updateChannel(ch.id, k, v)} level={levels[ch.id] ?? 0} />
                 ))}
               </div>
+            </div>
+
+            {/* Group divider */}
+            <div style={{
+              flexShrink: 0, width: 1, alignSelf: 'stretch', margin: '0 16px',
+              background: `linear-gradient(to bottom, transparent, ${T.border} 15%, ${T.border} 85%, transparent)`,
+            }} />
+
+            {/* Dedicated conference return */}
+            <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+              <GroupHeader label="Conference" color="#a78bfa" count={1} />
+              <ConferenceStrip
+                conf={confState}
+                onUpdate={updateConf}
+                onOpenConference={onOpenConference}
+                level={levels.conference ?? 0}
+              />
             </div>
           </div>
 

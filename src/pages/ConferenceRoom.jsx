@@ -575,9 +575,9 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError, onGo
             <div className="flex items-start gap-3">
               <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-500 text-sm font-black text-gray-950">!</div>
               <div className="flex-1">
-                <p className="text-sm font-bold text-white">Incoming callers are not connected to the mixer</p>
+                <p className="text-sm font-bold text-white">Conference return is not ready</p>
                 <p className="mt-1 text-xs leading-5 text-amber-200">
-                  Set an available line channel source to <strong>Conference Room</strong> so callers can be heard locally and sent on-air.
+                  Open Mixer and check the dedicated <strong>CONF</strong> strip so callers can be heard locally and sent on-air.
                 </p>
                 {onGoToMixer && (
                   <button

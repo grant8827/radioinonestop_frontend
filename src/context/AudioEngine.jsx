@@ -12,6 +12,7 @@ export function AudioEngineProvider({ children }) {
   const conferenceSendMutedRef = useRef(false)
   const conferenceReturnAnalyserRef = useRef(null) // Raw incoming caller audio, before mixer controls
   const conferenceReturnDestRef = useRef(null)
+  const conferenceNodesRef = useRef(null) // Dedicated mixer return strip for caller audio
 
   // channelId → { gainNode, hiEQ, midEQ, loEQ, panNode, faderNode, analyserNode }
   const channelNodes  = useRef({})
@@ -110,6 +111,24 @@ export function AudioEngineProvider({ children }) {
       const conferenceReturnDest = ac.createMediaStreamDestination()
       conferenceReturnDestRef.current = conferenceReturnDest
       conferenceReturnAnalyser.connect(conferenceReturnDest)
+
+      const savedConference = (() => {
+        try { return JSON.parse(localStorage.getItem('mixer_conference') || 'null') || {} } catch { return {} }
+      })()
+      const confGain = ac.createGain()
+      confGain.gain.value = (savedConference.gain ?? 0.5) * 2
+      const confFader = ac.createGain()
+      const confOn = savedConference.on ?? true
+      const confMute = savedConference.mute ?? false
+      const confFaderValue = savedConference.fader ?? 0.8
+      confFader.gain.value = confOn && !confMute ? confFaderValue * confFaderValue : 0
+      const confAnalyser = ac.createAnalyser()
+      confAnalyser.fftSize = 256
+      confAnalyser.smoothingTimeConstant = 0.8
+      confGain.connect(confFader)
+      confFader.connect(confAnalyser)
+      confAnalyser.connect(master)
+      conferenceNodesRef.current = { gainNode: confGain, faderNode: confFader, analyserNode: confAnalyser }
 
       // 3-band master EQ — inserted between master gain and master analyser
       const masterHi  = ac.createBiquadFilter()
@@ -261,8 +280,8 @@ export function AudioEngineProvider({ children }) {
     const nodes = { gainNode, hiEQ, midEQ, loEQ, panNode, faderNode, analyserNode, duckNode, confSendNode }
     channelNodes.current[channelId] = nodes
 
-    // If this channel is the conference return, rebuilding the channel must not
-    // leave already-subscribed caller tracks connected to the old gain node.
+    // Legacy support for older saved layouts that assigned Conference Room to a
+    // line channel. The dedicated CONF strip is now the primary return.
     if (confChannelIdRef.current === channelId) {
       confSourcesRef.current.forEach((entry, sid) => {
         if (entry.sourceNode) { try { entry.sourceNode.disconnect() } catch { /* ignore */ } }
@@ -450,39 +469,10 @@ export function AudioEngineProvider({ children }) {
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('mixer_channels') || '{}')
-      const hasConferenceReturn = Object.values(saved).some(ch => ch?.sourceType === 'conference')
-      const phone = saved[7]
-      if (!hasConferenceReturn && (!phone?.sourceType || phone.sourceType === 'none')) {
-        saved[7] = {
-          ...phone,
-          gain: phone?.gain ?? 0.5,
-          hi: phone?.hi ?? 0.5,
-          mid: phone?.mid ?? 0.5,
-          lo: phone?.lo ?? 0.5,
-          pan: phone?.pan ?? 0.5,
-          fader: phone?.fader ?? 0.8,
-          on: true,
-          mute: false,
-          sourceType: 'conference',
-        }
-        localStorage.setItem('mixer_channels', JSON.stringify(saved))
-      }
-
-      // AudioEngine supports one conference return. Resolve that assignment
-      // before channel nodes are built so already-subscribed caller tracks are
-      // connected when setupChannelNodes() restores the selected channel.
-      const conferenceIds = Object.entries(saved)
-        .filter(([idStr, ch]) => parseInt(idStr) > 3 && ch?.sourceType === 'conference')
-        .map(([idStr]) => parseInt(idStr))
-        .filter(Number.isFinite)
-      const conferenceChannelId = conferenceIds.length > 0 ? Math.max(...conferenceIds) : null
-      if (conferenceChannelId !== null) {
-        confChannelIdRef.current = conferenceChannelId
-        conferenceIds.forEach((id) => {
-          if (id !== conferenceChannelId) saved[id] = { ...saved[id], sourceType: 'none' }
-        })
-        localStorage.setItem('mixer_channels', JSON.stringify(saved))
-      }
+      Object.entries(saved).forEach(([id, ch]) => {
+        if (parseInt(id) > 3 && ch?.sourceType === 'conference') saved[id] = { ...ch, sourceType: 'none' }
+      })
+      localStorage.setItem('mixer_channels', JSON.stringify(saved))
 
       Object.entries(saved).forEach(([idStr, ch]) => {
         if (!ch) return
@@ -497,51 +487,14 @@ export function AudioEngineProvider({ children }) {
           pendingDjChannel.current = id
           setDjConnected(true)
         }
-        if (!isMic && ch.sourceType === 'conference') {
-          channelNodes.current[id]?.duckNode?.gain.setTargetAtTime(1, getAC().currentTime, 0.02)
-        }
       })
     } catch { /* ignore */ }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Connect a DJ / conference source to a mixer channel ─────────────────────
+  // ── Connect a DJ / media source to a mixer channel ─────────────────────────
   const connectSourceToChannel = useCallback((sourceType, channelId) => {
     const nodes = channelNodes.current[channelId]
     if (!nodes) return
-
-    // Conference: route all remote participant streams through this line channel
-    if (sourceType === 'conference') {
-      const prevConfChannel = confChannelIdRef.current
-      if (confChannelIdRef.current !== null && confChannelIdRef.current !== channelId) {
-        // Disconnect from the old channel first
-        confSourcesRef.current.forEach((entry) => {
-          if (entry.sourceNode) { try { entry.sourceNode.disconnect() } catch {} }
-          entry.sourceNode = null
-        })
-      }
-      confChannelIdRef.current = channelId
-
-      // Mix-minus: exclude conference return channel from conference outbound send.
-      if (prevConfChannel !== null && channelNodes.current[prevConfChannel]?.confSendNode) {
-        channelNodes.current[prevConfChannel].confSendNode.gain.setTargetAtTime(1, getAC().currentTime, 0.02)
-      }
-      if (channelNodes.current[channelId]?.confSendNode) {
-        channelNodes.current[channelId].confSendNode.gain.setTargetAtTime(0, getAC().currentTime, 0.02)
-      }
-      if (channelNodes.current[channelId]?.duckNode) {
-        channelNodes.current[channelId].duckNode.gain.setTargetAtTime(1, getAC().currentTime, 0.02)
-      }
-
-      const ac = getAC()
-      confSourcesRef.current.forEach((entry, sid) => {
-        if (entry.sourceNode) { try { entry.sourceNode.disconnect() } catch {} }
-        const sn = ac.createMediaStreamSource(entry.stream)
-        sn.connect(conferenceReturnAnalyserRef.current)
-        sn.connect(nodes.gainNode)
-        confSourcesRef.current.set(sid, { stream: entry.stream, sourceNode: sn })
-      })
-      return
-    }
 
     // 'dj' connects both decks (A and B) so the crossfader blend comes through
     // 'podcast' connects only deck A (the video/podcast element)
@@ -657,6 +610,9 @@ export function AudioEngineProvider({ children }) {
     const ac = getAC()
     const sourceNode = ac.createMediaStreamSource(stream)
     sourceNode.connect(conferenceReturnAnalyserRef.current)
+    if (conferenceNodesRef.current?.gainNode) {
+      sourceNode.connect(conferenceNodesRef.current.gainNode)
+    }
     if (confChannelIdRef.current !== null) {
       const nodes = channelNodes.current[confChannelIdRef.current]
       if (nodes) {
@@ -735,6 +691,35 @@ export function AudioEngineProvider({ children }) {
     return conferenceReturnAnalyserRef.current
   }, [getAC])
 
+  const getConferenceAnalyser = useCallback(() => {
+    getAC()
+    return conferenceNodesRef.current?.analyserNode ?? null
+  }, [getAC])
+
+  const setupConferenceChannel = useCallback(() => {
+    getAC()
+    confSourcesRef.current.forEach((entry) => {
+      if (entry.sourceNode && conferenceNodesRef.current?.gainNode) {
+        try { entry.sourceNode.connect(conferenceNodesRef.current.gainNode) } catch { /* already connected */ }
+      }
+    })
+  }, [getAC])
+
+  const setConferenceActive = useCallback((on, mute, fader) => {
+    getAC()
+    const nodes = conferenceNodesRef.current
+    if (!nodes || !acRef.current) return
+    const target = on && !mute ? fader * fader : 0
+    nodes.faderNode.gain.setTargetAtTime(target, acRef.current.currentTime, 0.02)
+  }, [getAC])
+
+  const updateConferenceGain = useCallback((gain) => {
+    getAC()
+    const nodes = conferenceNodesRef.current
+    if (!nodes || !acRef.current) return
+    nodes.gainNode.gain.setTargetAtTime(gain * 2, acRef.current.currentTime, 0.01)
+  }, [getAC])
+
   const setConferenceSendMuted = useCallback((muted) => {
     getAC()
     conferenceSendMutedRef.current = !!muted
@@ -747,7 +732,7 @@ export function AudioEngineProvider({ children }) {
   }, [])
 
   const getConferenceChannelId = useCallback(() => {
-    return confChannelIdRef.current
+    return conferenceNodesRef.current ? 'dedicated' : confChannelIdRef.current
   }, [])
 
   // ── On-Air mic tracking (shared across NowPlaying + Mixer) ───────────────
@@ -875,6 +860,10 @@ export function AudioEngineProvider({ children }) {
       getConferenceSendTrack,
       getConferenceSendAnalyser,
       getConferenceReturnAnalyser,
+      getConferenceAnalyser,
+      setupConferenceChannel,
+      setConferenceActive,
+      updateConferenceGain,
       setConferenceSendMuted,
       getConferenceSendMuted,
       getConferenceChannelId,
