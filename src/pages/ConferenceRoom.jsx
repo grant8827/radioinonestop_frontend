@@ -262,8 +262,8 @@ function ConferenceSendMeter({ audioEngine, muted }) {
   return <AudioLevelMeter analyser={audioEngine?.getConferenceSendAnalyser?.()} label="Send" muted={muted} />
 }
 
-function ConferenceReturnMeter({ audioEngine, channelId }) {
-  return <AudioLevelMeter analyser={channelId === null ? null : audioEngine?.getAnalyser?.(channelId)} label="Return" />
+function ConferenceReturnMeter({ audioEngine }) {
+  return <AudioLevelMeter analyser={audioEngine?.getConferenceReturnAnalyser?.()} label="Return" />
 }
 
 // ── Participant grid ───────────────────────────────────────────────────────────
@@ -487,7 +487,7 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError }) {
             {audioEngine ? `Send: ${outboundStatus.message || outboundStatus.status}` : 'Send: Mic'}
           </span>
           {audioEngine && <ConferenceSendMeter audioEngine={audioEngine} muted={sendMuted} />}
-          {audioEngine && <ConferenceReturnMeter audioEngine={audioEngine} channelId={conferenceChannelId} />}
+          {audioEngine && <ConferenceReturnMeter audioEngine={audioEngine} />}
         </div>
         <div className="flex items-center gap-2">
           <MuteButton
@@ -544,8 +544,16 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError }) {
           </div>
         )}
         {audioEngine && conferenceChannelId === null && (
-          <div className="mx-4 mt-4 rounded-xl border border-amber-700/40 bg-amber-900/20 px-4 py-3 text-sm text-amber-200">
-            Conference return is not assigned to a mixer channel. Go to Mixer and set one line channel source to Conference so incoming callers can be heard and sent on-air.
+          <div className="mx-4 mt-4 border-2 border-amber-500 bg-amber-950 px-4 py-4 text-amber-100 shadow-lg shadow-amber-950/40">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-500 text-sm font-black text-gray-950">!</div>
+              <div>
+                <p className="text-sm font-bold text-white">Incoming callers are not connected to the mixer</p>
+                <p className="mt-1 text-xs leading-5 text-amber-200">
+                  Open Mixer and set an available line channel source to Conference Room. Callers cannot be heard locally or sent on-air until a return channel is assigned.
+                </p>
+              </div>
+            </div>
           </div>
         )}
         {tab === 'group' && <GroupTab />}

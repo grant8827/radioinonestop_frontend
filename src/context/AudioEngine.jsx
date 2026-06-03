@@ -10,6 +10,8 @@ export function AudioEngineProvider({ children }) {
   const conferenceSendBusRef = useRef(null)  // GainNode fed by channel send taps
   const conferenceSendAnalyserRef = useRef(null)
   const conferenceSendMutedRef = useRef(false)
+  const conferenceReturnAnalyserRef = useRef(null) // Raw incoming caller audio, before mixer controls
+  const conferenceReturnDestRef = useRef(null)
 
   // channelId → { gainNode, hiEQ, midEQ, loEQ, panNode, faderNode, analyserNode }
   const channelNodes  = useRef({})
@@ -96,6 +98,18 @@ export function AudioEngineProvider({ children }) {
 
       conferenceSendBus.connect(conferenceSendAnalyser)
       conferenceSendAnalyser.connect(conferenceSendDest)
+
+      // Raw conference return meter. This is intentionally separate from the
+      // mixer channel analyser so it shows whether caller audio is arriving even
+      // when the selected channel is muted, off, or has its fader down.
+      const conferenceReturnAnalyser = ac.createAnalyser()
+      conferenceReturnAnalyser.fftSize = 256
+      conferenceReturnAnalyser.smoothingTimeConstant = 0.85
+      conferenceReturnAnalyserRef.current = conferenceReturnAnalyser
+
+      const conferenceReturnDest = ac.createMediaStreamDestination()
+      conferenceReturnDestRef.current = conferenceReturnDest
+      conferenceReturnAnalyser.connect(conferenceReturnDest)
 
       // 3-band master EQ — inserted between master gain and master analyser
       const masterHi  = ac.createBiquadFilter()
@@ -253,6 +267,7 @@ export function AudioEngineProvider({ children }) {
       confSourcesRef.current.forEach((entry, sid) => {
         if (entry.sourceNode) { try { entry.sourceNode.disconnect() } catch { /* ignore */ } }
         const sourceNode = ac.createMediaStreamSource(entry.stream)
+        sourceNode.connect(conferenceReturnAnalyserRef.current)
         sourceNode.connect(nodes.gainNode)
         confSourcesRef.current.set(sid, { stream: entry.stream, sourceNode })
       })
@@ -435,6 +450,23 @@ export function AudioEngineProvider({ children }) {
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('mixer_channels') || '{}')
+      const hasConferenceReturn = Object.values(saved).some(ch => ch?.sourceType === 'conference')
+      const phone = saved[7]
+      if (!hasConferenceReturn && (!phone?.sourceType || phone.sourceType === 'none')) {
+        saved[7] = {
+          ...phone,
+          gain: phone?.gain ?? 0.5,
+          hi: phone?.hi ?? 0.5,
+          mid: phone?.mid ?? 0.5,
+          lo: phone?.lo ?? 0.5,
+          pan: phone?.pan ?? 0.5,
+          fader: phone?.fader ?? 0.8,
+          on: phone?.on ?? true,
+          mute: phone?.mute ?? false,
+          sourceType: 'conference',
+        }
+        localStorage.setItem('mixer_channels', JSON.stringify(saved))
+      }
       Object.entries(saved).forEach(([idStr, ch]) => {
         if (!ch) return
         const id = parseInt(idStr)
@@ -488,6 +520,7 @@ export function AudioEngineProvider({ children }) {
       confSourcesRef.current.forEach((entry, sid) => {
         if (entry.sourceNode) { try { entry.sourceNode.disconnect() } catch {} }
         const sn = ac.createMediaStreamSource(entry.stream)
+        sn.connect(conferenceReturnAnalyserRef.current)
         sn.connect(nodes.gainNode)
         confSourcesRef.current.set(sid, { stream: entry.stream, sourceNode: sn })
       })
@@ -605,12 +638,12 @@ export function AudioEngineProvider({ children }) {
     }
 
     const stream = new MediaStream([mediaStreamTrack])
-    let sourceNode = null
+    const ac = getAC()
+    const sourceNode = ac.createMediaStreamSource(stream)
+    sourceNode.connect(conferenceReturnAnalyserRef.current)
     if (confChannelIdRef.current !== null) {
       const nodes = channelNodes.current[confChannelIdRef.current]
       if (nodes) {
-        const ac = getAC()
-        sourceNode = ac.createMediaStreamSource(stream)
         sourceNode.connect(nodes.gainNode)
       }
     }
@@ -679,6 +712,11 @@ export function AudioEngineProvider({ children }) {
   const getConferenceSendAnalyser = useCallback(() => {
     getAC()
     return conferenceSendAnalyserRef.current
+  }, [getAC])
+
+  const getConferenceReturnAnalyser = useCallback(() => {
+    getAC()
+    return conferenceReturnAnalyserRef.current
   }, [getAC])
 
   const setConferenceSendMuted = useCallback((muted) => {
@@ -820,6 +858,7 @@ export function AudioEngineProvider({ children }) {
       getStreamTrack,
       getConferenceSendTrack,
       getConferenceSendAnalyser,
+      getConferenceReturnAnalyser,
       setConferenceSendMuted,
       getConferenceSendMuted,
       getConferenceChannelId,

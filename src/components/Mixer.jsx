@@ -840,14 +840,23 @@ function loadSavedChannels() {
   ]
   try {
     const saved = JSON.parse(localStorage.getItem('mixer_channels') || '{}')
-    return defaults.map(ch => {
+    const channels = defaults.map(ch => {
       const s = saved[ch.id]
       if (!s) return ch
       const merged = { ...ch }
       SAVED_CH_KEYS.forEach(k => { if (s[k] !== undefined) merged[k] = s[k] })
       return merged
     })
-  } catch { return defaults }
+    const hasConferenceReturn = channels.some(ch => !ch.isMic && ch.sourceType === 'conference')
+    const phone = channels.find(ch => ch.id === 7)
+    if (!hasConferenceReturn && phone?.sourceType === 'none') {
+      phone.sourceType = 'conference'
+    }
+    return channels
+  } catch {
+    defaults[6].sourceType = 'conference'
+    return defaults
+  }
 }
 
 function loadSavedMaster() {
