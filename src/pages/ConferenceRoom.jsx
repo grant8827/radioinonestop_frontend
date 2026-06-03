@@ -305,37 +305,64 @@ function ConferenceAudioBridge() {
   const audioEngine = useAudioEngine()
   const room = useRoomContext()
   const trackMapRef = useRef(new Map()) // track.sid → MediaStreamTrack
+  const retryTimersRef = useRef(new Map()) // track.sid → timeout id
 
   useEffect(() => {
     if (!audioEngine || !room) return
     audioEngine.resume()
 
-    const connect = (track) => {
-      if (track.kind !== Track.Kind.Audio) return
-      if (track.mediaStreamTrack) {
-        audioEngine.connectConferenceStream(track.sid, track.mediaStreamTrack)
-        trackMapRef.current.set(track.sid, track.mediaStreamTrack)
+    const clearRetry = (sid) => {
+      const timerId = retryTimersRef.current.get(sid)
+      if (timerId) {
+        clearTimeout(timerId)
+        retryTimersRef.current.delete(sid)
       }
     }
+
+    const connect = (track, attempt = 0) => {
+      if (track.kind !== Track.Kind.Audio) return
+      const mediaTrack = track.mediaStreamTrack
+      if (mediaTrack) {
+        clearRetry(track.sid)
+        if (trackMapRef.current.get(track.sid) === mediaTrack) return
+        audioEngine.connectConferenceStream(track.sid, mediaTrack)
+        trackMapRef.current.set(track.sid, mediaTrack)
+        return
+      }
+      if (attempt >= 12) return
+      clearRetry(track.sid)
+      const timerId = setTimeout(() => connect(track, attempt + 1), 250)
+      retryTimersRef.current.set(track.sid, timerId)
+    }
+
     const disconnect = (track) => {
       if (track.kind !== Track.Kind.Audio) return
+      clearRetry(track.sid)
       audioEngine.disconnectConferenceStream(track.sid)
       trackMapRef.current.delete(track.sid)
     }
 
-    // Connect tracks already subscribed before this component mounted
-    for (const participant of room.remoteParticipants.values()) {
-      for (const pub of participant.audioTrackPublications.values()) {
-        if (pub.track) connect(pub.track)
+    const reconnectExistingTracks = () => {
+      for (const participant of room.remoteParticipants.values()) {
+        for (const pub of participant.audioTrackPublications.values()) {
+          if (pub.track) connect(pub.track)
+        }
       }
     }
 
+    // Connect tracks already subscribed before this component mounted
+    reconnectExistingTracks()
+
     room.on(RoomEvent.TrackSubscribed, connect)
     room.on(RoomEvent.TrackUnsubscribed, disconnect)
+    room.on(RoomEvent.Reconnected, reconnectExistingTracks)
 
     return () => {
       room.off(RoomEvent.TrackSubscribed, connect)
       room.off(RoomEvent.TrackUnsubscribed, disconnect)
+      room.off(RoomEvent.Reconnected, reconnectExistingTracks)
+      retryTimersRef.current.forEach((timerId) => clearTimeout(timerId))
+      retryTimersRef.current.clear()
       audioEngine.disconnectAllConferenceStreams()
       trackMapRef.current.clear()
     }
