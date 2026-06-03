@@ -851,12 +851,25 @@ function loadSavedChannels() {
     const phone = channels.find(ch => ch.id === 7)
     if (!hasConferenceReturn && phone?.sourceType === 'none') {
       phone.sourceType = 'conference'
+      phone.on = true
+      phone.mute = false
       // Persist so AudioEngine init (which reads localStorage before Mixer mounts) finds it
       try {
         const raw = JSON.parse(localStorage.getItem('mixer_channels') || '{}')
-        raw[7] = { ...(raw[7] || {}), sourceType: 'conference' }
+        raw[7] = { ...(raw[7] || {}), sourceType: 'conference', on: true, mute: false }
         localStorage.setItem('mixer_channels', JSON.stringify(raw))
       } catch { /* ignore */ }
+    }
+
+    // Only one line channel can own the conference return. Keep the highest
+    // channel ID to match AudioEngine's restore behavior and clear stale UI
+    // assignments left by older builds.
+    const conferenceChannels = channels.filter(ch => !ch.isMic && ch.sourceType === 'conference')
+    if (conferenceChannels.length > 1) {
+      const keepId = Math.max(...conferenceChannels.map(ch => ch.id))
+      channels.forEach(ch => {
+        if (!ch.isMic && ch.sourceType === 'conference' && ch.id !== keepId) ch.sourceType = 'none'
+      })
     }
     return channels
   } catch {
@@ -976,8 +989,18 @@ export default function Mixer({ config, onOpenConference }) {
 
   const updateChannel = useCallback((id, key, value) => {
     setChannels(prev => {
+      const displacedConferenceIds = key === 'sourceType' && value === 'conference'
+        ? prev.filter(ch => ch.id !== id && !ch.isMic && ch.sourceType === 'conference').map(ch => ch.id)
+        : []
+      if (audioEngine) {
+        displacedConferenceIds.forEach(channelId => audioEngine.disconnectConferenceFromChannel?.(channelId))
+      }
+
       const updated = prev.map(ch => {
-        if (ch.id !== id) return ch
+        if (ch.id !== id) {
+          if (displacedConferenceIds.includes(ch.id)) return { ...ch, sourceType: 'none' }
+          return ch
+        }
         const next = { ...ch, [key]: value }
         if (audioEngine) {
           // Smooth param updates

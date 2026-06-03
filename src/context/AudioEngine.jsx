@@ -461,12 +461,29 @@ export function AudioEngineProvider({ children }) {
           lo: phone?.lo ?? 0.5,
           pan: phone?.pan ?? 0.5,
           fader: phone?.fader ?? 0.8,
-          on: phone?.on ?? true,
-          mute: phone?.mute ?? false,
+          on: true,
+          mute: false,
           sourceType: 'conference',
         }
         localStorage.setItem('mixer_channels', JSON.stringify(saved))
       }
+
+      // AudioEngine supports one conference return. Resolve that assignment
+      // before channel nodes are built so already-subscribed caller tracks are
+      // connected when setupChannelNodes() restores the selected channel.
+      const conferenceIds = Object.entries(saved)
+        .filter(([idStr, ch]) => parseInt(idStr) > 3 && ch?.sourceType === 'conference')
+        .map(([idStr]) => parseInt(idStr))
+        .filter(Number.isFinite)
+      const conferenceChannelId = conferenceIds.length > 0 ? Math.max(...conferenceIds) : null
+      if (conferenceChannelId !== null) {
+        confChannelIdRef.current = conferenceChannelId
+        conferenceIds.forEach((id) => {
+          if (id !== conferenceChannelId) saved[id] = { ...saved[id], sourceType: 'none' }
+        })
+        localStorage.setItem('mixer_channels', JSON.stringify(saved))
+      }
+
       Object.entries(saved).forEach(([idStr, ch]) => {
         if (!ch) return
         const id = parseInt(idStr)
@@ -481,7 +498,6 @@ export function AudioEngineProvider({ children }) {
           setDjConnected(true)
         }
         if (!isMic && ch.sourceType === 'conference') {
-          confChannelIdRef.current = id  // tracks connect when ConferenceAudioBridge mounts
           channelNodes.current[id]?.duckNode?.gain.setTargetAtTime(1, getAC().currentTime, 0.02)
         }
       })
