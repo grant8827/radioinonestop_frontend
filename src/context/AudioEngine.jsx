@@ -11,6 +11,8 @@ export function AudioEngineProvider({ children }) {
   const conferenceSendAnalyserRef = useRef(null)
   const conferenceSendMutedRef = useRef(false)
   const conferenceReturnAnalyserRef = useRef(null) // Raw incoming caller audio, before mixer controls
+  const conferencePgmAnalyserRef = useRef(null)
+  const conferenceCueAnalyserRef = useRef(null)
   const conferenceReturnDestRef = useRef(null)
   const conferenceNodesRef = useRef(null) // Dedicated mixer return strip for caller audio
 
@@ -53,7 +55,10 @@ export function AudioEngineProvider({ children }) {
   // channelId → { stream: MediaStream, sourceNode: MediaStreamSourceNode }
   const micStreams     = useRef({})
 
-  // track.sid → { stream: MediaStream, sourceNode: MediaStreamSourceNode | null }
+  // participant identity → { route: 'pgm' | 'cue', gain: 0..1, muted: boolean }
+  const conferenceControlsRef = useRef(new Map())
+
+  // track.sid → conference source wiring
   const confSourcesRef   = useRef(new Map())
   // channelId of the line channel that has 'conference' as its source (or null)
   const confChannelIdRef = useRef(null)
@@ -107,6 +112,16 @@ export function AudioEngineProvider({ children }) {
       conferenceReturnAnalyser.fftSize = 256
       conferenceReturnAnalyser.smoothingTimeConstant = 0.85
       conferenceReturnAnalyserRef.current = conferenceReturnAnalyser
+
+      const conferencePgmAnalyser = ac.createAnalyser()
+      conferencePgmAnalyser.fftSize = 256
+      conferencePgmAnalyser.smoothingTimeConstant = 0.85
+      conferencePgmAnalyserRef.current = conferencePgmAnalyser
+
+      const conferenceCueAnalyser = ac.createAnalyser()
+      conferenceCueAnalyser.fftSize = 256
+      conferenceCueAnalyser.smoothingTimeConstant = 0.85
+      conferenceCueAnalyserRef.current = conferenceCueAnalyser
 
       const conferenceReturnDest = ac.createMediaStreamDestination()
       conferenceReturnDestRef.current = conferenceReturnDest
@@ -594,9 +609,23 @@ export function AudioEngineProvider({ children }) {
   // connectLineInToChannel is the same as connectMicToChannel
   const connectLineInToChannel = connectMicToChannel
 
+  const applyConferenceControl = useCallback((entry, nextControl = {}) => {
+    if (!entry || !acRef.current) return
+    const t = acRef.current.currentTime
+    const control = {
+      route: nextControl.route === 'pgm' ? 'pgm' : 'cue',
+      gain: Number.isFinite(nextControl.gain) ? Math.max(0, Math.min(1, nextControl.gain)) : 0.8,
+      muted: !!nextControl.muted,
+    }
+    const openGain = control.muted ? 0 : control.gain
+    entry.pgmGainNode?.gain.setTargetAtTime(control.route === 'pgm' ? openGain : 0, t, 0.02)
+    entry.cueGainNode?.gain.setTargetAtTime(control.route === 'cue' ? openGain : 0, t, 0.02)
+    entry.control = control
+  }, [])
+
   // ── Conference stream management ─────────────────────────────────────────
   // Connect one remote participant track (keyed by sid to prevent duplicates)
-  const connectConferenceStream = useCallback((sid, mediaStreamTrack) => {
+  const connectConferenceStream = useCallback((sid, mediaStreamTrack, meta = {}) => {
     if (!sid || !mediaStreamTrack) return
 
     // LiveKit can re-deliver a track with the same SID after reconnects.
@@ -605,28 +634,49 @@ export function AudioEngineProvider({ children }) {
     if (existing?.sourceNode) {
       try { existing.sourceNode.disconnect() } catch {}
     }
+    if (existing?.pgmGainNode) {
+      try { existing.pgmGainNode.disconnect() } catch {}
+    }
+    if (existing?.cueGainNode) {
+      try { existing.cueGainNode.disconnect() } catch {}
+    }
 
+    const participantId = meta.participantId || sid
     const stream = new MediaStream([mediaStreamTrack])
     const ac = getAC()
     const sourceNode = ac.createMediaStreamSource(stream)
+    const pgmGainNode = ac.createGain()
+    const cueGainNode = ac.createGain()
+
     sourceNode.connect(conferenceReturnAnalyserRef.current)
+    sourceNode.connect(pgmGainNode)
+    sourceNode.connect(cueGainNode)
+
+    pgmGainNode.connect(conferencePgmAnalyserRef.current)
     if (conferenceNodesRef.current?.gainNode) {
-      sourceNode.connect(conferenceNodesRef.current.gainNode)
+      pgmGainNode.connect(conferenceNodesRef.current.gainNode)
     }
     if (confChannelIdRef.current !== null) {
       const nodes = channelNodes.current[confChannelIdRef.current]
       if (nodes) {
-        sourceNode.connect(nodes.gainNode)
+        pgmGainNode.connect(nodes.gainNode)
       }
     }
-    confSourcesRef.current.set(sid, { stream, sourceNode })
-  }, [getAC])
+    cueGainNode.connect(conferenceCueAnalyserRef.current)
+
+    const control = conferenceControlsRef.current.get(participantId) || { route: 'cue', gain: 0.8, muted: false }
+    const entry = { stream, sourceNode, pgmGainNode, cueGainNode, participantId, control }
+    confSourcesRef.current.set(sid, entry)
+    applyConferenceControl(entry, control)
+  }, [applyConferenceControl, getAC])
 
   // Disconnect one track (participant left)
   const disconnectConferenceStream = useCallback((sid) => {
     const entry = confSourcesRef.current.get(sid)
     if (!entry) return
     if (entry.sourceNode) { try { entry.sourceNode.disconnect() } catch {} }
+    if (entry.pgmGainNode) { try { entry.pgmGainNode.disconnect() } catch {} }
+    if (entry.cueGainNode) { try { entry.cueGainNode.disconnect() } catch {} }
     confSourcesRef.current.delete(sid)
   }, [])
 
@@ -637,6 +687,10 @@ export function AudioEngineProvider({ children }) {
     confSourcesRef.current.forEach(({ sourceNode }) => {
       if (sourceNode) { try { sourceNode.disconnect() } catch {} }
     })
+    confSourcesRef.current.forEach(({ pgmGainNode, cueGainNode }) => {
+      if (pgmGainNode) { try { pgmGainNode.disconnect() } catch {} }
+      if (cueGainNode) { try { cueGainNode.disconnect() } catch {} }
+    })
     confSourcesRef.current.clear()
   }, [])
 
@@ -646,6 +700,10 @@ export function AudioEngineProvider({ children }) {
     confSourcesRef.current.forEach((entry) => {
       if (entry.sourceNode) { try { entry.sourceNode.disconnect() } catch {} }
       entry.sourceNode = null
+      if (entry.pgmGainNode) { try { entry.pgmGainNode.disconnect() } catch {} }
+      if (entry.cueGainNode) { try { entry.cueGainNode.disconnect() } catch {} }
+      entry.pgmGainNode = null
+      entry.cueGainNode = null
     })
     if (channelNodes.current[channelId]?.confSendNode && acRef.current) {
       channelNodes.current[channelId].confSendNode.gain.setTargetAtTime(1, acRef.current.currentTime, 0.02)
@@ -691,6 +749,16 @@ export function AudioEngineProvider({ children }) {
     return conferenceReturnAnalyserRef.current
   }, [getAC])
 
+  const getConferencePgmAnalyser = useCallback(() => {
+    getAC()
+    return conferencePgmAnalyserRef.current
+  }, [getAC])
+
+  const getConferenceCueAnalyser = useCallback(() => {
+    getAC()
+    return conferenceCueAnalyserRef.current
+  }, [getAC])
+
   const getConferenceAnalyser = useCallback(() => {
     getAC()
     return conferenceNodesRef.current?.analyserNode ?? null
@@ -700,10 +768,28 @@ export function AudioEngineProvider({ children }) {
     getAC()
     confSourcesRef.current.forEach((entry) => {
       if (entry.sourceNode && conferenceNodesRef.current?.gainNode) {
-        try { entry.sourceNode.connect(conferenceNodesRef.current.gainNode) } catch { /* already connected */ }
+        try { entry.pgmGainNode?.connect(conferenceNodesRef.current.gainNode) } catch { /* already connected */ }
       }
     })
   }, [getAC])
+
+  const setConferenceParticipantControl = useCallback((participantId, control) => {
+    if (!participantId) return
+    const current = conferenceControlsRef.current.get(participantId) || { route: 'cue', gain: 0.8, muted: false }
+    const next = {
+      ...current,
+      ...control,
+      route: control?.route === 'pgm' ? 'pgm' : control?.route === 'cue' ? 'cue' : current.route,
+      gain: Number.isFinite(control?.gain) ? Math.max(0, Math.min(1, control.gain)) : current.gain,
+      muted: typeof control?.muted === 'boolean' ? control.muted : current.muted,
+    }
+    conferenceControlsRef.current.set(participantId, next)
+    confSourcesRef.current.forEach((entry, sid) => {
+      if (entry.participantId === participantId || sid === participantId) {
+        applyConferenceControl(entry, next)
+      }
+    })
+  }, [applyConferenceControl])
 
   const setConferenceActive = useCallback((on, mute, fader) => {
     getAC()
@@ -860,10 +946,13 @@ export function AudioEngineProvider({ children }) {
       getConferenceSendTrack,
       getConferenceSendAnalyser,
       getConferenceReturnAnalyser,
+      getConferencePgmAnalyser,
+      getConferenceCueAnalyser,
       getConferenceAnalyser,
       setupConferenceChannel,
       setConferenceActive,
       updateConferenceGain,
+      setConferenceParticipantControl,
       setConferenceSendMuted,
       getConferenceSendMuted,
       getConferenceChannelId,

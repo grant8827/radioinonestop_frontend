@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useAudioEngine } from '../context/AudioEngine'
@@ -106,7 +106,7 @@ function LeaveButton({ onLeave }) {
 }
 
 // ── Settings tab — invite link ─────────────────────────────────────────────────
-function SettingsPanel({ inviteUrl }) {
+function SettingsPanel({ inviteUrl, passcode, limit, onPasscodeChange, onLimitChange }) {
   const [copied, setCopied] = useState(false)
   const url = inviteUrl || window.location.href
 
@@ -125,7 +125,31 @@ function SettingsPanel({ inviteUrl }) {
   }, [url, handleCopy])
 
   return (
-    <div className="p-4 flex flex-col gap-6 max-w-md mx-auto w-full">
+    <div className="p-4 flex flex-col gap-6 max-w-2xl mx-auto w-full">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Passcode</span>
+          <input
+            type="text"
+            value={passcode}
+            onChange={(e) => onPasscodeChange(e.target.value.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 32))}
+            placeholder="Optional"
+            className="bg-gray-900 border border-gray-800 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-red-500"
+          />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Guest limit</span>
+          <select
+            value={limit}
+            onChange={(e) => onLimitChange(e.target.value)}
+            className="bg-gray-900 border border-gray-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-red-500"
+          >
+            <option value="8">8 guests</option>
+            <option value="16">16 guests</option>
+            <option value="32">32 guests</option>
+          </select>
+        </label>
+      </div>
       <div>
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Invite link</p>
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col gap-3">
@@ -175,10 +199,14 @@ function SettingsPanel({ inviteUrl }) {
 }
 
 // ── Single participant tile ──────────────────────────────────────────────────
-function ParticipantTile({ participant, isLocal }) {
+function ParticipantTile({ participant, isLocal, control, onRouteChange, onGainChange, onMuteToggle, onDisconnect }) {
   const isSpeaking = useIsSpeaking(participant)
   const micEnabled = participant.isMicrophoneEnabled
   const name = participant.name || participant.identity || 'Guest'
+  const route = control?.route || (isLocal ? 'pgm' : 'cue')
+  const gain = control?.gain ?? 0.8
+  const muted = control?.muted || !micEnabled
+  const disconnected = control?.disconnected
   const initials = name
     .split(' ')
     .map((w) => w[0])
@@ -187,26 +215,97 @@ function ParticipantTile({ participant, isLocal }) {
     .slice(0, 2)
 
   return (
-    <div className="flex flex-col items-center gap-2 p-3">
-      <div
-        className={`relative w-16 h-16 rounded-full bg-gradient-to-br from-purple-600 to-indigo-700 flex items-center justify-center transition-all ${
-          isSpeaking ? 'ring-4 ring-green-400 ring-offset-2 ring-offset-gray-950' : 'ring-2 ring-gray-800'
-        }`}
-      >
-        <span className="text-xl font-bold text-white select-none">{initials}</span>
-        {!micEnabled && (
-          <div className="absolute -bottom-1 -right-1 bg-red-600 rounded-full p-1 border-2 border-gray-950">
-            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z" />
-            </svg>
+    <div className={`border rounded-lg p-3 bg-gray-900 ${route === 'pgm' ? 'border-red-700/70' : 'border-green-700/60'} ${disconnected ? 'opacity-50' : ''}`}>
+      <div className="flex items-center gap-3">
+        <div
+          className={`relative w-14 h-14 rounded-full flex items-center justify-center transition-all ${
+            route === 'pgm' ? 'bg-red-900' : 'bg-green-950'
+          } ${isSpeaking && !muted && !disconnected ? 'ring-4 ring-yellow-300 ring-offset-2 ring-offset-gray-950' : 'ring-2 ring-gray-800'}`}
+        >
+          <span className="text-lg font-bold text-white select-none">{initials}</span>
+          {muted && (
+            <div className="absolute -bottom-1 -right-1 bg-red-600 rounded-full p-1 border-2 border-gray-950">
+              <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z" />
+              </svg>
+            </div>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-white truncate">{name}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+              route === 'pgm' ? 'bg-red-600 text-white' : 'bg-green-700 text-white'
+            }`}>
+              <span className="w-1.5 h-1.5 rounded-full bg-current" />
+              {isLocal ? 'Host' : route === 'pgm' ? 'On-Air' : 'Cue'}
+            </span>
+            {isSpeaking && !disconnected && <span className="text-[10px] text-yellow-300">Voice active</span>}
+            {disconnected && <span className="text-[10px] text-red-300">Dropped locally</span>}
           </div>
-        )}
+        </div>
       </div>
-      <div className="text-center">
-        <p className="text-sm font-semibold text-white truncate max-w-[90px]">{name}</p>
-        {isLocal && <p className="text-xs text-purple-400">You</p>}
-        {isSpeaking && !isLocal && <p className="text-xs text-green-400">Speaking…</p>}
-      </div>
+
+      {!isLocal && (
+        <div className="mt-3 space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => onRouteChange(participant.identity, 'cue')}
+              className={`px-3 py-2 rounded-lg text-xs font-bold border transition-colors ${
+                route === 'cue' ? 'bg-green-700 border-green-500 text-white' : 'bg-gray-950 border-gray-800 text-gray-400 hover:text-white'
+              }`}
+            >
+              CUE
+            </button>
+            <button
+              type="button"
+              onClick={() => onRouteChange(participant.identity, 'pgm')}
+              className={`px-3 py-2 rounded-lg text-xs font-bold border transition-colors ${
+                route === 'pgm' ? 'bg-red-700 border-red-500 text-white' : 'bg-gray-950 border-gray-800 text-gray-400 hover:text-white'
+              }`}
+            >
+              PGM
+            </button>
+          </div>
+          <label className="block">
+            <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-wide text-gray-500">
+              <span>Gain</span>
+              <span>{Math.round(gain * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={gain}
+              onChange={(e) => onGainChange(participant.identity, Number(e.target.value))}
+              className="w-full accent-red-500"
+            />
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => onMuteToggle(participant.identity)}
+              className={`px-3 py-2 rounded-lg text-xs font-bold transition-colors ${
+                control?.muted ? 'bg-red-700 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+              }`}
+            >
+              {control?.muted ? 'Unmute' : 'Force Mute'}
+            </button>
+            <button
+              type="button"
+              onClick={() => onDisconnect(participant.identity)}
+              className="px-3 py-2 rounded-lg text-xs font-bold bg-gray-950 border border-red-900/70 text-red-300 hover:bg-red-950"
+            >
+              Disconnect
+            </button>
+          </div>
+        </div>
+      )}
+      {isLocal && (
+        <p className="mt-3 text-xs text-gray-500">Mixer send is published as the host return feed.</p>
+      )}
     </div>
   )
 }
@@ -266,8 +365,70 @@ function ConferenceReturnMeter({ audioEngine }) {
   return <AudioLevelMeter analyser={audioEngine?.getConferenceReturnAnalyser?.()} label="Return" />
 }
 
+function BusCanvas({ analyser, label, color, muted = false }) {
+  const canvasRef = useRef(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    const data = analyser ? new Uint8Array(analyser.frequencyBinCount) : null
+    let rafId = 0
+
+    const draw = () => {
+      const width = canvas.width
+      const height = canvas.height
+      ctx.clearRect(0, 0, width, height)
+      ctx.fillStyle = '#030712'
+      ctx.fillRect(0, 0, width, height)
+      ctx.strokeStyle = '#1f2937'
+      ctx.lineWidth = 1
+      for (let y = 24; y < height; y += 24) {
+        ctx.beginPath()
+        ctx.moveTo(0, y)
+        ctx.lineTo(width, y)
+        ctx.stroke()
+      }
+      ctx.fillStyle = '#9ca3af'
+      ctx.font = '12px sans-serif'
+      ctx.fillText(label, 12, 20)
+
+      ctx.strokeStyle = muted ? '#4b5563' : color
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      if (analyser && data && !muted) {
+        analyser.getByteTimeDomainData(data)
+        const slice = width / data.length
+        for (let i = 0; i < data.length; i += 1) {
+          const y = (data[i] / 255) * height
+          const x = i * slice
+          if (i === 0) ctx.moveTo(x, y)
+          else ctx.lineTo(x, y)
+        }
+      } else {
+        ctx.moveTo(0, height / 2)
+        ctx.lineTo(width, height / 2)
+      }
+      ctx.stroke()
+      rafId = requestAnimationFrame(draw)
+    }
+
+    draw()
+    return () => cancelAnimationFrame(rafId)
+  }, [analyser, color, label, muted])
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width="640"
+      height="112"
+      className="h-28 w-full rounded-lg border border-gray-800 bg-gray-950"
+    />
+  )
+}
+
 // ── Participant grid ───────────────────────────────────────────────────────────
-function GroupTab() {
+function GroupTab({ participantControls, onRouteChange, onGainChange, onMuteToggle, onDisconnect }) {
   const { localParticipant } = useLocalParticipant()
   const remoteParticipants = useParticipants()
 
@@ -291,9 +452,18 @@ function GroupTab() {
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 p-2">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 p-4">
       {tiles.map(({ p, isLocal }) => (
-        <ParticipantTile key={p.identity} participant={p} isLocal={isLocal} />
+        <ParticipantTile
+          key={p.identity}
+          participant={p}
+          isLocal={isLocal}
+          control={participantControls[p.identity]}
+          onRouteChange={onRouteChange}
+          onGainChange={onGainChange}
+          onMuteToggle={onMuteToggle}
+          onDisconnect={onDisconnect}
+        />
       ))}
     </div>
   )
@@ -301,7 +471,7 @@ function GroupTab() {
 
 // ── Route remote audio tracks through AudioEngine so CONF can go on air ────────
 // Must be mounted inside <LiveKitRoom> so it can use room hooks.
-function ConferenceAudioBridge() {
+function ConferenceAudioBridge({ participantControls }) {
   const audioEngine = useAudioEngine()
   const room = useRoomContext()
   const trackMapRef = useRef(new Map()) // track.sid → MediaStreamTrack
@@ -319,19 +489,20 @@ function ConferenceAudioBridge() {
       }
     }
 
-    const connect = (track, attempt = 0) => {
+    const connect = (track, publication, participant, attempt = 0) => {
       if (track.kind !== Track.Kind.Audio) return
       const mediaTrack = track.mediaStreamTrack
+      const participantId = participant?.identity || publication?.trackSid || track.sid
       if (mediaTrack) {
         clearRetry(track.sid)
         if (trackMapRef.current.get(track.sid) === mediaTrack) return
-        audioEngine.connectConferenceStream(track.sid, mediaTrack)
+        audioEngine.connectConferenceStream(track.sid, mediaTrack, { participantId })
         trackMapRef.current.set(track.sid, mediaTrack)
         return
       }
       if (attempt >= 12) return
       clearRetry(track.sid)
-      const timerId = setTimeout(() => connect(track, attempt + 1), 250)
+      const timerId = setTimeout(() => connect(track, publication, participant, attempt + 1), 250)
       retryTimersRef.current.set(track.sid, timerId)
     }
 
@@ -345,7 +516,7 @@ function ConferenceAudioBridge() {
     const reconnectExistingTracks = () => {
       for (const participant of room.remoteParticipants.values()) {
         for (const pub of participant.audioTrackPublications.values()) {
-          if (pub.track) connect(pub.track)
+          if (pub.track) connect(pub.track, pub, participant)
         }
       }
     }
@@ -367,6 +538,13 @@ function ConferenceAudioBridge() {
       trackMapRef.current.clear()
     }
   }, [audioEngine, room])
+
+  useEffect(() => {
+    if (!audioEngine) return
+    Object.entries(participantControls || {}).forEach(([participantId, control]) => {
+      audioEngine.setConferenceParticipantControl?.(participantId, control)
+    })
+  }, [audioEngine, participantControls])
 
   return null
 }
@@ -464,9 +642,72 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError, onGo
   const [tab, setTab] = useState('group')
   const participants = useParticipants()
   const audioEngine = useAudioEngine()
+  const room = useRoomContext()
   const [sendMuted, setSendMuted] = useState(false)
   const [outboundStatus, setOutboundStatus] = useState({ status: audioEngine ? 'connecting' : 'mic', message: '' })
   const [conferenceChannelId, setConferenceChannelId] = useState(null)
+  const [passcode, setPasscode] = useState('')
+  const [limit, setLimit] = useState('8')
+  const [participantControls, setParticipantControls] = useState({})
+
+  const secureInviteUrl = useMemo(() => {
+    try {
+      const url = new URL(inviteUrl)
+      if (passcode) url.searchParams.set('pwd', passcode)
+      else url.searchParams.delete('pwd')
+      if (limit) url.searchParams.set('limit', limit)
+      return url.toString()
+    } catch {
+      const params = new URLSearchParams()
+      if (passcode) params.set('pwd', passcode)
+      if (limit) params.set('limit', limit)
+      const query = params.toString()
+      return query ? `${inviteUrl}?${query}` : inviteUrl
+    }
+  }, [inviteUrl, limit, passcode])
+
+  useEffect(() => {
+    setParticipantControls((prev) => {
+      let changed = false
+      const next = { ...prev }
+      participants.forEach((participant) => {
+        if (!participant?.identity || next[participant.identity]) return
+        next[participant.identity] = { route: 'cue', gain: 0.8, muted: false, disconnected: false }
+        changed = true
+      })
+      return changed ? next : prev
+    })
+  }, [participants])
+
+  const updateParticipantControl = useCallback((participantId, patch) => {
+    setParticipantControls((prev) => {
+      const current = prev[participantId] || { route: 'cue', gain: 0.8, muted: false, disconnected: false }
+      const nextControl = { ...current, ...patch }
+      audioEngine?.setConferenceParticipantControl?.(participantId, nextControl)
+      return { ...prev, [participantId]: nextControl }
+    })
+  }, [audioEngine])
+
+  const handleRouteChange = useCallback((participantId, route) => {
+    updateParticipantControl(participantId, { route, disconnected: false })
+  }, [updateParticipantControl])
+
+  const handleGainChange = useCallback((participantId, gain) => {
+    updateParticipantControl(participantId, { gain, disconnected: false })
+  }, [updateParticipantControl])
+
+  const handleMuteToggle = useCallback((participantId) => {
+    const current = participantControls[participantId] || { muted: false }
+    updateParticipantControl(participantId, { muted: !current.muted, disconnected: false })
+  }, [participantControls, updateParticipantControl])
+
+  const handleDisconnect = useCallback((participantId) => {
+    updateParticipantControl(participantId, { muted: true, disconnected: true })
+    const participant = room?.remoteParticipants?.get?.(participantId)
+    participant?.audioTrackPublications?.forEach?.((publication) => {
+      try { publication.setEnabled?.(false) } catch {}
+    })
+  }, [room, updateParticipantControl])
 
   useEffect(() => {
     if (!audioEngine) {
@@ -570,6 +811,33 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError, onGo
             {microphoneError}
           </div>
         )}
+        {tab === 'group' && (
+          <section className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 pb-0">
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-red-300">Program Bus</span>
+                <span className="rounded-full bg-red-700 px-2 py-0.5 text-[10px] font-bold text-white">PGM</span>
+              </div>
+              <BusCanvas
+                analyser={audioEngine?.getConferencePgmAnalyser?.() || audioEngine?.getConferenceAnalyser?.()}
+                label="Live broadcast feed"
+                color="#ef4444"
+                muted={sendMuted}
+              />
+            </div>
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-green-300">Cue Bus</span>
+                <span className="rounded-full bg-green-700 px-2 py-0.5 text-[10px] font-bold text-white">CUE</span>
+              </div>
+              <BusCanvas
+                analyser={audioEngine?.getConferenceCueAnalyser?.()}
+                label="Off-air talkback"
+                color="#22c55e"
+              />
+            </div>
+          </section>
+        )}
         {audioEngine && conferenceChannelId === null && (
           <div className="mx-4 mt-4 border-2 border-amber-500 bg-amber-950 px-4 py-4 text-amber-100 shadow-lg shadow-amber-950/40">
             <div className="flex items-start gap-3">
@@ -591,8 +859,24 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError, onGo
             </div>
           </div>
         )}
-        {tab === 'group' && <GroupTab />}
-        {tab === 'settings' && <SettingsPanel inviteUrl={inviteUrl} />}
+        {tab === 'group' && (
+          <GroupTab
+            participantControls={participantControls}
+            onRouteChange={handleRouteChange}
+            onGainChange={handleGainChange}
+            onMuteToggle={handleMuteToggle}
+            onDisconnect={handleDisconnect}
+          />
+        )}
+        {tab === 'settings' && (
+          <SettingsPanel
+            inviteUrl={secureInviteUrl}
+            passcode={passcode}
+            limit={limit}
+            onPasscodeChange={setPasscode}
+            onLimitChange={setLimit}
+          />
+        )}
       </main>
 
       {/* ConferenceAudioBridge routes remote audio through the AudioEngine mix bus.
@@ -600,7 +884,7 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError, onGo
           For guests (no AudioEngine), fall back to RoomAudioRenderer. */}
       {audioEngine ? (
         <>
-          <ConferenceAudioBridge />
+          <ConferenceAudioBridge participantControls={participantControls} />
           <ConferenceOutboundPublisher onStatusChange={setOutboundStatus} />
         </>
       ) : <RoomAudioRenderer />}
