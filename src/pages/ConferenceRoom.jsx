@@ -688,9 +688,26 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError, onGo
     })
   }, [audioEngine])
 
+  const ensureConferenceReturnOpen = useCallback(() => {
+    audioEngine?.setupConferenceChannel?.()
+    audioEngine?.setConferenceActive?.(true, false, 0.8)
+    audioEngine?.updateConferenceGain?.(0.5)
+    try {
+      const saved = JSON.parse(localStorage.getItem('mixer_conference') || 'null') || {}
+      localStorage.setItem('mixer_conference', JSON.stringify({
+        ...saved,
+        on: true,
+        mute: false,
+        fader: Math.max(saved.fader ?? 0.8, 0.8),
+        gain: saved.gain ?? 0.5,
+      }))
+    } catch {}
+  }, [audioEngine])
+
   const handleRouteChange = useCallback((participantId, route) => {
+    if (route === 'pgm') ensureConferenceReturnOpen()
     updateParticipantControl(participantId, { route, disconnected: false })
-  }, [updateParticipantControl])
+  }, [ensureConferenceReturnOpen, updateParticipantControl])
 
   const handleGainChange = useCallback((participantId, gain) => {
     updateParticipantControl(participantId, { gain, disconnected: false })
