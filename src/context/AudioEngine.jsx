@@ -667,7 +667,7 @@ export function AudioEngineProvider({ children }) {
       cueGainNode.connect(cueBusRef.current)
     }
 
-    const control = conferenceControlsRef.current.get(participantId) || { route: 'cue', gain: 0.8, muted: false }
+    const control = conferenceControlsRef.current.get(participantId) || { route: 'pgm', gain: 0.8, muted: false }
     const entry = { stream, sourceNode, pgmGainNode, cueGainNode, participantId, control }
     confSourcesRef.current.set(sid, entry)
     applyConferenceControl(entry, control)
@@ -778,7 +778,7 @@ export function AudioEngineProvider({ children }) {
 
   const setConferenceParticipantControl = useCallback((participantId, control) => {
     if (!participantId) return
-    const current = conferenceControlsRef.current.get(participantId) || { route: 'cue', gain: 0.8, muted: false }
+    const current = conferenceControlsRef.current.get(participantId) || { route: 'pgm', gain: 0.8, muted: false }
     const next = {
       ...current,
       ...control,

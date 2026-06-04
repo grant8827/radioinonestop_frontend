@@ -427,6 +427,44 @@ function BusCanvas({ analyser, label, color, muted = false }) {
   )
 }
 
+function ConferenceDebugPanel({ room, bridgeStats, outboundStatus, participantControls }) {
+  const remoteCount = room?.remoteParticipants?.size ?? 0
+  const tracks = bridgeStats?.tracks || []
+  const events = bridgeStats?.events || []
+  const controls = Object.values(participantControls || {})
+  const pgmCount = controls.filter((control) => control.route === 'pgm' && !control.muted && !control.disconnected).length
+
+  return (
+    <div className="mx-4 mt-4 rounded-lg border border-gray-800 bg-gray-900 px-3 py-2 text-xs text-gray-400">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span><strong className="text-gray-200">Room:</strong> {room?.state || 'unknown'}</span>
+        <span><strong className="text-gray-200">Remote:</strong> {remoteCount}</span>
+        <span><strong className="text-gray-200">Audio tracks:</strong> {tracks.length}</span>
+        <span><strong className="text-gray-200">PGM open:</strong> {pgmCount}</span>
+        <span><strong className="text-gray-200">Send:</strong> {outboundStatus?.message || outboundStatus?.status || 'unknown'}</span>
+      </div>
+      {tracks.length > 0 && (
+        <div className="mt-2 grid gap-1">
+          {tracks.map((track) => (
+            <div key={track.sid} className="truncate font-mono text-[10px] text-gray-500">
+              {track.participantId} / {track.sid} / {track.readyState || 'unknown'}
+            </div>
+          ))}
+        </div>
+      )}
+      {events.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {events.map((event, idx) => (
+            <span key={`${event}-${idx}`} className="rounded bg-gray-950 px-1.5 py-0.5 text-[10px] text-gray-500">
+              {event}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Participant grid ───────────────────────────────────────────────────────────
 function GroupTab({ participantControls, onRouteChange, onGainChange, onMuteToggle, onDisconnect }) {
   const { localParticipant } = useLocalParticipant()
@@ -471,15 +509,31 @@ function GroupTab({ participantControls, onRouteChange, onGainChange, onMuteTogg
 
 // ── Route remote audio tracks through AudioEngine so CONF can go on air ────────
 // Must be mounted inside <LiveKitRoom> so it can use room hooks.
-function ConferenceAudioBridge({ participantControls }) {
+function ConferenceAudioBridge({ participantControls, onDebug }) {
   const audioEngine = useAudioEngine()
   const room = useRoomContext()
   const trackMapRef = useRef(new Map()) // track.sid → MediaStreamTrack
+  const trackInfoRef = useRef(new Map())
   const retryTimersRef = useRef(new Map()) // track.sid → timeout id
+  const participantControlsRef = useRef(participantControls)
+
+  useEffect(() => {
+    participantControlsRef.current = participantControls
+  }, [participantControls])
+
+  const emitDebug = useCallback((event) => {
+    const stamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    onDebug?.((prev) => ({
+      tracks: Array.from(trackInfoRef.current.values()),
+      lastEvent: event,
+      events: [...(prev?.events || []), `${stamp} ${event}`].slice(-6),
+    }))
+  }, [onDebug])
 
   useEffect(() => {
     if (!audioEngine || !room) return
     audioEngine.resume()
+    emitDebug('bridge mounted')
 
     const clearRetry = (sid) => {
       const timerId = retryTimersRef.current.get(sid)
@@ -497,7 +551,18 @@ function ConferenceAudioBridge({ participantControls }) {
         clearRetry(track.sid)
         if (trackMapRef.current.get(track.sid) === mediaTrack) return
         audioEngine.connectConferenceStream(track.sid, mediaTrack, { participantId })
+        // Immediately apply whatever control the host has set (or pgm default)
+        const control = participantControlsRef.current?.[participantId]
+        if (control) audioEngine.setConferenceParticipantControl?.(participantId, control)
         trackMapRef.current.set(track.sid, mediaTrack)
+        trackInfoRef.current.set(track.sid, {
+          sid: track.sid,
+          participantId,
+          readyState: mediaTrack.readyState,
+          enabled: mediaTrack.enabled,
+          muted: mediaTrack.muted,
+        })
+        emitDebug(`subscribed ${participantId}`)
         return
       }
       if (attempt >= 12) return
@@ -511,6 +576,8 @@ function ConferenceAudioBridge({ participantControls }) {
       clearRetry(track.sid)
       audioEngine.disconnectConferenceStream(track.sid)
       trackMapRef.current.delete(track.sid)
+      trackInfoRef.current.delete(track.sid)
+      emitDebug(`unsubscribed ${track.sid}`)
     }
 
     const reconnectExistingTracks = () => {
@@ -536,8 +603,10 @@ function ConferenceAudioBridge({ participantControls }) {
       retryTimersRef.current.clear()
       audioEngine.disconnectAllConferenceStreams()
       trackMapRef.current.clear()
+      trackInfoRef.current.clear()
+      emitDebug('bridge unmounted')
     }
-  }, [audioEngine, room])
+  }, [audioEngine, emitDebug, room])
 
   useEffect(() => {
     if (!audioEngine) return
@@ -649,6 +718,7 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError, onGo
   const [passcode, setPasscode] = useState('')
   const [limit, setLimit] = useState('8')
   const [participantControls, setParticipantControls] = useState({})
+  const [bridgeStats, setBridgeStats] = useState({ tracks: [], events: [] })
 
   const secureInviteUrl = useMemo(() => {
     try {
@@ -856,6 +926,14 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError, onGo
             </div>
           </section>
         )}
+        {tab === 'group' && (
+          <ConferenceDebugPanel
+            room={room}
+            bridgeStats={bridgeStats}
+            outboundStatus={outboundStatus}
+            participantControls={participantControls}
+          />
+        )}
         {audioEngine && conferenceChannelId === null && (
           <div className="mx-4 mt-4 border-2 border-amber-500 bg-amber-950 px-4 py-4 text-amber-100 shadow-lg shadow-amber-950/40">
             <div className="flex items-start gap-3">
@@ -902,7 +980,7 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError, onGo
           For guests (no AudioEngine), fall back to RoomAudioRenderer. */}
       {audioEngine ? (
         <>
-          <ConferenceAudioBridge participantControls={participantControls} />
+          <ConferenceAudioBridge participantControls={participantControls} onDebug={setBridgeStats} />
           <ConferenceOutboundPublisher onStatusChange={setOutboundStatus} />
         </>
       ) : <RoomAudioRenderer />}
