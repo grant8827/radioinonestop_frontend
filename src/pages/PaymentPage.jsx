@@ -17,7 +17,7 @@ export default function PaymentPage() {
   const [searchParams] = useSearchParams()
   const requestedPlan = (searchParams.get('plan') || 'starter').toLowerCase()
   const requestedBilling = (searchParams.get('billing') || 'monthly').toLowerCase()
-  const requestedProvider = (searchParams.get('provider') || 'paypal').toLowerCase()
+  const requestedProvider = (searchParams.get('provider') || 'stripe').toLowerCase()
   const requestedStatus = (searchParams.get('status') || '').toLowerCase()
   const stripeSessionId = searchParams.get('session_id') || ''
   const planId = PLAN_INFO[requestedPlan] ? requestedPlan : 'starter'
