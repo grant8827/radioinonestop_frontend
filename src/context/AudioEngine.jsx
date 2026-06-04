@@ -663,6 +663,9 @@ export function AudioEngineProvider({ children }) {
       }
     }
     cueGainNode.connect(conferenceCueAnalyserRef.current)
+    if (cueBusRef.current) {
+      cueGainNode.connect(cueBusRef.current)
+    }
 
     const control = conferenceControlsRef.current.get(participantId) || { route: 'cue', gain: 0.8, muted: false }
     const entry = { stream, sourceNode, pgmGainNode, cueGainNode, participantId, control }
@@ -818,7 +821,17 @@ export function AudioEngineProvider({ children }) {
   }, [])
 
   const getConferenceChannelId = useCallback(() => {
-    return conferenceNodesRef.current ? 'dedicated' : confChannelIdRef.current
+    if (conferenceNodesRef.current) {
+      try {
+        const saved = JSON.parse(localStorage.getItem('mixer_conference') || 'null') || {}
+        const on = saved.on ?? true
+        const mute = saved.mute ?? false
+        return (on && !mute) ? 'dedicated' : null
+      } catch {
+        return 'dedicated'
+      }
+    }
+    return confChannelIdRef.current
   }, [])
 
   // ── On-Air mic tracking (shared across NowPlaying + Mixer) ───────────────

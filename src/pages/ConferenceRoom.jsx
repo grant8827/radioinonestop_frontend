@@ -672,16 +672,17 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError, onGo
       const next = { ...prev }
       participants.forEach((participant) => {
         if (!participant?.identity || next[participant.identity]) return
-        next[participant.identity] = { route: 'cue', gain: 0.8, muted: false, disconnected: false }
+        next[participant.identity] = { route: 'pgm', gain: 0.8, muted: false, disconnected: false }
         changed = true
       })
+      if (changed) ensureConferenceReturnOpen()
       return changed ? next : prev
     })
-  }, [participants])
+  }, [participants, ensureConferenceReturnOpen])
 
   const updateParticipantControl = useCallback((participantId, patch) => {
     setParticipantControls((prev) => {
-      const current = prev[participantId] || { route: 'cue', gain: 0.8, muted: false, disconnected: false }
+      const current = prev[participantId] || { route: 'pgm', gain: 0.8, muted: false, disconnected: false }
       const nextControl = { ...current, ...patch }
       audioEngine?.setConferenceParticipantControl?.(participantId, nextControl)
       return { ...prev, [participantId]: nextControl }
