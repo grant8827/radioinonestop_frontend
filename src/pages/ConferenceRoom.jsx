@@ -571,6 +571,17 @@ function ConferenceAudioBridge({ participantControls, onDebug }) {
       retryTimersRef.current.set(track.sid, timerId)
     }
 
+    const ensureAudioPublication = (publication, participant) => {
+      if (!publication) return
+      if (publication.kind && publication.kind !== Track.Kind.Audio) return
+      try { publication.setSubscribed?.(true) } catch {}
+      if (publication.track) {
+        connect(publication.track, publication, participant)
+      } else {
+        emitDebug(`waiting audio ${participant?.identity || publication.trackSid || 'unknown'}`)
+      }
+    }
+
     const disconnect = (track) => {
       if (track.kind !== Track.Kind.Audio) return
       clearRetry(track.sid)
@@ -583,22 +594,26 @@ function ConferenceAudioBridge({ participantControls, onDebug }) {
     const reconnectExistingTracks = () => {
       for (const participant of room.remoteParticipants.values()) {
         for (const pub of participant.audioTrackPublications.values()) {
-          if (pub.track) connect(pub.track, pub, participant)
+          ensureAudioPublication(pub, participant)
         }
       }
     }
 
     // Connect tracks already subscribed before this component mounted
     reconnectExistingTracks()
+    const reconcileId = setInterval(reconnectExistingTracks, 1000)
 
     room.on(RoomEvent.TrackSubscribed, connect)
     room.on(RoomEvent.TrackUnsubscribed, disconnect)
+    room.on(RoomEvent.TrackPublished, ensureAudioPublication)
     room.on(RoomEvent.Reconnected, reconnectExistingTracks)
 
     return () => {
       room.off(RoomEvent.TrackSubscribed, connect)
       room.off(RoomEvent.TrackUnsubscribed, disconnect)
+      room.off(RoomEvent.TrackPublished, ensureAudioPublication)
       room.off(RoomEvent.Reconnected, reconnectExistingTracks)
+      clearInterval(reconcileId)
       retryTimersRef.current.forEach((timerId) => clearTimeout(timerId))
       retryTimersRef.current.clear()
       audioEngine.disconnectAllConferenceStreams()
