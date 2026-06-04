@@ -666,6 +666,22 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError, onGo
     }
   }, [inviteUrl, limit, passcode])
 
+  const ensureConferenceReturnOpen = useCallback(() => {
+    audioEngine?.setupConferenceChannel?.()
+    audioEngine?.setConferenceActive?.(true, false, 0.8)
+    audioEngine?.updateConferenceGain?.(0.5)
+    try {
+      const saved = JSON.parse(localStorage.getItem('mixer_conference') || 'null') || {}
+      localStorage.setItem('mixer_conference', JSON.stringify({
+        ...saved,
+        on: true,
+        mute: false,
+        fader: Math.max(saved.fader ?? 0.8, 0.8),
+        gain: saved.gain ?? 0.5,
+      }))
+    } catch {}
+  }, [audioEngine])
+
   useEffect(() => {
     setParticipantControls((prev) => {
       let changed = false
@@ -687,22 +703,6 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError, onGo
       audioEngine?.setConferenceParticipantControl?.(participantId, nextControl)
       return { ...prev, [participantId]: nextControl }
     })
-  }, [audioEngine])
-
-  const ensureConferenceReturnOpen = useCallback(() => {
-    audioEngine?.setupConferenceChannel?.()
-    audioEngine?.setConferenceActive?.(true, false, 0.8)
-    audioEngine?.updateConferenceGain?.(0.5)
-    try {
-      const saved = JSON.parse(localStorage.getItem('mixer_conference') || 'null') || {}
-      localStorage.setItem('mixer_conference', JSON.stringify({
-        ...saved,
-        on: true,
-        mute: false,
-        fader: Math.max(saved.fader ?? 0.8, 0.8),
-        gain: saved.gain ?? 0.5,
-      }))
-    } catch {}
   }, [audioEngine])
 
   const handleRouteChange = useCallback((participantId, route) => {
