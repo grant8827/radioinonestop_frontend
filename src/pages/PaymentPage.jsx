@@ -24,7 +24,7 @@ export default function PaymentPage() {
   const billingCycle = ['monthly', 'yearly'].includes(requestedBilling) ? requestedBilling : 'monthly'
   const planInfo = PLAN_INFO[planId] || PLAN_INFO.starter
   const planPrice = planInfo[billingCycle] || planInfo.monthly
-  const [provider, setProvider] = useState(requestedProvider === 'stripe' ? 'stripe' : 'paypal')
+  const [provider, setProvider] = useState(requestedProvider === 'paypal' ? 'paypal' : 'stripe')
 
   // PayPal states
   const paypalRef = useRef(null)
@@ -75,6 +75,11 @@ export default function PaymentPage() {
 
   // Load PayPal SDK
   useEffect(() => {
+    if (provider !== 'paypal') {
+      setPaypalLoaded(false)
+      setLoadingPayPal(false)
+      return undefined
+    }
     const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID || 'AU8pGj0hF09PcmBnAskqmFW3TDCP5VC50Sku0vCyup8xqZyTJdb69jx0pdw4iSQNGk0WH1NGV2jU6gSj'
     if (!clientId) return undefined
     const script = document.createElement('script')
@@ -86,13 +91,13 @@ export default function PaymentPage() {
         document.body.removeChild(script)
       }
     }
-    return undefined
-  }, [])
+  }, [provider])
 
   // Fetch PayPal plan ID from backend
   useEffect(() => {
     async function fetchPlanId() {
       if (provider !== 'paypal') {
+        setPaypalPlanId(null)
         setLoadingPayPal(false)
         return
       }
@@ -249,7 +254,7 @@ export default function PaymentPage() {
             </svg>
             <div className="flex-1">
               <p className="text-sm text-blue-200">
-                Choose your payment provider. PayPal may show card checkout without a PayPal account, and Stripe supports cards directly.
+                Stripe is the primary checkout. PayPal remains available as an optional fallback.
               </p>
             </div>
           </div>
@@ -269,32 +274,39 @@ export default function PaymentPage() {
         <div className="bg-white/3 border border-white/10 rounded-xl p-6">
           <h2 className="font-semibold text-sm uppercase tracking-wider text-gray-400 mb-4">Complete Payment</h2>
 
-          <div className="grid grid-cols-2 gap-2 mb-5">
-            <button
-              type="button"
-              onClick={() => setProvider('paypal')}
-              className={`px-3 py-2 rounded-lg text-sm font-semibold transition-colors border ${
-                provider === 'paypal'
-                  ? 'bg-blue-600/20 border-blue-500 text-blue-300'
-                  : 'bg-transparent border-white/15 text-gray-300 hover:text-white'
-              }`}
-            >
-              PayPal
-            </button>
-            <button
-              type="button"
-              onClick={() => setProvider('stripe')}
-              className={`px-3 py-2 rounded-lg text-sm font-semibold transition-colors border ${
-                provider === 'stripe'
-                  ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300'
-                  : 'bg-transparent border-white/15 text-gray-300 hover:text-white'
-              }`}
-            >
-              Stripe
-            </button>
-          </div>
+          {provider === 'stripe' ? (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/10 p-4">
+                <p className="text-sm text-gray-300 text-center">
+                  Pay securely with Stripe using your debit or credit card.
+                </p>
+                <button
+                  type="button"
+                  onClick={startStripeCheckout}
+                  disabled={stripeLoading || stripeVerifying}
+                  className="mt-4 w-full px-4 py-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-semibold transition-colors"
+                >
+                  {stripeVerifying ? 'Finalizing payment...' : stripeLoading ? 'Redirecting to Stripe...' : 'Continue with Stripe'}
+                </button>
+                {requestedProvider === 'stripe' && requestedStatus === 'cancel' && !stripeLoading && !stripeVerifying && (
+                  <p className="text-xs text-amber-300 mt-3 text-center">Stripe checkout was canceled. You can try again anytime.</p>
+                )}
+                <p className="text-xs text-gray-500 text-center mt-4">
+                  Secure payment processed by Stripe
+                </p>
+              </div>
 
-          {provider === 'paypal' && loadingPayPal ? (
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => setProvider('paypal')}
+                  className="text-sm text-gray-400 hover:text-white transition-colors underline underline-offset-4"
+                >
+                  Prefer PayPal instead?
+                </button>
+              </div>
+            </div>
+          ) : loadingPayPal ? (
             <div className="flex flex-col items-center justify-center py-12">
               <svg className="animate-spin w-8 h-8 text-purple-400 mb-3" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -302,34 +314,21 @@ export default function PaymentPage() {
               </svg>
               <p className="text-sm text-gray-400">Loading PayPal...</p>
             </div>
-          ) : provider === 'paypal' ? (
-            <div>
-              <p className="text-sm text-gray-400 mb-4 text-center">
-                Pay with a PayPal account or an eligible credit/debit card.
-              </p>
-              <div ref={paypalRef} className="min-h-[200px]"></div>
-              <p className="text-xs text-gray-500 text-center mt-4">
-                Secure payment processed by PayPal
-              </p>
-            </div>
           ) : (
             <div className="text-center">
               <p className="text-sm text-gray-400 mb-4">
-                Pay securely with Stripe using your debit or credit card.
+                Pay with a PayPal account or an eligible credit/debit card.
               </p>
+              <div ref={paypalRef} className="min-h-[200px]"></div>
               <button
                 type="button"
-                onClick={startStripeCheckout}
-                disabled={stripeLoading || stripeVerifying}
-                className="w-full max-w-xs mx-auto px-4 py-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-semibold transition-colors"
+                onClick={() => setProvider('stripe')}
+                className="mt-3 text-sm text-gray-400 hover:text-white transition-colors underline underline-offset-4"
               >
-                {stripeVerifying ? 'Finalizing payment...' : stripeLoading ? 'Redirecting to Stripe...' : 'Pay with Stripe'}
+                Use Stripe instead
               </button>
-              {requestedProvider === 'stripe' && requestedStatus === 'cancel' && !stripeLoading && !stripeVerifying && (
-                <p className="text-xs text-amber-300 mt-3">Stripe checkout was canceled. You can try again anytime.</p>
-              )}
               <p className="text-xs text-gray-500 text-center mt-4">
-                Secure payment processed by Stripe
+                Secure payment processed by PayPal
               </p>
             </div>
           )}
