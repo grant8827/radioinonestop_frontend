@@ -102,7 +102,7 @@ export default function RegisterPage() {
       if (selectedPlan) {
         navigate(`/payment?plan=${selectedPlan}&billing=${billingCycle}`)
       } else {
-        navigate('/app')
+        navigate('/payment')
       }
     }
   }, [isAuthenticated, selectedPlan, billingCycle, navigate])
@@ -163,7 +163,7 @@ export default function RegisterPage() {
       if (selectedPlan) {
         navigate(`/payment?plan=${selectedPlan}&billing=${billingCycle}`)
       } else {
-        navigate('/app')
+        navigate('/payment')
       }
     } catch {
       setError('Network error — is the server running?')

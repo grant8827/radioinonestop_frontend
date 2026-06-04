@@ -140,6 +140,11 @@ export default function LandingPage() {
   function handleAuthSuccess() {
     setShowLogin(false)
     setShowRegister(false)
+    if (localStorage.getItem('rio_pending_payment') === '1') {
+      localStorage.removeItem('rio_pending_payment')
+      navigate('/payment')
+      return
+    }
     navigate('/app')
   }
 

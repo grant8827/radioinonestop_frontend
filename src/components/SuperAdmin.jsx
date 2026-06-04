@@ -78,6 +78,7 @@ function UsersTab({ token }) {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [editUser, setEditUser] = useState(null)
+  const [actionLoadingId, setActionLoadingId] = useState('')
 
   useEffect(() => {
     loadUsers()
@@ -124,6 +125,34 @@ function UsersTab({ token }) {
     }
   }
 
+  async function handleActionChange(user, action) {
+    if (!action) return
+    setActionLoadingId(user.id)
+
+    const base = {
+      plan: user.plan || 'starter',
+      billingCycle: user.billingCycle || 'monthly',
+      isSuspended: user.isSuspended,
+    }
+
+    // Inactive means suspended and reset to starter/monthly until admin re-activates.
+    if (action === 'activate') {
+      base.isSuspended = false
+    } else if (action === 'suspend') {
+      base.isSuspended = true
+    } else if (action === 'inactive') {
+      base.isSuspended = true
+      base.plan = 'starter'
+      base.billingCycle = 'monthly'
+    }
+
+    try {
+      await handleUpdate(user.id, base)
+    } finally {
+      setActionLoadingId('')
+    }
+  }
+
   if (loading) {
     return <div className="text-center text-gray-400 py-12">Loading users...</div>
   }
@@ -167,12 +196,31 @@ function UsersTab({ token }) {
                   {new Date(user.createdAt).toLocaleDateString()}
                 </td>
                 <td className="px-6 py-4 text-right">
-                  <button
-                    onClick={() => setEditUser(user)}
-                    className="text-sm text-purple-400 hover:text-purple-300"
-                  >
-                    Edit
-                  </button>
+                  <div className="inline-flex items-center gap-2">
+                    <select
+                      defaultValue=""
+                      disabled={actionLoadingId === user.id}
+                      onChange={(e) => {
+                        const action = e.target.value
+                        e.target.value = ''
+                        handleActionChange(user, action)
+                      }}
+                      className="bg-gray-800 border border-gray-700 text-gray-200 text-xs rounded-lg px-2 py-1.5"
+                    >
+                      <option value="" disabled>
+                        {actionLoadingId === user.id ? 'Applying...' : 'Action'}
+                      </option>
+                      <option value="activate">Activate</option>
+                      <option value="suspend">Suspend</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                    <button
+                      onClick={() => setEditUser(user)}
+                      className="text-sm text-purple-400 hover:text-purple-300"
+                    >
+                      Edit
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

@@ -26,7 +26,8 @@ function loadFromStorage() {
       stationName: payload.station_name || '',
       role: payload.role || 'user',
       plan: 'starter', // default until profile loads
-      billingCycle: 'monthly'
+      billingCycle: 'monthly',
+      isSuspended: false,
     } 
   }
 }
@@ -49,7 +50,8 @@ export function AuthProvider({ children }) {
             ...prev.user,
             plan: profile.plan || 'starter',
             billingCycle: profile.billing_cycle || 'monthly',
-            stationName: profile.station_name || prev.user.stationName
+            stationName: profile.station_name || prev.user.stationName,
+            isSuspended: !!profile.is_suspended,
           } : prev.user
         }))
       })
@@ -72,7 +74,8 @@ export function AuthProvider({ children }) {
         stationName: payload.station_name || '',
         role: payload.role || 'user',
         plan: 'starter',
-        billingCycle: 'monthly'
+        billingCycle: 'monthly',
+        isSuspended: false,
       } : null,
     })
   }, [])

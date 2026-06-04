@@ -278,7 +278,7 @@ export default function PaymentPage() {
             <div className="space-y-4">
               <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/10 p-4">
                 <p className="text-sm text-gray-300 text-center">
-                  Pay securely with Stripe using your debit or credit card.
+                  Pay securely with your debit or credit card.
                 </p>
                 <button
                   type="button"
@@ -286,10 +286,10 @@ export default function PaymentPage() {
                   disabled={stripeLoading || stripeVerifying}
                   className="mt-4 w-full px-4 py-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-semibold transition-colors"
                 >
-                  {stripeVerifying ? 'Finalizing payment...' : stripeLoading ? 'Redirecting to Stripe...' : 'Continue with Stripe'}
+                  {stripeVerifying ? 'Finalizing payment...' : stripeLoading ? 'Redirecting to Stripe...' : 'Continue to Checkout'}
                 </button>
                 {requestedProvider === 'stripe' && requestedStatus === 'cancel' && !stripeLoading && !stripeVerifying && (
-                  <p className="text-xs text-amber-300 mt-3 text-center">Stripe checkout was canceled. You can try again anytime.</p>
+                  <p className="text-xs text-amber-300 mt-3 text-center">Checkout was canceled. You can try again anytime.</p>
                 )}
                 <p className="text-xs text-gray-500 text-center mt-4">
                   Secure payment processed by Stripe

@@ -24,8 +24,15 @@ import { AudioEngineProvider } from './context/AudioEngine'
 import { StreamProvider, useStream } from './context/StreamContext'
 
 function ProtectedRoute({ children }) {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
   return isAuthenticated ? children : <Navigate to="/" replace />
+}
+
+function ActiveAccountRoute({ children }) {
+  const { isAuthenticated, user } = useAuth()
+  if (!isAuthenticated) return <Navigate to="/" replace />
+  if (user?.isSuspended) return <Navigate to="/payment" replace />
+  return children
 }
 
 function MainApp() {
@@ -246,13 +253,13 @@ export default function App() {
           <Route
             path="/app"
             element={
-              <ProtectedRoute>
+              <ActiveAccountRoute>
                 <AudioEngineProvider>
                   <StreamProvider>
                     <MainApp />
                   </StreamProvider>
                 </AudioEngineProvider>
-              </ProtectedRoute>
+              </ActiveAccountRoute>
             }
           />
           <Route path="*" element={<Navigate to="/" replace />} />
