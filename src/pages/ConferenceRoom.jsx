@@ -199,7 +199,7 @@ function SettingsPanel({ inviteUrl, passcode, limit, onPasscodeChange, onLimitCh
 }
 
 // ── Single participant tile ──────────────────────────────────────────────────
-function ParticipantTile({ participant, isLocal, control, onRouteChange, onGainChange, onMuteToggle, onDisconnect }) {
+function ParticipantTile({ participant, isLocal, isHost, control, onRouteChange, onGainChange, onMuteToggle, onDisconnect }) {
   const isSpeaking = useIsSpeaking(participant)
   const micEnabled = participant.isMicrophoneEnabled
   const name = participant.name || participant.identity || 'Guest'
@@ -246,7 +246,7 @@ function ParticipantTile({ participant, isLocal, control, onRouteChange, onGainC
         </div>
       </div>
 
-      {!isLocal && (
+      {isHost && !isLocal && (
         <div className="mt-3 space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <button
@@ -466,7 +466,7 @@ function ConferenceDebugPanel({ room, bridgeStats, outboundStatus, participantCo
 }
 
 // ── Participant grid ───────────────────────────────────────────────────────────
-function GroupTab({ participantControls, onRouteChange, onGainChange, onMuteToggle, onDisconnect }) {
+function GroupTab({ isHost, participantControls, onRouteChange, onGainChange, onMuteToggle, onDisconnect }) {
   const { localParticipant } = useLocalParticipant()
   const remoteParticipants = useParticipants()
 
@@ -496,6 +496,7 @@ function GroupTab({ participantControls, onRouteChange, onGainChange, onMuteTogg
           key={p.identity}
           participant={p}
           isLocal={isLocal}
+          isHost={isHost}
           control={participantControls[p.identity]}
           onRouteChange={onRouteChange}
           onGainChange={onGainChange}
@@ -735,6 +736,8 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError, onGo
   const [participantControls, setParticipantControls] = useState({})
   const [bridgeStats, setBridgeStats] = useState({ tracks: [], events: [] })
 
+  const isHost = !!audioEngine
+
   const secureInviteUrl = useMemo(() => {
     try {
       const url = new URL(inviteUrl)
@@ -901,6 +904,7 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError, onGo
             </span>
           )}
         </button>
+        {isHost && (
         <button
           onClick={() => setTab('settings')}
           className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${
@@ -915,6 +919,7 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError, onGo
           </svg>
           Settings
         </button>
+        )}
       </div>
 
       {/* Tab content */}
@@ -924,7 +929,7 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError, onGo
             {microphoneError}
           </div>
         )}
-        {tab === 'group' && (
+        {isHost && tab === 'group' && (
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 pb-0">
             <div>
               <div className="mb-2 flex items-center justify-between">
@@ -951,7 +956,7 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError, onGo
             </div>
           </section>
         )}
-        {tab === 'group' && (
+        {isHost && tab === 'group' && (
           <ConferenceDebugPanel
             room={room}
             bridgeStats={bridgeStats}
@@ -959,7 +964,7 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError, onGo
             participantControls={participantControls}
           />
         )}
-        {audioEngine && conferenceChannelId === null && (
+        {isHost && conferenceChannelId === null && (
           <div className="mx-4 mt-4 border-2 border-amber-500 bg-amber-950 px-4 py-4 text-amber-100 shadow-lg shadow-amber-950/40">
             <div className="flex items-start gap-3">
               <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-500 text-sm font-black text-gray-950">!</div>
@@ -982,6 +987,7 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError, onGo
         )}
         {tab === 'group' && (
           <GroupTab
+            isHost={isHost}
             participantControls={participantControls}
             onRouteChange={handleRouteChange}
             onGainChange={handleGainChange}
