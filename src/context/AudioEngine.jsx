@@ -640,6 +640,11 @@ export function AudioEngineProvider({ children }) {
     if (existing?.cueGainNode) {
       try { existing.cueGainNode.disconnect() } catch {}
     }
+    if (existing?.dummyEl) {
+      existing.dummyEl.pause()
+      existing.dummyEl.srcObject = null
+      existing.dummyEl.remove()
+    }
 
     const participantId = meta.participantId || sid
     const stream = new MediaStream([mediaStreamTrack])
