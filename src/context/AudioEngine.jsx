@@ -643,6 +643,15 @@ export function AudioEngineProvider({ children }) {
 
     const participantId = meta.participantId || sid
     const stream = new MediaStream([mediaStreamTrack])
+
+    // Create a dummy audio element to ensure the remote track is "active" for the Web Audio API.
+    // In many browsers (like Chrome), remote MediaStreamTracks will output silence in 
+    // createMediaStreamSource if not attached to a playing media element.
+    const dummyEl = document.createElement('audio')
+    dummyEl.muted = true
+    dummyEl.srcObject = stream
+    dummyEl.play().catch(() => {})
+
     const ac = getAC()
     const sourceNode = ac.createMediaStreamSource(stream)
     const pgmGainNode = ac.createGain()
@@ -668,7 +677,7 @@ export function AudioEngineProvider({ children }) {
     }
 
     const control = conferenceControlsRef.current.get(participantId) || { route: 'pgm', gain: 0.8, muted: false }
-    const entry = { stream, sourceNode, pgmGainNode, cueGainNode, participantId, control }
+    const entry = { stream, sourceNode, pgmGainNode, cueGainNode, participantId, control, dummyEl }
     confSourcesRef.current.set(sid, entry)
     applyConferenceControl(entry, control)
   }, [applyConferenceControl, getAC])
@@ -680,6 +689,11 @@ export function AudioEngineProvider({ children }) {
     if (entry.sourceNode) { try { entry.sourceNode.disconnect() } catch {} }
     if (entry.pgmGainNode) { try { entry.pgmGainNode.disconnect() } catch {} }
     if (entry.cueGainNode) { try { entry.cueGainNode.disconnect() } catch {} }
+    if (entry.dummyEl) {
+      entry.dummyEl.pause()
+      entry.dummyEl.srcObject = null
+      entry.dummyEl.remove()
+    }
     confSourcesRef.current.delete(sid)
   }, [])
 
@@ -687,12 +701,15 @@ export function AudioEngineProvider({ children }) {
   // The channel assignment belongs to Mixer state; clearing it here makes the UI
   // say "Conference Room" while AudioEngine has no route for incoming callers.
   const disconnectAllConferenceStreams = useCallback(() => {
-    confSourcesRef.current.forEach(({ sourceNode }) => {
-      if (sourceNode) { try { sourceNode.disconnect() } catch {} }
-    })
-    confSourcesRef.current.forEach(({ pgmGainNode, cueGainNode }) => {
-      if (pgmGainNode) { try { pgmGainNode.disconnect() } catch {} }
-      if (cueGainNode) { try { cueGainNode.disconnect() } catch {} }
+    confSourcesRef.current.forEach((entry) => {
+      if (entry.sourceNode) { try { entry.sourceNode.disconnect() } catch {} }
+      if (entry.pgmGainNode) { try { entry.pgmGainNode.disconnect() } catch {} }
+      if (entry.cueGainNode) { try { entry.cueGainNode.disconnect() } catch {} }
+      if (entry.dummyEl) {
+        entry.dummyEl.pause()
+        entry.dummyEl.srcObject = null
+        entry.dummyEl.remove()
+      }
     })
     confSourcesRef.current.clear()
   }, [])

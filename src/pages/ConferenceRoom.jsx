@@ -776,10 +776,15 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError, onGo
         next[participant.identity] = { route: 'pgm', gain: 0.8, muted: false, disconnected: false }
         changed = true
       })
-      if (changed) ensureConferenceReturnOpen()
       return changed ? next : prev
     })
-  }, [participants, ensureConferenceReturnOpen])
+  }, [participants])
+
+  useEffect(() => {
+    if (participants.length > 0) {
+      ensureConferenceReturnOpen()
+    }
+  }, [participants.length, ensureConferenceReturnOpen])
 
   const updateParticipantControl = useCallback((participantId, patch) => {
     setParticipantControls((prev) => {

@@ -109,6 +109,7 @@ export default function LandingPage() {
   const [showRegister, setShowRegister] = useState(false)
   const [selectedStation, setSelectedStation] = useState(null)
   const [stations, setStations] = useState(DEMO_STATIONS)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   // Fetch stations on mount, refresh every 30s
   useEffect(() => {
@@ -134,8 +135,24 @@ export default function LandingPage() {
     return () => clearInterval(id)
   }, [searchParams])
 
-  function openLogin() { setShowRegister(false); setShowLogin(true) }
-  function openRegister() { setShowLogin(false); setShowRegister(true) }
+  function openLogin() { setMobileMenuOpen(false); setShowRegister(false); setShowLogin(true) }
+  function openRegister() { setMobileMenuOpen(false); setShowLogin(false); setShowRegister(true) }
+
+  function goTo(path) {
+    setMobileMenuOpen(false)
+    navigate(path)
+  }
+
+  function scrollToFeatures() {
+    setMobileMenuOpen(false)
+    document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  function handleLogout() {
+    setMobileMenuOpen(false)
+    logout()
+    navigate('/')
+  }
 
   function handleAuthSuccess() {
     setShowLogin(false)
@@ -162,41 +179,38 @@ export default function LandingPage() {
             <span className="font-bold text-sm tracking-tight">Radio In One Stop</span>
           </div>
           
-          <div className="flex items-center gap-1">
+          <div className="hidden md:flex items-center gap-1">
             <button
-              onClick={() => navigate('/stations')}
+              onClick={() => goTo('/stations')}
               className="text-sm font-medium text-gray-300 hover:text-white transition-colors px-4 py-1.5 rounded-lg hover:bg-white/5"
             >
               Stations
             </button>
             <button
-              onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+              onClick={scrollToFeatures}
               className="text-sm font-medium text-gray-300 hover:text-white transition-colors px-4 py-1.5 rounded-lg hover:bg-white/5"
             >
               Features
             </button>
             <button
-              onClick={() => navigate('/pricing')}
+              onClick={() => goTo('/pricing')}
               className="text-sm font-medium text-gray-300 hover:text-white transition-colors px-4 py-1.5 rounded-lg hover:bg-white/5"
             >
               Pricing
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-2">
             {isAuthenticated ? (
               <>
                 <button
-                  onClick={() => navigate('/app')}
+                  onClick={() => goTo('/app')}
                   className="text-sm font-medium text-gray-300 hover:text-white transition-colors px-4 py-1.5 rounded-lg hover:bg-white/5"
                 >
                   Dashboard
                 </button>
                 <button
-                  onClick={() => {
-                    logout()
-                    navigate('/')
-                  }}
+                  onClick={handleLogout}
                   className="px-5 py-2 rounded-lg border border-white/20 hover:bg-white/5 text-white font-semibold text-sm transition-all"
                 >
                   Logout
@@ -205,7 +219,7 @@ export default function LandingPage() {
             ) : (
               <>
                 <button
-                  onClick={() => navigate('/pricing')}
+                  onClick={() => goTo('/pricing')}
                   className="px-5 py-2 rounded-lg bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold text-sm transition-all shadow-lg shadow-purple-900/30 hover:shadow-purple-900/50"
                 >
                   Start Broadcasting
@@ -219,7 +233,85 @@ export default function LandingPage() {
               </>
             )}
           </div>
+
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((open) => !open)}
+            className="md:hidden inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 text-gray-300 transition-colors hover:border-white/20 hover:bg-white/5 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-400"
+            aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="landing-mobile-menu"
+          >
+            {mobileMenuOpen ? (
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M4 12h16M4 17h16" />
+              </svg>
+            )}
+          </button>
         </div>
+
+        {mobileMenuOpen && (
+          <div id="landing-mobile-menu" className="md:hidden border-t border-white/5 bg-[#09090f]/95 px-4 py-4 shadow-2xl shadow-black/30">
+            <div className="mx-auto flex max-w-6xl flex-col gap-2">
+              <button
+                onClick={() => goTo('/stations')}
+                className="w-full rounded-lg px-3 py-3 text-left text-sm font-semibold text-gray-300 transition-colors hover:bg-white/5 hover:text-white"
+              >
+                Stations
+              </button>
+              <button
+                onClick={scrollToFeatures}
+                className="w-full rounded-lg px-3 py-3 text-left text-sm font-semibold text-gray-300 transition-colors hover:bg-white/5 hover:text-white"
+              >
+                Features
+              </button>
+              <button
+                onClick={() => goTo('/pricing')}
+                className="w-full rounded-lg px-3 py-3 text-left text-sm font-semibold text-gray-300 transition-colors hover:bg-white/5 hover:text-white"
+              >
+                Pricing
+              </button>
+
+              <div className="mt-2 border-t border-white/5 pt-3">
+                {isAuthenticated ? (
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => goTo('/app')}
+                      className="w-full rounded-lg px-3 py-3 text-left text-sm font-semibold text-gray-300 transition-colors hover:bg-white/5 hover:text-white"
+                    >
+                      Dashboard
+                    </button>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full rounded-lg border border-white/20 px-3 py-3 text-left text-sm font-semibold text-white transition-colors hover:bg-white/5"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => goTo('/pricing')}
+                      className="w-full rounded-lg bg-linear-to-r from-purple-600 to-blue-600 px-3 py-3 text-left text-sm font-semibold text-white shadow-lg shadow-purple-900/30 transition-all hover:from-purple-500 hover:to-blue-500 hover:shadow-purple-900/50"
+                    >
+                      Start Broadcasting
+                    </button>
+                    <button
+                      onClick={openLogin}
+                      className="w-full rounded-lg px-3 py-3 text-left text-sm font-semibold text-gray-300 transition-colors hover:bg-white/5 hover:text-white"
+                    >
+                      Sign In
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* ── Hero ── */}
@@ -256,7 +348,7 @@ export default function LandingPage() {
               Sign In →
             </button>
             <button
-              onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+              onClick={scrollToFeatures}
               className="px-7 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white font-semibold text-sm transition-all border border-white/10 hover:border-white/20"
             >
               Explore Features
