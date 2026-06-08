@@ -303,7 +303,7 @@ function ParticipantTile({ participant, isLocal, isHost, control, onRouteChange,
           </div>
         </div>
       )}
-      {isLocal && (
+      {isHost && isLocal && (
         <p className="mt-3 text-xs text-gray-500">Mixer send is published as the host return feed.</p>
       )}
     </div>
