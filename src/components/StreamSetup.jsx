@@ -4,6 +4,7 @@ import { useAudioEngine } from '../context/AudioEngine'
 import { useStream } from '../context/StreamContext'
 import ListenersPage from './ListenersPage'
 import UpgradeModal from './UpgradeModal'
+import StudioCompositor from './StudioCompositor'
 
 // Channel limits per plan
 const MAX_CHANNELS = {

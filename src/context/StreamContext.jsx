@@ -146,7 +146,7 @@ export function StreamProvider({ children }) {
       if (providedStream) {
         displayStream = providedStream
       } else {
-        // Capture screen/window
+        // Default to screen capture if nothing provided
         displayStream = await navigator.mediaDevices.getDisplayMedia({
           video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
           audio: false,
