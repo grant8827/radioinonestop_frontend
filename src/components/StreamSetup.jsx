@@ -2002,21 +2002,16 @@ function ChannelTab({ host, audioKey, isSuspended = false }) {
 
   const selectedPlatform = SOCIAL_PLATFORMS.find((p) => p.id === formPlatform) || SOCIAL_PLATFORMS[0]
 
-  // Video go live — passes the camera stream when available so VideoPreview's camera feed is used;
-  // falls back to screen-share capture (same as the radio page's Go Live Video button)
-  function handleVideoGoLive(cameraStream) {
-    startVideo(audioKey, cameraStream || null)
-  }
-  function handleVideoStop() {
-    stopVideo()
-  }
-
   return (
     <div className="space-y-6">
 
       {/* ── Video Preview — mirrored with radio page's Go Live Video button via shared StreamContext ── */}
       {maxChannels > 0 ? (
-        <VideoPreview isLive={videoStatus === 'live'} liveStatus={videoStatus} onGoLive={handleVideoGoLive} onStop={handleVideoStop} isSuspended={isSuspended} />
+        <StudioCompositor
+          isLive={videoStatus === 'live'}
+          videoKey={audioKey}
+          isSuspended={isSuspended}
+        />
       ) : (
         // Locked video preview for plans without video streaming
         <div className="bg-black border border-gray-800 rounded-xl overflow-hidden relative">
