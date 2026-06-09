@@ -14,6 +14,14 @@ export default function StudioCompositor({ isLive, videoKey, isSuspended }) {
   ])
   const [selectedId, setSelectedId] = useState('background')
 
+  // --- New state for scene transitions ---
+  const [transitioning, setTransitioning] = useState(false)
+  const [transitionStartTime, setTransitionStartTime] = useState(0)
+  const [transitionDuration, setTransitionDuration] = useState(500) // milliseconds
+  const [oldSceneLayers, setOldSceneLayers] = useState(null)
+  const [newSceneLayers, setNewSceneLayers] = useState(null)
+  // --- End new state ---
+
   // Setup source for a layer
   const initLayerSource = async (layer) => {
     if (sourcesRef.current[layer.id]) return
@@ -86,10 +94,9 @@ export default function StudioCompositor({ isLive, videoKey, isSuspended }) {
     setLayers(prev => prev.map(l => l.id === selectedId ? { ...l, ...patch } : l))
   }
 
-  const render = useCallback(() => {
-    const canvas = canvasRef.current
+  // --- New function to draw a set of layers with a given global opacity ---
+  const drawLayers = useCallback((ctx, layerSet, globalOpacity) => {
     if (!canvas) return
-    const ctx = canvas.getContext('2d')
     const { width, height } = canvas
 
     ctx.clearRect(0, 0, width, height)
@@ -114,6 +121,40 @@ export default function StudioCompositor({ isLive, videoKey, isSuspended }) {
         ctx.fillText(layer.text, layer.x + 20, layer.y + height - 40)
       }
     })
+  }, [])
+
+  const render = useCallback(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    const { width, height } = canvas
+
+    ctx.clearRect(0, 0, width, height)
+
+    if (transitioning && oldSceneLayers && newSceneLayers) {
+      const elapsed = performance.now() - transitionStartTime
+      let progress = elapsed / transitionDuration
+      
+      if (progress >= 1) {
+        // Transition finished
+        setTransitioning(false)
+        setLayers(newSceneLayers) // Set the new layers as current
+        setOldSceneLayers(null)
+        setNewSceneLayers(null)
+        // Re-render immediately with new layers
+        requestRef.current = requestAnimationFrame(render)
+        return
+      }
+
+      // Draw old layers fading out
+      drawLayers(ctx, oldSceneLayers, 1 - progress)
+      // Draw new layers fading in
+      drawLayers(ctx, newSceneLayers, progress)
+
+    } else {
+      // No transition, draw current layers
+      drawLayers(ctx, layers, 1)
+    }
 
     requestRef.current = requestAnimationFrame(render)
   }, [layers])
@@ -127,6 +168,21 @@ export default function StudioCompositor({ isLive, videoKey, isSuspended }) {
     if (!canvasRef.current) return
     const stream = canvasRef.current.captureStream(30)
     startVideo(videoKey, stream)
+  }
+
+  // --- New function to initiate a scene transition ---
+  const startSceneTransition = (targetLayers) => {
+    setTransitioning(true)
+    setTransitionStartTime(performance.now())
+    setOldSceneLayers(layers) // Capture current layers
+    setNewSceneLayers(targetLayers) // Set target layers
+    // The render loop will handle the animation and final state update
+  }
+
+  // --- Example: A simple button to load a "preset" with a fade ---
+  const loadExamplePreset = () => {
+    const examplePresetLayers = [{ id: 'background', type: 'color', color: '#1a1a1a', opacity: 1, z: 0, visible: true }, { id: 'text_preset', type: 'text', text: 'Live Broadcast!', color: '#ffcc00', fontSize: 60, x: 100, y: 100, scale: 1, opacity: 1, visible: true, z: 1 }]
+    startSceneTransition(examplePresetLayers)
   }
 
   const activeLayer = layers.find(l => l.id === selectedId)
@@ -174,6 +230,17 @@ export default function StudioCompositor({ isLive, videoKey, isSuspended }) {
             Add Text Overlay
           </button>
 
+          {/* --- New button to trigger a preset transition --- */}
+          <button
+            onClick={loadExamplePreset}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-800 hover:bg-blue-700 rounded-xl text-xs font-bold transition-all"
+            disabled={transitioning}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.5 9.5V4m0 0h5M7.5 18.5v.5m0 0h.5m-.5 0a8.001 8.001 0 0015.356-2A8.001 8.001 0 0018.5 13H13m-1.5 0v5m0 0h5" /></svg>
+            Load Preset (Fade)
+          </button>
+          {/* --- End new button --- */}
+
           <div className="ml-auto flex items-center gap-2">
             {videoStatus === 'live' ? (
               <button
@@ -185,7 +252,7 @@ export default function StudioCompositor({ isLive, videoKey, isSuspended }) {
             ) : (
               <button
                 onClick={handleGoLive}
-                disabled={isSuspended}
+                disabled={isSuspended || transitioning} // Disable during transition
                 className="px-6 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-purple-900/40"
               >
                 Go Live Studio
