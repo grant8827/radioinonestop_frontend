@@ -14,7 +14,7 @@ const T = {
 }
 
 // ─── Arc-track Knob ──────────────────────────────────────────────────────────
-function Knob({ value, onChange, size = 44, color = '#38bdf8', label }) {
+function Knob({ value, onChange, size = 44, color = '#38bdf8', label, title }) {
   const dragRef = useRef(null)
   const onPointerDown = (e) => {
     e.preventDefault()
@@ -42,7 +42,7 @@ function Knob({ value, onChange, size = 44, color = '#38bdf8', label }) {
   const [mx2, my2] = [cx + capR * 0.88 * Math.cos(tickAngle), cy + capR * 0.88 * Math.sin(tickAngle)]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, userSelect: 'none' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, userSelect: 'none' }} title={title || label}>
       {label && (
         <span style={{ fontSize: 9, fontWeight: 700, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           {label}
@@ -90,7 +90,7 @@ function Knob({ value, onChange, size = 44, color = '#38bdf8', label }) {
 }
 
 // ─── Vertical fader ───────────────────────────────────────────────────────────
-function VFader({ value, onChange, height = 140, color = '#e2e8f0', label }) {
+function VFader({ value, onChange, height = 140, color = '#e2e8f0', label, title }) {
   const trackRef = useRef(null)
   const dragRef  = useRef(null)
   const getVal = (clientY) => {
@@ -111,7 +111,7 @@ function VFader({ value, onChange, height = 140, color = '#e2e8f0', label }) {
   const capBottom = 8 + value * travel - capH / 2
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, userSelect: 'none' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, userSelect: 'none' }} title={title || label}>
       {label && (
         <span style={{ fontSize: 9, fontWeight: 700, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           {label}
@@ -217,9 +217,9 @@ function StereoVu({ levelL = 0, levelR = 0, active = true, segments = 26, label 
 }
 
 // ─── Pill toggle button ───────────────────────────────────────────────────────
-function Pill({ on, onToggle, label, color = '#22c55e', width = '100%' }) {
+function Pill({ on, onToggle, label, color = '#22c55e', width = '100%', title }) {
   return (
-    <button onClick={onToggle} style={{
+    <button onClick={onToggle} title={title || label} style={{
       width,
       padding: '4px 0',
       fontSize: 9,
@@ -612,6 +612,7 @@ function ChannelStrip({ ch, onUpdate, level = 0 }) {
         <button
           ref={gearRef}
           onClick={() => setSettingsOpen(v => !v)}
+        title="Channel Settings"
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
             width: '100%', padding: '4px 0', borderRadius: 6,
@@ -664,25 +665,25 @@ function ChannelStrip({ ch, onUpdate, level = 0 }) {
         border: `1px solid ${T.borderFaint}`,
       }}>
         <SectionLabel color={T.faint}>EQ</SectionLabel>
-        <Knob value={ch.hi}  onChange={(v) => onUpdate('hi', v)}  size={28} color="#fbbf24" label="Hi"  />
-        <Knob value={ch.mid} onChange={(v) => onUpdate('mid', v)} size={28} color="#c084fc" label="Mid" />
-        <Knob value={ch.lo}  onChange={(v) => onUpdate('lo', v)}  size={28} color="#34d399" label="Lo"  />
+        <Knob value={ch.hi}  onChange={(v) => onUpdate('hi', v)}  size={28} color="#fbbf24" label="Hi" title="High EQ" />
+        <Knob value={ch.mid} onChange={(v) => onUpdate('mid', v)} size={28} color="#c084fc" label="Mid" title="Mid EQ" />
+        <Knob value={ch.lo}  onChange={(v) => onUpdate('lo', v)}  size={28} color="#34d399" label="Lo" title="Low EQ" />
       </div>
 
-      <Knob value={ch.aux} onChange={(v) => onUpdate('aux', v)} size={26} color="#fb923c" label="Aux" />
-      <Knob value={ch.pan} onChange={(v) => onUpdate('pan', v)} size={26} color="#94a3b8" label="Pan" />
+      <Knob value={ch.aux} onChange={(v) => onUpdate('aux', v)} size={26} color="#fb923c" label="Aux" title="Auxiliary Send" />
+      <Knob value={ch.pan} onChange={(v) => onUpdate('pan', v)} size={26} color="#94a3b8" label="Pan" title="Panning (Left/Right)" />
 
       {/* VU */}
       <VuMeter level={level} segments={22} width={8} active={ch.on && !ch.mute} />
 
       {/* Fader */}
-      <VFader value={ch.fader} onChange={(v) => onUpdate('fader', v)} height={130} color={color} />
+      <VFader value={ch.fader} onChange={(v) => onUpdate('fader', v)} height={130} color={color} title={`${ch.label} Fader`} />
 
       {/* Buttons */}
       <div style={{ display: 'flex', gap: 4, width: '100%' }}>
-        <Pill on={ch.pfl}  onToggle={() => onUpdate('pfl', !ch.pfl)}   label="PFL"  color="#f59e0b" width="33%" />
-        <Pill on={ch.mute} onToggle={() => onUpdate('mute', !ch.mute)} label="M"    color="#ef4444" width="33%" />
-        <Pill on={ch.on}   onToggle={() => onUpdate('on', !ch.on)}     label="ON"   color="#22c55e" width="33%" />
+        <Pill on={ch.pfl}  onToggle={() => onUpdate('pfl', !ch.pfl)}   label="PFL"  color="#f59e0b" width="33%" title="Pre-Fader Listen" />
+        <Pill on={ch.mute} onToggle={() => onUpdate('mute', !ch.mute)} label="M"    color="#ef4444" width="33%" title="Mute Channel" />
+        <Pill on={ch.on}   onToggle={() => onUpdate('on', !ch.on)}     label="ON"   color="#22c55e" width="33%" title="Channel On" />
       </div>
     </div>
   )
@@ -724,23 +725,23 @@ function MasterSection({ master, onUpdate, vuL = 0, vuR = 0, onRecToggle, record
 
       {/* Master fader */}
       <VFader value={master.fader} onChange={(v) => onUpdate('fader', v)}
-        height={150} color="#e2e8f0" label="Master" />
+        height={150} color="#e2e8f0" label="Master" title="Master Volume Fader" />
 
       <Divider />
 
       {/* Monitor / headphone knobs */}
       <SectionLabel>Monitor</SectionLabel>
-      <Knob value={master.monitor} onChange={(v) => onUpdate('monitor', v)} size={36} color="#d1d5db" label="Mon"   />
-      <Knob value={master.booth}   onChange={(v) => onUpdate('booth', v)}   size={30} color="#818cf8" label="HDPH"  />
-      <Knob value={master.phones}  onChange={(v) => onUpdate('phones', v)}  size={30} color="#f97316" label="CUE"   />
+      <Knob value={master.monitor} onChange={(v) => onUpdate('monitor', v)} size={36} color="#d1d5db" label="Mon" title="Monitor Volume" />
+      <Knob value={master.booth}   onChange={(v) => onUpdate('booth', v)}   size={30} color="#818cf8" label="HDPH" title="Headphones Volume" />
+      <Knob value={master.phones}  onChange={(v) => onUpdate('phones', v)}  size={30} color="#f97316" label="CUE" title="Cue/Master Mix (Headphones)" />
 
       <Divider />
 
       {/* AUX returns */}
       <SectionLabel>AUX Ret</SectionLabel>
       <div style={{ display: 'flex', gap: 10 }}>
-        <Knob value={master.aux1} onChange={(v) => onUpdate('aux1', v)} size={28} color="#fb923c" label="A1" />
-        <Knob value={master.aux2} onChange={(v) => onUpdate('aux2', v)} size={28} color="#fb923c" label="A2" />
+        <Knob value={master.aux1} onChange={(v) => onUpdate('aux1', v)} size={28} color="#fb923c" label="A1" title="Aux 1 Return" />
+        <Knob value={master.aux2} onChange={(v) => onUpdate('aux2', v)} size={28} color="#fb923c" label="A2" title="Aux 2 Return" />
       </div>
 
       <Divider />
@@ -754,7 +755,7 @@ function MasterSection({ master, onUpdate, vuL = 0, vuR = 0, onRecToggle, record
             onToggle={() => onUpdate('fx', master.fx.includes(lbl)
               ? master.fx.filter(x => x !== lbl)
               : [...master.fx, lbl])}
-            label={lbl} color="#38bdf8" width="33%"
+            label={lbl} color="#38bdf8" width="33%" title={`Toggle ${lbl}`}
           />
         ))}
       </div>
@@ -762,7 +763,7 @@ function MasterSection({ master, onUpdate, vuL = 0, vuR = 0, onRecToggle, record
       <Divider />
 
       {/* REC + ON AIR */}
-      <Pill on={recording} onToggle={onRecToggle} label="● Rec" color="#ef4444" />
+      <Pill on={recording} onToggle={onRecToggle} label="● Rec" color="#ef4444" title={recording ? "Stop Recording" : "Start Recording"} />
       {!recDirName && !recording && (
         <div style={{ fontSize: 8, color: '#f59e0b', textAlign: 'center', lineHeight: 1.4, padding: '0 2px' }}>
           No save location —{' '}
@@ -772,7 +773,7 @@ function MasterSection({ master, onUpdate, vuL = 0, vuR = 0, onRecToggle, record
           </span>
         </div>
       )}
-      <button onClick={() => onUpdate('onAir', !master.onAir)} style={{
+      <button onClick={() => onUpdate('onAir', !master.onAir)} title={master.onAir ? "Take Off Air" : "Go On Air"} style={{
         width: '100%', padding: '8px 0', borderRadius: 10, fontSize: 11,
         fontWeight: 900, letterSpacing: '0.1em', textTransform: 'uppercase',
         background: master.onAir
@@ -880,6 +881,7 @@ function ConferenceStrip({ conf, onUpdate, onOpenConference, level = 0 }) {
 
       {/* Open button */}
       <button onClick={() => onOpenConference?.()}
+        title="Open Conference Room"
         style={{
           width: '100%', padding: '4px 0', borderRadius: 6, fontSize: 8, fontWeight: 700,
           textTransform: 'uppercase', letterSpacing: '0.06em',
@@ -889,13 +891,13 @@ function ConferenceStrip({ conf, onUpdate, onOpenConference, level = 0 }) {
         Open
       </button>
 
-      <Knob value={conf.gain} onChange={(v) => onUpdate('gain', v)} size={32} color={color} label="Gain" />
+      <Knob value={conf.gain} onChange={(v) => onUpdate('gain', v)} size={32} color={color} label="Gain" title="Conference Gain" />
       <VuMeter level={level} segments={22} width={8} active={conf.on && !conf.mute} />
-      <VFader value={conf.fader} onChange={(v) => onUpdate('fader', v)} height={130} color={color} />
+      <VFader value={conf.fader} onChange={(v) => onUpdate('fader', v)} height={130} color={color} title="Conference Fader" />
 
       <div style={{ display: 'flex', gap: 4, width: '100%' }}>
-        <Pill on={conf.mute} onToggle={() => onUpdate('mute', !conf.mute)} label="M" color="#ef4444" width="50%" />
-        <Pill on={conf.on}   onToggle={() => onUpdate('on',   !conf.on)}   label="ON" color="#22c55e" width="50%" />
+        <Pill on={conf.mute} onToggle={() => onUpdate('mute', !conf.mute)} label="M" color="#ef4444" width="50%" title="Mute Conference" />
+        <Pill on={conf.on}   onToggle={() => onUpdate('on',   !conf.on)}   label="ON" color="#22c55e" width="50%" title="Conference On" />
       </div>
     </div>
   )

@@ -828,13 +828,20 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
         } catch {}
       }
 
-      ws.onerror = () => { addLog('WebSocket error'); setStatusBoth('error'); doCleanup() }
+      ws.onerror = () => { 
+        // We rely on ws.onclose to handle the reconnect loop smoothly
+      }
 
       ws.onclose = () => {
         if (statusRef.current === 'live' || statusRef.current === 'connecting') {
-          addLog('Connection closed unexpectedly')
-          setStatusBoth('stopped')
+          addLog('Connection lost. Reconnecting in 3s...')
+          setStatusBoth('reconnecting')
           doCleanup()
+          setTimeout(() => {
+            if (statusRef.current === 'reconnecting') {
+              goLive()
+            }
+          }, 3000)
         }
       }
     } catch (err) {
@@ -855,10 +862,10 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
   }
 
   const isLive = status === 'live'
-  const isBusy = status === 'requesting' || status === 'connecting'
+  const isBusy = status === 'requesting' || status === 'connecting' || status === 'reconnecting'
   const canStart = ['idle', 'stopped', 'error'].includes(status)
 
-  const statusLabel = { idle: 'IDLE', requesting: 'STARTING', connecting: 'CONNECTING', live: 'LIVE', stopped: 'STOPPED', error: 'ERROR' }[status] || 'IDLE'
+  const statusLabel = { idle: 'IDLE', requesting: 'STARTING', connecting: 'CONNECTING', reconnecting: 'RECONNECTING', live: 'LIVE', stopped: 'STOPPED', error: 'ERROR' }[status] || 'IDLE'
   const statusCls = isLive
     ? 'text-orange-400 bg-orange-900/30 border-orange-700/40'
     : isBusy ? 'text-yellow-400 bg-yellow-900/30 border-yellow-700/40'

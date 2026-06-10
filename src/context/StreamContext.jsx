@@ -91,11 +91,18 @@ export function StreamProvider({ children }) {
         } catch {}
       }
 
-      ws.onerror = () => { setRadioStatusBoth('error'); radioCleanup() }
+      ws.onerror = () => { 
+        // We rely on ws.onclose to handle the reconnect loop smoothly
+      }
       ws.onclose = () => {
         if (radioStatusRef.current === 'live' || radioStatusRef.current === 'connecting') {
-          setRadioStatusBoth('stopped')
+          setRadioStatusBoth('reconnecting')
           radioCleanup()
+          setTimeout(() => {
+            if (radioStatusRef.current === 'reconnecting') {
+              startRadio()
+            }
+          }, 3000)
         }
       }
     } catch {

@@ -6,6 +6,7 @@ export default function StudioCompositor({ isLive, videoKey, isSuspended }) {
   const canvasRef = useRef(null)
   const requestRef = useRef()
   const sourcesRef = useRef({}) // id -> { element, type, stream? }
+  const fileInputRef = useRef(null)
   const audioEngine = useAudioEngine()
   const { startVideo, stopVideo, videoStatus } = useStream()
 
@@ -29,14 +30,18 @@ export default function StudioCompositor({ isLive, videoKey, isSuspended }) {
     if (layer.type === 'camera') {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
       const video = document.createElement('video')
+      video.muted = true
+      video.playsInline = true
       video.srcObject = stream
-      video.play()
+      video.play().catch(e => console.error('Camera play error:', e))
       sourcesRef.current[layer.id] = { element: video, type: 'video', stream }
     } else if (layer.type === 'screen') {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
       const video = document.createElement('video')
+      video.muted = true
+      video.playsInline = true
       video.srcObject = stream
-      video.play()
+      video.play().catch(e => console.error('Screen play error:', e))
       sourcesRef.current[layer.id] = { element: video, type: 'video', stream }
     }
   }
@@ -74,6 +79,9 @@ export default function StudioCompositor({ isLive, videoKey, isSuspended }) {
     if (source?.stream) {
       source.stream.getTracks().forEach(t => t.stop())
     }
+    if (source?.type === 'image' && source.element) {
+      URL.revokeObjectURL(source.element.src) // Prevent memory leaks from old objects
+    }
     delete sourcesRef.current[id]
     setLayers(prev => prev.filter(l => l.id !== id))
     setSelectedId('background')
@@ -94,16 +102,33 @@ export default function StudioCompositor({ isLive, videoKey, isSuspended }) {
     setLayers(prev => prev.map(l => l.id === selectedId ? { ...l, ...patch } : l))
   }
 
+  const handleImageUpload = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      const id = `image_${Date.now()}`
+      sourcesRef.current[id] = { element: img, type: 'image' }
+      setLayers(prev => [...prev, {
+        id, type: 'image',
+        x: 0, y: 0, scale: 1, opacity: 1, visible: true, z: prev.length
+      }])
+      setSelectedId(id)
+    }
+    img.src = url
+    e.target.value = ''
+  }
+
   // --- New function to draw a set of layers with a given global opacity ---
   const drawLayers = useCallback((ctx, layerSet, globalOpacity) => {
+    const canvas = canvasRef.current
     if (!canvas) return
     const { width, height } = canvas
 
-    ctx.clearRect(0, 0, width, height)
-
-    layers.forEach(layer => {
+    layerSet.forEach(layer => {
       if (!layer.visible) return
-      ctx.globalAlpha = layer.opacity
+      ctx.globalAlpha = layer.opacity * globalOpacity
 
       if (layer.type === 'color') {
         ctx.fillStyle = layer.color
@@ -115,10 +140,16 @@ export default function StudioCompositor({ isLive, videoKey, isSuspended }) {
           const sh = source.element.videoHeight
           ctx.drawImage(source.element, layer.x, layer.y, sw * layer.scale, sh * layer.scale)
         }
+      } else if (layer.type === 'image') {
+        const source = sourcesRef.current[layer.id]
+        if (source?.element) {
+          ctx.drawImage(source.element, layer.x, layer.y, source.element.width * layer.scale, source.element.height * layer.scale)
+        }
       } else if (layer.type === 'text') {
-        ctx.font = `bold ${layer.fontSize}px Inter, sans-serif`
-        ctx.fillStyle = layer.color
-        ctx.fillText(layer.text, layer.x + 20, layer.y + height - 40)
+        ctx.font = `bold ${layer.fontSize * layer.scale}px Inter, sans-serif`
+        ctx.fillStyle = layer.color || '#ffffff'
+        ctx.textBaseline = 'top'
+        ctx.fillText(layer.text, layer.x, layer.y)
       }
     })
   }, [])
@@ -229,6 +260,15 @@ export default function StudioCompositor({ isLive, videoKey, isSuspended }) {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14" /></svg>
             Add Text Overlay
           </button>
+
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-xs font-bold transition-all"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            Add Image
+          </button>
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
 
           {/* --- New button to trigger a preset transition --- */}
           <button
@@ -342,7 +382,7 @@ export default function StudioCompositor({ isLive, videoKey, isSuspended }) {
                   <div>
                     <label className="text-[10px] font-bold text-gray-500 uppercase block mb-2">Scale ({activeLayer.scale})</label>
                     <input
-                      type="range" min="0.1" max="2" step="0.05"
+                      type="range" min="0.1" max="5" step="0.05"
                       value={activeLayer.scale}
                       onChange={(e) => updateLayer({ scale: parseFloat(e.target.value) })}
                       className="w-full accent-purple-500"
@@ -361,19 +401,21 @@ export default function StudioCompositor({ isLive, videoKey, isSuspended }) {
                 />
               </div>
 
-              {activeLayer.type === 'color' && (
+              {(activeLayer.type === 'color' || activeLayer.type === 'text') && (
                 <div>
-                  <label className="text-[10px] font-bold text-gray-500 uppercase block mb-2">Hex Color</label>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase block mb-2">
+                    {activeLayer.type === 'text' ? 'Text Color' : 'Hex Color'}
+                  </label>
                   <div className="flex gap-2">
                     <input
                       type="color"
-                      value={activeLayer.color}
+                      value={activeLayer.color || '#ffffff'}
                       onChange={(e) => updateLayer({ color: e.target.value })}
                       className="w-10 h-10 rounded bg-transparent cursor-pointer"
                     />
                     <input
                       type="text"
-                      value={activeLayer.color}
+                      value={activeLayer.color || '#ffffff'}
                       onChange={(e) => updateLayer({ color: e.target.value })}
                       className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white font-mono"
                     />
