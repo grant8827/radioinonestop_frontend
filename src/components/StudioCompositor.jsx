@@ -411,13 +411,13 @@ export default function StudioCompositor({ isLive, videoKey, isSuspended }) {
                       type="color"
                       value={activeLayer.color || '#ffffff'}
                       onChange={(e) => updateLayer({ color: e.target.value })}
-                      className="w-10 h-10 rounded bg-transparent cursor-pointer"
+                      className="h-10 flex-1 rounded bg-transparent cursor-pointer"
                     />
                     <input
                       type="text"
                       value={activeLayer.color || '#ffffff'}
                       onChange={(e) => updateLayer({ color: e.target.value })}
-                      className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white font-mono"
+                      className="w-28 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white font-mono"
                     />
                   </div>
                 </div>
