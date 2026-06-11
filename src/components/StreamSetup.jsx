@@ -1832,8 +1832,7 @@ function VideoPreview({ isLive, liveStatus, onGoLive, onStop, isSuspended = fals
 
 function ChannelTab({ host, audioKey, isSuspended = false }) {
   const { token, user } = useAuth()
-  const { broadcastMode, icecastStatus, radioStatus, icecastStartRef, icecastStopRef, startRadio, stopRadio,
-    videoStatus, startVideo, stopVideo } = useStream()
+  const { videoStatus } = useStream()
 
   const userPlan = user?.plan || 'starter'
   const maxChannels = MAX_CHANNELS[userPlan] || 0
@@ -1860,8 +1859,15 @@ function ChannelTab({ host, audioKey, isSuspended = false }) {
   const [formError,    setFormError]    = useState('')
 
   // ── Save feedback ──────────────────────────────────────────────────────────
-  const [saving,   setSaving]   = useState(false)
-  const [saveMsg,  setSaveMsg]  = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveMsg, setSaveMsg] = useState('')
+  const [metrics, setMetrics] = useState({ cpu: 0, bandwidth: 0, fps: 0, active_streams: 0 })
+  const [eventLogs, setEventLogs] = useState([])
+
+  function addEventLog(msg, kind = 'info') {
+    const t = new Date().toLocaleTimeString('en-US', { hour12: false })
+    setEventLogs((prev) => [...prev.slice(-79), { t, msg, kind }])
+  }
 
   // Update server URL when platform dropdown changes
   function handlePlatformChange(id) {
@@ -1874,17 +1880,66 @@ function ChannelTab({ host, audioKey, isSuspended = false }) {
   // ── Load credentials + saved channels on mount ─────────────────────────────
   useEffect(() => {
     if (!token) return
-    fetch('/api/user/stream-credentials', {
+    fetch('/api/destinations', {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (Array.isArray(data.destinations)) {
-          setChannels(data.destinations.map(migrateChannel))
+        if (Array.isArray(data?.destinations)) {
+          const mapped = data.destinations.map((d) => ({
+            id: d.id,
+            platform: d.platform || 'custom',
+            label: d.name || d.label || d.platform || 'Channel',
+            serverUrl: d.serverUrl,
+            streamKey: d.streamKey,
+            active: !!(d.enabled ?? d.active),
+          }))
+          setChannels(mapped)
+          return
         }
+        return fetch('/api/user/stream-credentials', {
+          headers: { Authorization: `Bearer ${token}` },
+        }).then((r) => r.ok ? r.json() : null).then((legacy) => {
+          if (Array.isArray(legacy?.destinations)) {
+            setChannels(legacy.destinations.map(migrateChannel))
+          }
+        })
       })
       .catch(() => {})
   }, [token])
+
+  useEffect(() => {
+    if (!token) return
+    let canceled = false
+    async function pollMetrics() {
+      try {
+        const res = await fetch('/api/metrics', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        if (!canceled) {
+          setMetrics({
+            cpu: Number(data.cpu || 0),
+            bandwidth: Number(data.bandwidth || 0),
+            fps: Number(data.fps || 0),
+            active_streams: Number(data.active_streams || 0),
+          })
+        }
+      } catch (_) {}
+    }
+    pollMetrics()
+    const id = setInterval(pollMetrics, 1000)
+    return () => { canceled = true; clearInterval(id) }
+  }, [token])
+
+  useEffect(() => {
+    if (videoStatus === 'live') addEventLog('Video relay is live', 'live')
+    else if (videoStatus === 'connecting') addEventLog('Video relay is connecting…', 'info')
+    else if (videoStatus === 'error') addEventLog('Video relay encountered an error', 'error')
+    else if (videoStatus === 'idle' || videoStatus === 'stopped') addEventLog('Video relay is idle', 'info')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoStatus])
 
   // ── Load OAuth connections on mount ────────────────────────────────────────
   useEffect(() => {
@@ -1931,24 +1986,87 @@ function ChannelTab({ host, audioKey, isSuspended = false }) {
     }
   }, [token])
 
-  // ── Persist channels to backend ────────────────────────────────────────────
-  async function saveChannels(updated) {
+  async function createDestination(channel) {
     if (!token) return
     setSaving(true)
     setSaveMsg('')
     try {
-      const r = await fetch('/api/user/stream-credentials', {
-        method: 'PUT',
+      const r = await fetch('/api/destinations', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ destinations: updated }),
+        body: JSON.stringify({
+          name: channel.label,
+          serverUrl: channel.serverUrl,
+          streamKey: channel.streamKey,
+          enabled: !!channel.active,
+          platform: channel.platform,
+        }),
       })
-      setSaveMsg(r.ok ? 'Saved!' : 'Save failed — try again')
+      if (!r.ok) {
+        const text = await r.text().catch(() => '')
+        throw new Error(text || `Save failed (${r.status})`)
+      }
+      const data = await r.json().catch(() => null)
+      setChannels((prev) => prev.map((c) => c.id === channel.id ? { ...c, id: data?.id || c.id } : c))
+      setSaveMsg('Saved!')
+      addEventLog(`Destination added: ${channel.label}`, 'info')
     } catch {
       setSaveMsg('Network error')
+      addEventLog('Failed to add destination', 'error')
     } finally {
       setSaving(false)
     }
     setTimeout(() => setSaveMsg(''), 3000)
+  }
+
+  async function updateDestination(channel) {
+    if (!token || !channel?.id) return
+    setSaving(true)
+    setSaveMsg('')
+    try {
+      const r = await fetch(`/api/destinations/${encodeURIComponent(channel.id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          name: channel.label,
+          serverUrl: channel.serverUrl,
+          streamKey: channel.streamKey,
+          enabled: !!channel.active,
+          platform: channel.platform,
+        }),
+      })
+      if (!r.ok) throw new Error(`Update failed (${r.status})`)
+      setSaveMsg('Saved!')
+    } catch {
+      setSaveMsg('Save failed — try again')
+      addEventLog(`Failed to update destination: ${channel.label}`, 'error')
+    } finally {
+      setSaving(false)
+    }
+    setTimeout(() => setSaveMsg(''), 3000)
+  }
+
+  async function removeDestination(id, label) {
+    if (!token || !id) return false
+    setSaving(true)
+    setSaveMsg('')
+    try {
+      const r = await fetch(`/api/destinations/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!r.ok) throw new Error(`Delete failed (${r.status})`)
+      setSaveMsg('Saved!')
+      addEventLog(`Destination removed: ${label}`, 'info')
+      return true
+    } catch {
+      setSaveMsg('Save failed — try again')
+      addEventLog(`Failed to remove destination: ${label}`, 'error')
+      return false
+    } finally {
+      setSaving(false)
+      setTimeout(() => setSaveMsg(''), 3000)
+    }
   }
 
   // ── Add channel ────────────────────────────────────────────────────────────
@@ -1983,7 +2101,7 @@ function ChannelTab({ host, audioKey, isSuspended = false }) {
     }
     const updated = [...channels, channel]
     setChannels(updated)
-    saveChannels(updated)
+    createDestination(channel)
     // Reset form (keep platform selection)
     setFormLabel('')
     setFormKey('')
@@ -1994,17 +2112,27 @@ function ChannelTab({ host, audioKey, isSuspended = false }) {
   // ── Delete channel ─────────────────────────────────────────────────────────
   function deleteChannel(id) {
     if (isLive) return
-    const updated = channels.filter((c) => c.id !== id)
-    setChannels(updated)
-    saveChannels(updated)
+    const target = channels.find((c) => c.id === id)
+    setChannels((prev) => prev.filter((c) => c.id !== id))
+    removeDestination(id, target?.label || 'channel')
   }
 
   // ── Toggle Staged / Muted ──────────────────────────────────────────────────
   function toggleActive(id) {
     if (isLive) return
-    const updated = channels.map((c) => (c.id === id ? { ...c, active: !c.active } : c))
+    let toggled = null
+    const updated = channels.map((c) => {
+      if (c.id === id) {
+        toggled = { ...c, active: !c.active }
+        return toggled
+      }
+      return c
+    })
     setChannels(updated)
-    saveChannels(updated)
+    if (toggled) {
+      updateDestination(toggled)
+      addEventLog(`${toggled.label} set to ${toggled.active ? 'Staged' : 'Muted'}`, toggled.active ? 'live' : 'info')
+    }
   }
 
   const selectedPlatform = SOCIAL_PLATFORMS.find((p) => p.id === formPlatform) || SOCIAL_PLATFORMS[0]
@@ -2046,6 +2174,49 @@ function ChannelTab({ host, audioKey, isSuspended = false }) {
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
             </svg>
             <p className="text-xs text-gray-500">Available in <span className="text-purple-400 font-semibold">Enterprise</span> and <span className="text-purple-400 font-semibold">Ultimate</span> plans</p>
+          </div>
+        </div>
+      )}
+
+      {maxChannels > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-800 bg-gray-950/40">
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Stream Metrics</p>
+            </div>
+            <div className="p-4 grid grid-cols-2 gap-3">
+              <div className="bg-gray-800/70 rounded-lg px-3 py-2">
+                <div className="text-[10px] uppercase text-gray-500">CPU</div>
+                <div className="text-white font-mono text-lg">{metrics.cpu.toFixed(1)}%</div>
+              </div>
+              <div className="bg-gray-800/70 rounded-lg px-3 py-2">
+                <div className="text-[10px] uppercase text-gray-500">Bandwidth</div>
+                <div className="text-white font-mono text-lg">{metrics.bandwidth.toFixed(2)} Mbps</div>
+              </div>
+              <div className="bg-gray-800/70 rounded-lg px-3 py-2">
+                <div className="text-[10px] uppercase text-gray-500">FPS</div>
+                <div className="text-white font-mono text-lg">{Math.round(metrics.fps)}</div>
+              </div>
+              <div className="bg-gray-800/70 rounded-lg px-3 py-2">
+                <div className="text-[10px] uppercase text-gray-500">Active Streams</div>
+                <div className="text-white font-mono text-lg">{metrics.active_streams}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-800 bg-gray-950/40">
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Routing Console</p>
+            </div>
+            <div className="p-3 h-44 overflow-y-auto font-mono text-xs bg-gray-950">
+              {eventLogs.length === 0 && <div className="text-gray-600">Waiting for events…</div>}
+              {eventLogs.map((l, i) => (
+                <div key={`${l.t}-${i}`} className="mb-1">
+                  <span className="text-gray-600">[{l.t}]</span>{' '}
+                  <span className={l.kind === 'error' ? 'text-red-400' : l.kind === 'live' ? 'text-green-300' : 'text-gray-300'}>{l.msg}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
