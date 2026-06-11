@@ -2,7 +2,76 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-const API_BASE = import.meta.env.VITE_API_BASE || ''
+const RAW_API_BASE = import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_BASE_URL || ''
+const API_BASE = import.meta.env.DEV ? '' : RAW_API_BASE
+
+const DEFAULT_PLANS = [
+  {
+    id: 'starter',
+    name: 'Starter',
+    monthlyPrice: 29,
+    yearlyPrice: 290,
+    features: [
+      'Radio DJ & Mixer',
+      'Custom stream URL',
+      'Embeddable player widget',
+      'Listeners analytics',
+      'Up to 500 concurrent listeners',
+      'Record sessions',
+    ],
+    monthlySalePercent: 0,
+    yearlySalePercent: 0,
+    isFeatured: false,
+  },
+  {
+    id: 'professional',
+    name: 'Professional',
+    monthlyPrice: 39,
+    yearlyPrice: 390,
+    features: [
+      'Everything in Starter',
+      'Conference call rooms',
+      'Screen sharing',
+      'Up to 10 participants per call',
+      'Up to 1000 concurrent listeners',
+    ],
+    monthlySalePercent: 0,
+    yearlySalePercent: 0,
+    isFeatured: true,
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    monthlyPrice: 59,
+    yearlyPrice: 590,
+    features: [
+      'Everything in Professional',
+      'Video live streaming',
+      'Multistream up to 3 channels',
+      'Social media live streaming',
+      'Up to 2000 concurrent listeners',
+    ],
+    monthlySalePercent: 0,
+    yearlySalePercent: 0,
+    isFeatured: false,
+  },
+  {
+    id: 'ultimate',
+    name: 'Ultimate',
+    monthlyPrice: 99,
+    yearlyPrice: 990,
+    features: [
+      'Everything in Enterprise',
+      'Multistream up to 6 channels',
+      'Advanced analytics dashboard',
+      'Custom branding options',
+      'Unlimited concurrent listeners',
+    ],
+    monthlySalePercent: 0,
+    yearlySalePercent: 0,
+    isFeatured: false,
+  },
+]
 
 export default function PricingPage() {
   const navigate = useNavigate()
@@ -10,6 +79,7 @@ export default function PricingPage() {
   const [billingCycle, setBillingCycle] = useState('monthly') // 'monthly' or 'yearly'
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadWarning, setLoadWarning] = useState('')
 
   useEffect(() => {
     async function fetchPricing() {
@@ -17,10 +87,21 @@ export default function PricingPage() {
         const res = await fetch(`${API_BASE}/api/public/pricing`)
         if (res.ok) {
           const data = await res.json()
-          setPlans(data)
+          if (Array.isArray(data) && data.length > 0) {
+            setPlans(data)
+            setLoadWarning('')
+          } else {
+            setPlans(DEFAULT_PLANS)
+            setLoadWarning('Live pricing is temporarily unavailable. Showing default prices.')
+          }
+        } else {
+          setPlans(DEFAULT_PLANS)
+          setLoadWarning('Live pricing is temporarily unavailable. Showing default prices.')
         }
       } catch (err) {
         console.error('Failed to fetch pricing:', err)
+        setPlans(DEFAULT_PLANS)
+        setLoadWarning('Live pricing is temporarily unavailable. Showing default prices.')
       } finally {
         setLoading(false)
       }
@@ -163,6 +244,11 @@ export default function PricingPage() {
 
       {/* ── Pricing Cards ── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
+        {loadWarning && (
+          <div className="mb-6 rounded-xl border border-amber-500/40 bg-amber-900/20 px-4 py-3 text-sm text-amber-200">
+            {loadWarning}
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {plans.map((plan) => {
             const pricing = getDisplayPrice(plan)

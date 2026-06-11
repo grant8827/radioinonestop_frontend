@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import LoginModal from '../components/LoginModal'
 import RegisterModal from '../components/RegisterModal'
 import StationModal from '../components/StationModal'
+import appLogo from '../assets/radioinonestop_logo .png'
 
 const FEATURES = [
   {
@@ -172,10 +173,7 @@ export default function LandingPage() {
       <nav className="sticky top-0 z-40 border-b border-white/5 bg-[#09090f]/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-14">
           <div className="flex items-center gap-2.5">
-            {/* Radio waves logo */}
-            <svg className="w-7 h-7 text-purple-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 19.5l2.25-2.25m0 0l.75-.75m-.75.75A8.953 8.953 0 0112 15a8.953 8.953 0 015.999 2.25m-12-2.25A8.953 8.953 0 0112 6a8.953 8.953 0 016 3m-12 0L3.75 7.5M3.75 4.5l2.25 2.25m12-2.25l-2.25 2.25m0 0l-.75.75m.75-.75A8.953 8.953 0 0112 9a8.953 8.953 0 016 3m-6-3V3m0 18v-1.5" />
-            </svg>
+            <img src={appLogo} alt="Radio In One Stop logo" className="w-7 h-7 rounded-sm object-contain" />
             <span className="font-bold text-sm tracking-tight">Radio In One Stop</span>
           </div>
           
