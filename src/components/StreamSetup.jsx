@@ -2338,6 +2338,43 @@ function ChannelTab({ host, audioKey, isSuspended = false, manualOnly = false })
       )}
       */}
 
+      {/* ── Platform Connections (Video Settings) ── */}
+      {manualOnly && (maxChannels > 0 ? (
+        <PlatformConnections
+          connectedPlatforms={connectedPlatforms}
+          onDisconnect={async (platformId) => {
+            try {
+              await fetch(`/api/user/oauth-connections/${platformId}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` },
+              })
+            } catch { /* best-effort */ }
+            setConnectedPlatforms((prev) => { const n = { ...prev }; delete n[platformId]; return n })
+          }}
+          disabled={isLive}
+        />
+      ) : (
+        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden relative opacity-60">
+          <div className="absolute inset-0 bg-black/40 z-10 flex items-center justify-center backdrop-blur-sm">
+            <div className="text-center px-4">
+              <div className="w-12 h-12 rounded-full bg-purple-600/20 border-2 border-purple-500/30 flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                </svg>
+              </div>
+              <p className="text-white font-semibold mb-1">Enterprise Feature</p>
+              <button
+                onClick={() => setUpgradeModal({ show: true, feature: 'Social Media Platform Connections', requiredPlan: 'enterprise' })}
+                className="mt-2 px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition-all"
+              >
+                Upgrade
+              </button>
+            </div>
+          </div>
+          <PlatformConnections connectedPlatforms={{}} onDisconnect={() => {}} disabled={true} />
+        </div>
+      ))}
+
       {/* ── Multistream Destinations ── */}
       {manualOnly && (maxChannels > 0 ? (
         <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
