@@ -181,14 +181,41 @@ export function StreamProvider({ children }) {
         })
       })
 
-      const res = await fetch(`/webrtc/${videoKey}/whip`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/sdp', Authorization: `Bearer ${token}` },
-        body: pc.localDescription.sdp,
-      })
-      if (!res.ok) throw new Error(`WHIP ${res.status}`)
+      // Some deployments/proxy setups expose different WHIP URL shapes.
+      // Try a short, ordered fallback list to avoid hard-failing on 404/405.
+      const whipCandidates = [
+        `/webrtc/${videoKey}/whip`,
+        `/whip/${videoKey}`,
+        `/webrtc/whip/${videoKey}`,
+      ]
 
-      const answer = await res.text()
+      let answer = ''
+      let whipConnected = false
+      let lastWhipError = null
+
+      for (const whipUrl of whipCandidates) {
+        const res = await fetch(whipUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/sdp', Authorization: `Bearer ${token}` },
+          body: pc.localDescription.sdp,
+        })
+
+        if (res.ok) {
+          answer = await res.text()
+          whipConnected = true
+          break
+        }
+
+        lastWhipError = new Error(`WHIP ${res.status} at ${whipUrl}`)
+        if (res.status !== 404 && res.status !== 405) {
+          throw lastWhipError
+        }
+      }
+
+      if (!whipConnected) {
+        throw lastWhipError || new Error('WHIP publish failed')
+      }
+
       await pc.setRemoteDescription({ type: 'answer', sdp: answer })
 
       pc.onconnectionstatechange = () => {
