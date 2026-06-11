@@ -169,15 +169,42 @@ function DashboardCard({ label, colorClass, iconPath, stream, viewers }) {
 
 /* ─── Tab content ─────────────────────────────────────────────── */
 
-function StreamSettingsTab({ audioKey, liveStreams, viewers, host, sourcePassword, creds }) {
+function StreamSettingsTab({ audioKey, liveStreams, viewers, host, sourcePassword, creds, isSuspended = false }) {
   const audioStream = liveStreams.find(s => s.key === audioKey)
   const anyLive = liveStreams.some(s => s.live)
   const otherStreams = liveStreams.filter(s => s.key !== audioKey)
+  const [settingsTab, setSettingsTab] = useState('audio')
 
   return (
-    <div className="space-y-6">
-      {/* Dashboard */}
-      <div>
+    <div className="space-y-4">
+      <div className="flex gap-1 bg-gray-900/60 border border-gray-800 rounded-xl p-1">
+        <button
+          type="button"
+          onClick={() => setSettingsTab('audio')}
+          className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+            settingsTab === 'audio'
+              ? 'bg-gray-700 text-white'
+              : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/60'
+          }`}
+        >
+          Audio Settings
+        </button>
+        <button
+          type="button"
+          onClick={() => setSettingsTab('video')}
+          className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+            settingsTab === 'video'
+              ? 'bg-gray-700 text-white'
+              : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/60'
+          }`}
+        >
+          Video Settings
+        </button>
+      </div>
+
+      <div style={{ display: settingsTab === 'audio' ? undefined : 'none' }} className="space-y-6">
+        {/* Dashboard */}
+        <div>
         <div className="flex items-center gap-2 mb-3">
           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Live Dashboard</span>
           <span className={`flex items-center gap-1.5 text-[10px] font-bold border rounded px-2 py-0.5 ${anyLive ? 'text-green-400 bg-green-900/20 border-green-700/40' : 'text-gray-500 bg-gray-800/50 border-gray-700/40'}`}>
@@ -281,6 +308,12 @@ function StreamSettingsTab({ audioKey, liveStreams, viewers, host, sourcePasswor
             <p className="text-xs text-gray-500 py-2">Sign in to view your RTMP details</p>
           )}
         </div>
+      </div>
+
+      </div>
+
+      <div style={{ display: settingsTab === 'video' ? undefined : 'none' }}>
+        <ChannelTab host={host} audioKey={audioKey} isSuspended={isSuspended} manualOnly={true} />
       </div>
     </div>
   )
@@ -1878,7 +1911,7 @@ function VideoPreview({ isLive, liveStatus, onGoLive, onStop, isSuspended = fals
   )
 }
 
-function ChannelTab({ host, audioKey, isSuspended = false }) {
+function ChannelTab({ host, audioKey, isSuspended = false, manualOnly = false }) {
   const { token, user } = useAuth()
   const { videoStatus } = useStream()
 
@@ -2189,7 +2222,7 @@ function ChannelTab({ host, audioKey, isSuspended = false }) {
     <div className="space-y-6">
 
       {/* ── Video Preview — mirrored with radio page's Go Live Video button via shared StreamContext ── */}
-      {maxChannels > 0 ? (
+      {!manualOnly && (maxChannels > 0 ? (
         <StudioCompositor
           isLive={videoStatus === 'live'}
           videoKey={audioKey}
@@ -2224,9 +2257,9 @@ function ChannelTab({ host, audioKey, isSuspended = false }) {
             <p className="text-xs text-gray-500">Available in <span className="text-purple-400 font-semibold">Enterprise</span> and <span className="text-purple-400 font-semibold">Ultimate</span> plans</p>
           </div>
         </div>
-      )}
+      ))}
 
-      {maxChannels > 0 && (
+      {!manualOnly && maxChannels > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-800 bg-gray-950/40">
@@ -2306,7 +2339,7 @@ function ChannelTab({ host, audioKey, isSuspended = false }) {
       */}
 
       {/* ── Multistream Destinations ── */}
-      {maxChannels > 0 ? (
+      {manualOnly && (maxChannels > 0 ? (
         <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
 
         {/* Section header */}
@@ -2596,7 +2629,7 @@ function ChannelTab({ host, audioKey, isSuspended = false }) {
             </div>
           </div>
         </div>
-      )}
+      ))}
 
       {/* Upgrade Modal */}
       {upgradeModal.show && (
@@ -2717,6 +2750,7 @@ export default function StreamSetup({ isSuspended = false }) {
           host={host}
           sourcePassword={creds?.source_password ?? ''}
           creds={creds}
+          isSuspended={isSuspended}
         />
       </div>
       <div style={{ display: tab === 'audio' ? undefined : 'none' }}>
