@@ -1168,6 +1168,54 @@ const SOCIAL_PLATFORMS = [
     colorBadge: 'text-purple-400 bg-purple-900/30 border-purple-700/40',
   },
   {
+    id: 'tiktok',
+    name: 'TikTok Live',
+    defaultUrl: '',
+    badge: 'RTMP',
+    keyUrl: 'https://www.tiktok.com/live',
+    keyNote: 'TikTok Live Center → copy Server URL + Stream Key',
+    colorBorder: 'border-pink-900/40',
+    colorFrom: 'from-pink-900/30',
+    colorIcon: 'bg-pink-600/20 border-pink-500/30 text-pink-400',
+    colorBadge: 'text-pink-400 bg-pink-900/30 border-pink-700/40',
+  },
+  {
+    id: 'instagram',
+    name: 'Instagram Live',
+    defaultUrl: '',
+    badge: 'RTMP',
+    keyUrl: 'https://www.instagram.com/',
+    keyNote: 'Live Producer → copy Server URL + Stream Key',
+    colorBorder: 'border-fuchsia-900/40',
+    colorFrom: 'from-fuchsia-900/30',
+    colorIcon: 'bg-fuchsia-600/20 border-fuchsia-500/30 text-fuchsia-400',
+    colorBadge: 'text-fuchsia-400 bg-fuchsia-900/30 border-fuchsia-700/40',
+  },
+  {
+    id: 'x',
+    name: 'X Live',
+    defaultUrl: '',
+    badge: 'RTMP',
+    keyUrl: 'https://studio.x.com/',
+    keyNote: 'Media Studio Live → copy Server URL + Stream Key',
+    colorBorder: 'border-slate-700/60',
+    colorFrom: 'from-slate-700/40',
+    colorIcon: 'bg-slate-500/20 border-slate-400/30 text-slate-300',
+    colorBadge: 'text-slate-300 bg-slate-700/30 border-slate-500/40',
+  },
+  {
+    id: 'linkedin',
+    name: 'LinkedIn Live',
+    defaultUrl: '',
+    badge: 'RTMP',
+    keyUrl: 'https://www.linkedin.com/video/live/',
+    keyNote: 'LinkedIn Live Event → copy Server URL + Stream Key',
+    colorBorder: 'border-cyan-900/40',
+    colorFrom: 'from-cyan-900/30',
+    colorIcon: 'bg-cyan-600/20 border-cyan-500/30 text-cyan-400',
+    colorBadge: 'text-cyan-400 bg-cyan-900/30 border-cyan-700/40',
+  },
+  {
     id: 'custom',
     name: 'Custom RTMP',
     defaultUrl: '',
@@ -2221,48 +2269,6 @@ function ChannelTab({ host, audioKey, isSuspended = false }) {
         </div>
       )}
 
-      {/* ── Platform Connections (OAuth Login-to-Stream) ── */}
-      {maxChannels > 0 ? (
-        <PlatformConnections
-          connectedPlatforms={connectedPlatforms}
-          onDisconnect={async (platformId) => {
-            try {
-              await fetch(`/api/user/oauth-connections/${platformId}`, {
-                method: 'DELETE',
-                headers: { Authorization: `Bearer ${token}` },
-              })
-            } catch { /* best-effort */ }
-            setConnectedPlatforms((prev) => { const n = { ...prev }; delete n[platformId]; return n })
-          }}
-          disabled={isLive}
-        />
-      ) : (
-        // Locked platform connections
-        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden relative opacity-60">
-          <div className="absolute inset-0 bg-black/40 z-10 flex items-center justify-center backdrop-blur-sm">
-            <div className="text-center px-4">
-              <div className="w-12 h-12 rounded-full bg-purple-600/20 border-2 border-purple-500/30 flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-                </svg>
-              </div>
-              <p className="text-white font-semibold mb-1">Enterprise Feature</p>
-              <button
-                onClick={() => setUpgradeModal({ show: true, feature: 'Social Media Platform Connections', requiredPlan: 'enterprise' })}
-                className="mt-2 px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition-all"
-              >
-                Upgrade
-              </button>
-            </div>
-          </div>
-          <PlatformConnections
-            connectedPlatforms={{}}
-            onDisconnect={() => {}}
-            disabled={true}
-          />
-        </div>
-      )}
-
       {/* ── Sync from OAuth (if applicable) ── */}
       {/* TODO: Implement SyncOAuthButton component for OAuth integration
       {maxChannels > 0 && (
@@ -2361,7 +2367,7 @@ function ChannelTab({ host, audioKey, isSuspended = false }) {
                 type="text"
                 value={formUrl}
                 onChange={(e) => setFormUrl(e.target.value)}
-                disabled={isLive || formPlatform !== 'custom'}
+                disabled={isLive || (formPlatform !== 'custom' && !!selectedPlatform?.defaultUrl)}
                 placeholder="rtmp://"
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-purple-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed font-mono text-xs"
               />
