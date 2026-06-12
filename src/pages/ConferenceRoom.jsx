@@ -1027,6 +1027,9 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
   const inviteUrl = `${window.location.origin}/conference/${roomId}`
   const { user, token: authToken } = useAuth()
 
+  const containerRef = useRef(null)
+  const [hasBecomeVisible, setHasBecomeVisible] = useState(false)
+
   // Guests (no auth, no propUsername) must enter a display name before joining
   const isGuest = !authToken && !propUsername
   const [guestName, setGuestName] = useState('')
@@ -1041,8 +1044,20 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
   const [error, setError] = useState(null)
   const [microphoneError, setMicrophoneError] = useState('')
 
-  // Don't fetch token until guest has submitted their name
-  const readyToJoin = !isGuest || guestNameSubmitted
+  // Observe visibility so we don't auto-connect to LiveKit in the background on page load
+  useEffect(() => {
+    if (isGuest || hasBecomeVisible || !containerRef.current) return
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        setHasBecomeVisible(true)
+        observer.disconnect()
+      }
+    })
+    observer.observe(containerRef.current)
+    return () => observer.disconnect()
+  }, [isGuest, hasBecomeVisible])
+
+  const readyToJoin = isGuest ? guestNameSubmitted : hasBecomeVisible
 
   useEffect(() => {
     if (!readyToJoin || !username) return
@@ -1058,7 +1073,7 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
         setLivekitUrl(url)
       })
       .catch((e) => setError(e.message || 'Failed to connect'))
-  }, [username, roomId, readyToJoin])
+  }, [username, roomId, readyToJoin, authToken])
 
   // Guest name entry screen — shown before joining
   if (isGuest && !guestNameSubmitted) {
@@ -1111,7 +1126,7 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
+      <div ref={containerRef} className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
         <div className="flex items-center gap-3 text-gray-400">
           <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
