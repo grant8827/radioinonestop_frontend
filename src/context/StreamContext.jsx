@@ -163,7 +163,18 @@ export function StreamProvider({ children }) {
 
       // Mix in the Mixer's master audio output
       const audioTrack = audioEngine?.getStreamTrack?.()?.getTracks()[0]
-      if (audioTrack) displayStream.addTrack(audioTrack)
+      if (audioTrack) {
+        displayStream.addTrack(audioTrack)
+      } else {
+        // Add a silent audio track to ensure compatibility with RTMP destinations
+        // which often require both an audio and video stream.
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+        const oscillator = audioCtx.createOscillator()
+        const dst = audioCtx.createMediaStreamDestination()
+        oscillator.connect(dst)
+        oscillator.start()
+        displayStream.addTrack(dst.stream.getAudioTracks()[0])
+      }
 
       const pc = new RTCPeerConnection({ iceServers: [] })
       videoPcRef.current = pc
