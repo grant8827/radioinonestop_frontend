@@ -23,46 +23,6 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { AudioEngineProvider } from './context/AudioEngine'
 import { StreamProvider, useStream } from './context/StreamContext'
 
-// Disable responsive design at 1300px+ and add horizontal scroll
-const desktopOnlyStyles = `
-  @media (min-width: 1300px) {
-    .dashboard-main {
-      overflow-x: auto !important;
-      overflow-y: hidden !important;
-    }
-    .dashboard-content {
-      display: flex;
-      flex-direction: row;
-      flex-wrap: nowrap;
-      width: max-content;
-      gap: 1rem;
-      padding: 1rem;
-      margin: 0;
-      max-width: none;
-    }
-    .dashboard-player-section {
-      display: flex;
-      flex-direction: row;
-      flex-wrap: nowrap;
-      gap: 1rem;
-      min-width: max-content;
-      width: auto !important;
-    }
-    .dashboard-sidebar-section {
-      display: flex;
-      flex-direction: row;
-      flex-wrap: nowrap;
-      gap: 0.75rem;
-      min-width: max-content;
-      width: auto !important;
-    }
-    .dashboard-content > div {
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-  }
-`
-
 function ProtectedRoute({ children }) {
   const { isAuthenticated, user } = useAuth()
   return isAuthenticated ? children : <Navigate to="/" replace />
@@ -178,7 +138,6 @@ function MainApp() {
 
   return (
     <div className="h-screen overflow-hidden bg-gray-950 text-white flex">
-      <style>{desktopOnlyStyles}</style>
       {/* Listener limit modal */}
       {showListenerModal && listenerStatus && (listenerStatus.status === 'warning' || listenerStatus.status === 'suspended') && (
         <ListenerLimitModal
@@ -253,8 +212,8 @@ function MainApp() {
 
         {/* Content — main is a pure scroll container; the inner div handles flex layout
               so flex items can grow naturally and trigger overflow-y scroll */}
-        <main className="flex-1 min-h-0 overflow-y-auto dashboard-main">
-          <div className="flex flex-col gap-4 p-4 lg:p-6 max-w-6xl mx-auto w-full min-h-full dashboard-content">
+        <main className="flex-1 min-h-0 overflow-y-auto">
+          <div className="flex flex-col gap-4 p-4 lg:p-6 max-w-6xl mx-auto w-full min-h-full">
           {/* Keep StreamSetup mounted so an active broadcast isn't killed by tab navigation.
               Hidden via CSS — the WS + MediaRecorder stay alive. */}
           <div className={mode !== 'stream' ? 'hidden' : 'contents'}>
@@ -272,14 +231,14 @@ function MainApp() {
 
           {/* Player + NowPlaying + Chat — always mounted so audio elements survive
               mode switches. Hidden (display:none) when not in radio/video mode. */}
-          <div className={`flex flex-col lg:flex-row gap-4 w-full dashboard-player-section${
+          <div className={`flex flex-col lg:flex-row gap-4 w-full${
             mode !== 'radio' && mode !== 'video' ? ' hidden' : ''
           }`}>
             <div className="flex-1 flex flex-col gap-4 min-w-0">
               <Player mode={playerMode} config={config} trackA={trackA} trackB={trackB} queue={queue} onQueuePop={repeatPlaylist ? () => setQueue((q) => q.length > 0 ? [...q.slice(1), q[0]] : [...repeatBackupRef.current]) : () => setQueue((q) => q.slice(1))} onLoadTrackA={setTrackA} onLoadTrackB={setTrackB} onDeckPlaybackChange={handleDeckPlaybackChange} repeatPlaylist={repeatPlaylist} onRepeatReload={onRepeatReload} isSuspended={listenerStatus?.status === 'suspended'} />
               <NowPlaying config={config} mode={mode} />
             </div>
-            <div className="lg:w-80 xl:w-96 shrink-0 flex flex-col gap-3 min-h-0 dashboard-sidebar-section">
+            <div className="lg:w-80 xl:w-96 shrink-0 flex flex-col gap-3 min-h-0">
               <SocialLive />
               <div className="min-h-0 overflow-hidden" style={{ height: 530 }}>
                 <TrackLibrary onTrackLoadA={loadTrackAFromLibrary} onTrackLoadB={loadTrackBFromLibrary} queue={queue} onQueueChange={setQueue} repeatPlaylist={repeatPlaylist} onRepeatChange={setRepeatPlaylist} nowPlayingA={trackA} nowPlayingB={trackB} />
