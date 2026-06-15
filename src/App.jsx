@@ -28,51 +28,37 @@ const desktopOnlyStyles = `
   @media (min-width: 1300px) {
     .dashboard-main {
       overflow-x: auto !important;
-      overflow-y: visible !important;
+      overflow-y: hidden !important;
     }
     .dashboard-content {
-      display: flex !important;
-      flex-direction: row !important;
-      flex-wrap: nowrap !important;
-      width: max-content !important;
-      gap: 1rem !important;
-      padding: 1rem !important;
-      margin: 0 !important;
-      max-width: none !important;
-      align-items: flex-start !important;
-      min-height: 100% !important;
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      width: max-content;
+      gap: 1rem;
+      padding: 1rem;
+      margin: 0;
+      max-width: none;
     }
     .dashboard-player-section {
-      display: flex !important;
-      flex-direction: row !important;
-      flex-wrap: nowrap !important;
-      gap: 1rem !important;
-      min-width: max-content !important;
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      gap: 1rem;
+      min-width: max-content;
       width: auto !important;
-      flex-shrink: 0 !important;
-      align-items: stretch !important;
-    }
-    .dashboard-player-section > div {
-      flex-shrink: 0 !important;
-      display: flex !important;
-      flex-direction: column !important;
-      min-w-0 !important;
-    }
-    .dashboard-player-section > div:first-child {
-      min-width: 600px !important;
     }
     .dashboard-sidebar-section {
-      display: flex !important;
-      flex-direction: row !important;
-      flex-wrap: nowrap !important;
-      gap: 0.75rem !important;
-      min-width: max-content !important;
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      gap: 0.75rem;
+      min-width: max-content;
       width: auto !important;
-      flex-shrink: 0 !important;
-      min-width: 400px !important;
     }
     .dashboard-content > div {
-      flex-shrink: 0 !important;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
   }
 `
