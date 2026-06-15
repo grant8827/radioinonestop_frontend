@@ -245,19 +245,6 @@ export function StreamProvider({ children }) {
         })
       }
 
-      // Give MediaMTX a moment to initialize the stream internally before starting the relay
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
-      // Start FFmpeg relay: pull from MediaMTX RTSP → push to user's active destinations
-      const relayRes = await fetch('/api/stream/relay/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ path: videoKey }),
-      })
-      if (!relayRes.ok) {
-        throw new Error(`Relay failed to start: ${relayRes.status}`)
-      }
-
       setVideoStatusBoth('live')
     } catch (err) {
       // User cancelled getDisplayMedia → go back to idle rather than error

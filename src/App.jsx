@@ -45,6 +45,7 @@ function MainApp() {
   const [showAdmin, setShowAdmin] = useState(false)
   const [trackA, setTrackA] = useState(null)
   const [trackB, setTrackB] = useState(null)
+  const [deckPlaying, setDeckPlaying] = useState({ A: false, B: false })
   const [queue,          setQueue]          = useState([])
   const [repeatPlaylist, setRepeatPlaylist] = useState(false)
   const [listenerStatus, setListenerStatus] = useState(null)
@@ -59,6 +60,22 @@ function MainApp() {
     setQueue(backup)
     return backup
   }, [])
+
+  const handleDeckPlaybackChange = useCallback((next) => {
+    setDeckPlaying((prev) => (
+      prev.A === next.A && prev.B === next.B ? prev : next
+    ))
+  }, [])
+
+  const loadTrackAFromLibrary = useCallback((track) => {
+    if (deckPlaying.A) return
+    setTrackA(track)
+  }, [deckPlaying.A])
+
+  const loadTrackBFromLibrary = useCallback((track) => {
+    if (deckPlaying.B) return
+    setTrackB(track)
+  }, [deckPlaying.B])
   
   useEffect(() => {
     fetch('/api/config')
@@ -218,13 +235,13 @@ function MainApp() {
             mode !== 'radio' && mode !== 'video' ? ' hidden' : ''
           }`}>
             <div className="flex-1 flex flex-col gap-4 min-w-0">
-              <Player mode={playerMode} config={config} trackA={trackA} trackB={trackB} queue={queue} onQueuePop={repeatPlaylist ? () => setQueue((q) => q.length > 0 ? [...q.slice(1), q[0]] : [...repeatBackupRef.current]) : () => setQueue((q) => q.slice(1))} onLoadTrackA={setTrackA} onLoadTrackB={setTrackB} repeatPlaylist={repeatPlaylist} onRepeatReload={onRepeatReload} isSuspended={listenerStatus?.status === 'suspended'} />
+              <Player mode={playerMode} config={config} trackA={trackA} trackB={trackB} queue={queue} onQueuePop={repeatPlaylist ? () => setQueue((q) => q.length > 0 ? [...q.slice(1), q[0]] : [...repeatBackupRef.current]) : () => setQueue((q) => q.slice(1))} onLoadTrackA={setTrackA} onLoadTrackB={setTrackB} onDeckPlaybackChange={handleDeckPlaybackChange} repeatPlaylist={repeatPlaylist} onRepeatReload={onRepeatReload} isSuspended={listenerStatus?.status === 'suspended'} />
               <NowPlaying config={config} mode={mode} />
             </div>
             <div className="lg:w-80 xl:w-96 shrink-0 flex flex-col gap-3 min-h-0">
               <SocialLive />
               <div className="min-h-0 overflow-hidden" style={{ height: 530 }}>
-                <TrackLibrary onTrackLoadA={setTrackA} onTrackLoadB={setTrackB} queue={queue} onQueueChange={setQueue} repeatPlaylist={repeatPlaylist} onRepeatChange={setRepeatPlaylist} nowPlayingA={trackA} nowPlayingB={trackB} />
+                <TrackLibrary onTrackLoadA={loadTrackAFromLibrary} onTrackLoadB={loadTrackBFromLibrary} queue={queue} onQueueChange={setQueue} repeatPlaylist={repeatPlaylist} onRepeatChange={setRepeatPlaylist} nowPlayingA={trackA} nowPlayingB={trackB} />
               </div>
             </div>
           </div>

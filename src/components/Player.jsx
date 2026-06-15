@@ -1122,7 +1122,7 @@ function VideoGoLiveButton({ streamKey, isSuspended = false }) {
 }
 
 // ── Main Player ────────────────────────────────────────────────────────────────
-export default function Player({ mode, config, trackA, trackB, queue = [], onQueuePop, onLoadTrackA, onLoadTrackB, repeatPlaylist = false, onRepeatReload, isSuspended = false }) {
+export default function Player({ mode, config, trackA, trackB, queue = [], onQueuePop, onLoadTrackA, onLoadTrackB, onDeckPlaybackChange, repeatPlaylist = false, onRepeatReload, isSuspended = false }) {
   const mediaRef = useRef(null)
   const mediaRefB = useRef(null)
   const hlsRef   = useRef(null)
@@ -1163,6 +1163,10 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
 
   const [progressA, setProgressA] = useState(0)
   const [progressB, setProgressB] = useState(0)
+
+  useEffect(() => {
+    onDeckPlaybackChange?.({ A: playing, B: playingB })
+  }, [playing, playingB, onDeckPlaybackChange])
 
   // Track playhead position for Deck A + stop when track ends
   useEffect(() => {

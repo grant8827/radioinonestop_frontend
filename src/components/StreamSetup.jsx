@@ -2338,8 +2338,8 @@ function ChannelTab({ host, audioKey, isSuspended = false, manualOnly = false })
       )}
       */}
 
-      {/* ── Platform Connections (Video Settings) ── */}
-      {manualOnly && (maxChannels > 0 ? (
+      {/* ── Platform Connections (Video Settings) disabled per request ── */}
+      {false && manualOnly && (maxChannels > 0 ? (
         <PlatformConnections
           connectedPlatforms={connectedPlatforms}
           onDisconnect={async (platformId) => {
