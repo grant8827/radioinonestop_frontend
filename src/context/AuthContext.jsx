@@ -24,6 +24,7 @@ function loadFromStorage() {
       id: payload.user_id, 
       email: payload.email, 
       stationName: payload.station_name || '',
+      logoUrl: '',
       role: payload.role || 'user',
       plan: 'starter', // default until profile loads
       billingCycle: 'monthly',
@@ -51,6 +52,7 @@ export function AuthProvider({ children }) {
             plan: profile.plan || 'starter',
             billingCycle: profile.billing_cycle || 'monthly',
             stationName: profile.station_name || prev.user.stationName,
+            logoUrl: profile.logo_url || '',
             isSuspended: !!profile.is_suspended,
           } : prev.user
         }))
@@ -72,6 +74,7 @@ export function AuthProvider({ children }) {
         id: payload.user_id, 
         email: payload.email, 
         stationName: payload.station_name || '',
+        logoUrl: '',
         role: payload.role || 'user',
         plan: 'starter',
         billingCycle: 'monthly',

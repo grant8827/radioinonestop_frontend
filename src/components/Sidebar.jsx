@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import UpgradeModal from './UpgradeModal'
-import appLogo from '../assets/radioinonestop_logo .png'
 
 // Define which features are available in each plan
 const PLAN_FEATURES = {
@@ -79,7 +78,7 @@ function LockIcon({ className }) {
   )
 }
 
-export default function Sidebar({ stationName, mode, onModeChange, onSettingsClick }) {
+export default function Sidebar({ stationName, logoUrl, mode, onModeChange, onSettingsClick }) {
   const [open, setOpen] = useState(false) // mobile drawer
   const [upgradeModal, setUpgradeModal] = useState({ show: false, feature: null, requiredPlan: null })
   const { logout, user } = useAuth()
@@ -92,7 +91,13 @@ export default function Sidebar({ stationName, mode, onModeChange, onSettingsCli
       {/* Branding */}
       <div className="px-5 pt-6 pb-4 border-b border-gray-800">
         <div className="flex items-center gap-2.5">
-          <img src={appLogo} alt="Radio In One Stop logo" className="w-8 h-8 rounded-sm object-contain flex-shrink-0" />
+          {logoUrl ? (
+            <img src={logoUrl} alt={`${stationName} logo`} className="w-8 h-8 rounded-sm object-cover flex-shrink-0" />
+          ) : (
+            <span className="w-8 h-8 rounded-sm bg-gray-800 border border-gray-700 text-amber-400 flex items-center justify-center text-sm font-black flex-shrink-0">
+              {stationName?.[0]?.toUpperCase() || 'R'}
+            </span>
+          )}
           <span className="font-bold text-sm leading-tight truncate">{stationName}</span>
         </div>
       </div>

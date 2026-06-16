@@ -42,6 +42,7 @@ function MainApp() {
   const [playerMode, setPlayerMode] = useState('radio')  // sticky: only updates on radio/video
   const [config, setConfig] = useState(null)
   const [stationName, setStationName] = useState('')
+  const [stationLogoUrl, setStationLogoUrl] = useState('')
   const [showAdmin, setShowAdmin] = useState(false)
   const [trackA, setTrackA] = useState(null)
   const [trackB, setTrackB] = useState(null)
@@ -95,7 +96,10 @@ function MainApp() {
     if (!token) return
     fetch('/api/user/profile', { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
-      .then((d) => { if (d.station_name) setStationName(d.station_name) })
+      .then((d) => {
+        if (d.station_name) setStationName(d.station_name)
+        setStationLogoUrl(d.logo_url || '')
+      })
       .catch(() => {})
   }, [token])
 
@@ -197,6 +201,7 @@ function MainApp() {
       {/* Sidebar */}
       <Sidebar
         stationName={stationName || user?.stationName || config.stationName}
+        logoUrl={stationLogoUrl || user?.logoUrl || ''}
         mode={mode}
         onModeChange={handleModeChange}
         onSettingsClick={() => handleModeChange('settings')}
