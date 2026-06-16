@@ -43,7 +43,7 @@ export default function UpgradeModal({ requiredPlan, featureName, onClose }) {
         </button>
 
         {/* Icon */}
-        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center mx-auto mb-5 shadow-lg shadow-purple-900/40">
+        <div className="w-14 h-14 rounded-full rio-logo-gradient flex items-center justify-center mx-auto mb-5 shadow-lg shadow-red-900/40">
           <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
           </svg>
@@ -54,7 +54,7 @@ export default function UpgradeModal({ requiredPlan, featureName, onClose }) {
           Upgrade Required
         </h2>
         <p className="text-gray-400 text-center mb-6">
-          <span className="font-semibold text-white">{featureName}</span> is available in the <span className="font-semibold text-purple-400">{plan.name}</span> plan
+          <span className="font-semibold text-white">{featureName}</span> is available in the <span className="font-semibold text-amber-400">{plan.name}</span> plan
         </p>
 
         {/* Features */}
@@ -66,7 +66,7 @@ export default function UpgradeModal({ requiredPlan, featureName, onClose }) {
             {plan.features.map((feature, idx) => (
               <li key={idx} className="flex items-start gap-2.5">
                 <svg
-                  className="w-5 h-5 text-purple-400 shrink-0 mt-0.5"
+                  className="w-5 h-5 text-amber-400 shrink-0 mt-0.5"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2.5"
@@ -97,7 +97,7 @@ export default function UpgradeModal({ requiredPlan, featureName, onClose }) {
           </button>
           <button
             onClick={handleUpgrade}
-            className="flex-1 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold text-sm transition-all shadow-lg shadow-purple-900/40"
+            className="flex-1 py-3 rounded-xl rio-logo-gradient text-white font-semibold text-sm transition-all shadow-lg shadow-red-900/40"
           >
             Upgrade Now
           </button>

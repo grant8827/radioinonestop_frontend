@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import StationModal from '../components/StationModal'
+import appLogo from '../assets/radioinonestop_logo .png'
 
 export default function StationsPage() {
   const [stations, setStations] = useState([])
@@ -61,8 +62,9 @@ export default function StationsPage() {
             </svg>
             Back to Home
           </Link>
-          <Link to="/" className="font-bold text-lg tracking-tight">
-            Radio<span className="text-purple-400">InOneStop</span>
+          <Link to="/" className="flex items-center gap-2.5 font-bold text-lg tracking-tight">
+            <img src={appLogo} alt="Radio In One Stop logo" className="w-7 h-7 rounded-sm object-contain" />
+            <span>Radio In One Stop</span>
           </Link>
         </div>
       </header>
@@ -88,7 +90,7 @@ export default function StationsPage() {
               value={query}
               onChange={e => setQuery(e.target.value)}
               placeholder="Search by name, genre, or description..."
-              className="w-full pl-11 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:bg-white/10 transition-colors"
+              className="w-full pl-11 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 focus:bg-white/10 transition-colors"
             />
           </div>
           <button
@@ -120,7 +122,7 @@ export default function StationsPage() {
             {(query || liveOnly) && (
               <button
                 onClick={() => { setQuery(''); setLiveOnly(false) }}
-                className="text-sm text-purple-400 hover:text-purple-300"
+                className="text-sm text-amber-400 hover:text-amber-300"
               >
                 Clear filters
               </button>
@@ -132,14 +134,14 @@ export default function StationsPage() {
               <div
                 key={station.slug}
                 onClick={() => setSelectedStation(station)}
-                className="group relative rounded-xl border border-white/5 bg-white/3 hover:border-purple-800/60 hover:bg-white/5 transition-all duration-200 overflow-hidden cursor-pointer"
+                className="group relative rounded-xl border border-white/5 bg-white/3 hover:border-red-800/60 hover:bg-white/5 transition-all duration-200 overflow-hidden cursor-pointer"
               >
                 <div className="p-5 flex items-start gap-4">
                   <div className="shrink-0 w-14 h-14 rounded-xl overflow-hidden bg-[#1a1a2e] border border-white/10 flex items-center justify-center">
                     {station.logo_url ? (
                       <img src={station.logo_url} alt={station.name} className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-2xl font-black text-purple-400">
+                      <span className="text-2xl font-black text-amber-400">
                         {station.name?.[0]?.toUpperCase() ?? '♫'}
                       </span>
                     )}
@@ -155,7 +157,7 @@ export default function StationsPage() {
                       )}
                     </div>
                     {station.genre && (
-                      <p className="text-[10px] text-purple-400 font-semibold mb-1">{station.genre}</p>
+                      <p className="text-[10px] text-amber-400 font-semibold mb-1">{station.genre}</p>
                     )}
                     {station.description && (
                       <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">{station.description}</p>
@@ -169,7 +171,7 @@ export default function StationsPage() {
                 </div>
 
                 <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-xl">
-                  <span className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-linear-to-r from-purple-600 to-blue-600 text-white text-sm font-bold shadow-lg">
+                  <span className="flex items-center gap-2 px-5 py-2.5 rounded-xl rio-logo-gradient text-white text-sm font-bold shadow-lg">
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M8 5v14l11-7z" />
                     </svg>

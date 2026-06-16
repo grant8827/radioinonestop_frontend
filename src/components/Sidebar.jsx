@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import UpgradeModal from './UpgradeModal'
+import appLogo from '../assets/radioinonestop_logo .png'
 
 // Define which features are available in each plan
 const PLAN_FEATURES = {
@@ -91,7 +92,7 @@ export default function Sidebar({ stationName, mode, onModeChange, onSettingsCli
       {/* Branding */}
       <div className="px-5 pt-6 pb-4 border-b border-gray-800">
         <div className="flex items-center gap-2.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
+          <img src={appLogo} alt="Radio In One Stop logo" className="w-8 h-8 rounded-sm object-contain flex-shrink-0" />
           <span className="font-bold text-sm leading-tight truncate">{stationName}</span>
         </div>
       </div>
@@ -134,7 +135,7 @@ export default function Sidebar({ stationName, mode, onModeChange, onSettingsCli
                   </span>
                 )}
                 {isLocked && requiredPlan && (
-                  <span className="ml-auto text-[9px] font-bold text-purple-400 uppercase tracking-wider flex-shrink-0">
+                  <span className="ml-auto text-[9px] font-bold text-amber-400 uppercase tracking-wider flex-shrink-0">
                     {requiredPlan === 'professional' ? 'PRO' : requiredPlan === 'enterprise' ? 'ENT' : 'ULT'}
                   </span>
                 )}
@@ -180,7 +181,7 @@ export default function Sidebar({ stationName, mode, onModeChange, onSettingsCli
               }}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all mb-1 ${
                 mode === 'admin'
-                  ? 'bg-purple-600 text-white'
+                  ? 'bg-red-600 text-white'
                   : 'text-gray-400 hover:text-white hover:bg-gray-800'
               }`}
             >
@@ -204,7 +205,7 @@ export default function Sidebar({ stationName, mode, onModeChange, onSettingsCli
         {/* Upgrade Plan */}
         <a
           href="/pricing"
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-lg"
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all rio-logo-gradient text-white shadow-lg shadow-red-900/30"
         >
           <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />

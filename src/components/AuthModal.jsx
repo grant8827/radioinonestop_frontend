@@ -24,7 +24,7 @@ function Field({ label, required, children }) {
   return (
     <div>
       <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1.5">
-        {label} {required && <span className="text-purple-400">*</span>}
+        {label} {required && <span className="text-amber-400">*</span>}
       </label>
       {children}
     </div>
@@ -36,7 +36,7 @@ function Input({ inputRef, ...props }) {
     <input
       ref={inputRef}
       {...props}
-      className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition-colors"
+      className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-amber-500 transition-colors"
     />
   )
 }
@@ -238,7 +238,7 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
         {mode === 'register' && (
           <div className="mx-6 mb-5 h-1 bg-gray-800 rounded-full overflow-hidden">
             <div
-              className="h-full bg-linear-to-r from-purple-600 to-blue-600 rounded-full transition-all duration-300"
+              className="h-full rio-logo-gradient rounded-full transition-all duration-300"
               style={{ width: step === 1 ? '50%' : '100%' }}
             />
           </div>
@@ -262,13 +262,13 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
 
             <ErrorBox message={error} />
 
-            <button type="submit" disabled={loading} className="w-full py-3 rounded-xl bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm transition-all shadow-lg shadow-purple-900/30">
+            <button type="submit" disabled={loading} className="w-full py-3 rounded-xl rio-logo-gradient disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm transition-all shadow-lg shadow-red-900/30">
               {loading ? 'Signing in…' : 'Sign In'}
             </button>
 
             <p className="text-center text-xs text-gray-600">
               No account yet?{' '}
-              <button type="button" onClick={() => setMode('register')} className="text-purple-400 hover:text-purple-300 font-semibold">Create one free</button>
+              <button type="button" onClick={() => setMode('register')} className="text-amber-400 hover:text-amber-300 font-semibold">Create one free</button>
             </p>
           </form>
         )}
@@ -304,13 +304,13 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
 
             <ErrorBox message={error} />
 
-            <button type="submit" className="w-full py-3 rounded-xl bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold text-sm transition-all shadow-lg shadow-purple-900/30">
+            <button type="submit" className="w-full py-3 rounded-xl rio-logo-gradient text-white font-semibold text-sm transition-all shadow-lg shadow-red-900/30">
               Next: Set up your station →
             </button>
 
             <p className="text-center text-xs text-gray-600">
               Already have an account?{' '}
-              <button type="button" onClick={() => setMode('login')} className="text-purple-400 hover:text-purple-300 font-semibold">Sign in</button>
+              <button type="button" onClick={() => setMode('login')} className="text-amber-400 hover:text-amber-300 font-semibold">Sign in</button>
             </p>
           </form>
         )}
@@ -324,13 +324,13 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
                 <button
                   type="button"
                   onClick={() => logoInputRef.current?.click()}
-                  className="relative w-16 h-16 rounded-xl bg-gray-800 border-2 border-dashed border-gray-700 hover:border-purple-500 transition-colors overflow-hidden group flex items-center justify-center"
+                  className="relative w-16 h-16 rounded-xl bg-gray-800 border-2 border-dashed border-gray-700 hover:border-amber-500 transition-colors overflow-hidden group flex items-center justify-center"
                   title="Upload station logo (optional)"
                 >
                   {logoPreview ? (
                     <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
                   ) : (
-                    <div className="flex flex-col items-center gap-1 text-gray-600 group-hover:text-purple-400 transition-colors">
+                    <div className="flex flex-col items-center gap-1 text-gray-600 group-hover:text-amber-400 transition-colors">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 4.5h16.5a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75H3.75a.75.75 0 01-.75-.75V5.25a.75.75 0 01.75-.75z" />
                       </svg>
@@ -352,7 +352,7 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
               <select
                 value={genre}
                 onChange={(e) => setGenre(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500 transition-colors"
+                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500 transition-colors"
               >
                 <option value="">Select a genre (optional)</option>
                 {GENRES.map(g => <option key={g} value={g}>{g}</option>)}
@@ -366,7 +366,7 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
                 maxLength={300}
                 rows={3}
                 placeholder="Tell listeners what your station is about… (optional)"
-                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition-colors resize-none"
+                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-amber-500 transition-colors resize-none"
               />
             </Field>
 
@@ -383,7 +383,7 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-2 py-3 rounded-xl bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm transition-all shadow-lg shadow-purple-900/30"
+                className="flex-2 py-3 rounded-xl rio-logo-gradient disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm transition-all shadow-lg shadow-red-900/30"
               >
                 {loading ? 'Creating station…' : 'Launch My Station 🎙️'}
               </button>

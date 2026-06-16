@@ -25,7 +25,7 @@ function Field({ label, required, hint, children }) {
     <div>
       <div className="flex items-center justify-between mb-1.5">
         <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-          {label} {required && <span className="text-purple-400">*</span>}
+          {label} {required && <span className="text-amber-400">*</span>}
         </label>
         {hint && <span className="text-xs text-gray-600">{hint}</span>}
       </div>
@@ -39,7 +39,7 @@ function TextInput({ inputRef, ...props }) {
     <input
       ref={inputRef}
       {...props}
-      className="w-full bg-gray-900/60 border border-gray-700/80 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition-colors"
+      className="w-full bg-gray-900/60 border border-gray-700/80 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-amber-500 transition-colors"
     />
   )
 }
@@ -173,7 +173,7 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
 
           {/* Icon + title */}
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-linear-to-br from-purple-600 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-900/40">
+            <div className="w-10 h-10 rounded-xl rio-logo-gradient flex items-center justify-center shadow-lg shadow-red-900/40">
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
               </svg>
@@ -188,7 +188,7 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
             </div>
             {selectedPlan && (
               <div className="shrink-0">
-                <span className="inline-block text-[10px] font-bold uppercase tracking-wider bg-purple-600/20 text-purple-400 border border-purple-600/40 rounded-full px-3 py-1">
+                <span className="inline-block text-[10px] font-bold uppercase tracking-wider bg-red-600/20 text-amber-400 border border-red-600/40 rounded-full px-3 py-1">
                   {PLAN_NAMES[selectedPlan] || selectedPlan}
                 </span>
               </div>
@@ -198,7 +198,7 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
           {/* Progress bar */}
           <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
             <div
-              className="h-full bg-linear-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-500"
+              className="h-full rio-logo-gradient rounded-full transition-all duration-500"
               style={{ width: step === 1 ? '50%' : '100%' }}
             />
           </div>
@@ -237,14 +237,14 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
 
             <button
               type="submit"
-              className="w-full py-2.5 rounded-xl bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold text-sm transition-all shadow-lg shadow-purple-900/30"
+              className="w-full py-2.5 rounded-xl rio-logo-gradient text-white font-semibold text-sm transition-all shadow-lg shadow-red-900/30"
             >
               Next: Set up your station →
             </button>
 
             <p className="text-center text-xs text-gray-600 pt-1">
               Already have an account?{' '}
-              <button type="button" onClick={onSwitchToLogin} className="text-purple-400 hover:text-purple-300 font-semibold">Sign in</button>
+              <button type="button" onClick={onSwitchToLogin} className="text-amber-400 hover:text-amber-300 font-semibold">Sign in</button>
             </p>
           </form>
         )}
@@ -258,13 +258,13 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
                 <button
                   type="button"
                   onClick={() => logoInputRef.current?.click()}
-                  className="relative w-16 h-16 rounded-xl bg-gray-900 border-2 border-dashed border-gray-700 hover:border-purple-500 transition-colors overflow-hidden group flex items-center justify-center"
+                  className="relative w-16 h-16 rounded-xl bg-gray-900 border-2 border-dashed border-gray-700 hover:border-amber-500 transition-colors overflow-hidden group flex items-center justify-center"
                   title="Upload station logo (optional)"
                 >
                   {logoPreview ? (
                     <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
                   ) : (
-                    <div className="flex flex-col items-center gap-1 text-gray-600 group-hover:text-purple-400 transition-colors">
+                    <div className="flex flex-col items-center gap-1 text-gray-600 group-hover:text-amber-400 transition-colors">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 4.5h16.5a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75H3.75a.75.75 0 01-.75-.75V5.25a.75.75 0 01.75-.75z" />
                       </svg>
@@ -287,7 +287,7 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
               <select
                 value={genre}
                 onChange={(e) => setGenre(e.target.value)}
-                className="w-full bg-gray-900/60 border border-gray-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500 transition-colors"
+                className="w-full bg-gray-900/60 border border-gray-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500 transition-colors"
               >
                 <option value="">Choose a genre…</option>
                 {GENRES.map(g => <option key={g} value={g}>{g}</option>)}
@@ -301,7 +301,7 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
                 maxLength={300}
                 rows={3}
                 placeholder="Tell listeners what your station is about…"
-                className="w-full bg-gray-900/60 border border-gray-700/80 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition-colors resize-none"
+                className="w-full bg-gray-900/60 border border-gray-700/80 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-amber-500 transition-colors resize-none"
               />
             </Field>
 
@@ -318,7 +318,7 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-2 py-2.5 rounded-xl bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm transition-all shadow-lg shadow-purple-900/30"
+                className="flex-2 py-2.5 rounded-xl rio-logo-gradient disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm transition-all shadow-lg shadow-red-900/30"
               >
                 {loading ? 'Creating station…' : '🎙️ Launch My Station'}
               </button>

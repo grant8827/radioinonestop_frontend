@@ -35,6 +35,15 @@ function streamKeyFromUrl(url) {
 // Loop size labels
 const LOOP_SIZES = ['1/8', '1/4', '1/2', '1', '2', '4', '8', '16']
 
+const LOGO = {
+  red: '#e00012',
+  redHot: '#ff2a1f',
+  amber: '#f97316',
+  gold: '#fbbf24',
+  cream: '#fff4cf',
+  metal: '#cfd6dc',
+}
+
 // Pre-generate waveform shape — deterministic so it looks like audio
 const mkWave = (seed) =>
   Array.from({ length: 52 }, (_, i) => {
@@ -49,7 +58,7 @@ const WAVE_A = mkWave(0)
 const WAVE_B = mkWave(1.4)
 
 // ── Rotary Knob ────────────────────────────────────────────────────────────────
-function Knob({ value, onChange, size = 36, color = '#38bdf8', label, title }) {
+function Knob({ value, onChange, size = 36, color = LOGO.redHot, label, title }) {
   const dragRef = useRef(null)
   const onPointerDown = (e) => {
     e.preventDefault()
@@ -120,7 +129,7 @@ function Knob({ value, onChange, size = 36, color = '#38bdf8', label, title }) {
 }
 
 // ── Vertical channel fader ─────────────────────────────────────────────────────
-function VFader({ value, onChange, height = 100, color = '#d1d5db', title }) {
+function VFader({ value, onChange, height = 100, color = LOGO.gold, title }) {
   const trackRef = useRef(null)
   const dragRef  = useRef(null)
   const getVal = (clientY) => {
@@ -225,7 +234,7 @@ function HFader({ value, onChange, title }) {
         position: 'absolute', left: 8, top: '50%',
         width: `calc(${value} * (100% - 16px))`,
         height: 6, transform: 'translateY(-50%)',
-        background: 'linear-gradient(to right, #38bdf822, #d1d5db33)',
+        background: `linear-gradient(to right, ${LOGO.redHot}22, ${LOGO.gold}33)`,
         borderRadius: '3px 0 0 3px',
       }} />
       {/* Cap shadow */}
@@ -720,9 +729,9 @@ function DeckUnit({
           className="flex-1 h-8 rounded text-[7px] font-black tracking-wide transition-all active:scale-95"
           title={keyLock ? "Key Lock On" : "Key Lock Off (Preserve Pitch)"}
           style={{
-            backgroundColor: keyLock ? '#7c3aed22' : '#1a1d24',
-            color: keyLock ? '#a78bfa' : '#4b5563',
-            border: `1px solid ${keyLock ? '#7c3aed60' : '#2d3340'}`,
+            backgroundColor: keyLock ? `${LOGO.gold}22` : '#1a1d24',
+            color: keyLock ? LOGO.gold : '#4b5563',
+            border: `1px solid ${keyLock ? `${LOGO.gold}66` : '#2d3340'}`,
           }}
         >
           KEY
@@ -854,7 +863,7 @@ async function padIdbLoadAll() {
 }
 
 // ── Pad colour palette (6 colours, one per slot position) ─────────────────────
-const PAD_COLORS = ['#f87171', '#fb923c', '#fbbf24', '#4ade80', '#60a5fa', '#c084fc']
+const PAD_COLORS = [LOGO.redHot, LOGO.red, LOGO.amber, LOGO.gold, LOGO.cream, LOGO.metal]
 
 // ── Sample Pads ───────────────────────────────────────────────────────────────
 function SamplePads({ slots, onLoad, onToggle, onClear }) {
@@ -884,7 +893,7 @@ function SamplePads({ slots, onLoad, onToggle, onClear }) {
             style={{ left: ctxMenu.x, top: ctxMenu.y }}
           >
             <button
-              className="w-full text-left px-3 py-1.5 text-[10px] font-bold text-sky-400 hover:bg-gray-800/80"
+              className="w-full text-left px-3 py-1.5 text-[10px] font-bold text-amber-400 hover:bg-gray-800/80"
               onClick={() => { pendingRef.current = ctxMenu.idx; fileRef.current?.click() }}
             >
               Load track
@@ -984,23 +993,23 @@ function CenterMixer({
 
       <div className="flex gap-2">
         <div className="flex-1 flex flex-col items-center gap-1.5">
-          <span className="text-[7px] font-black uppercase tracking-widest" style={{ color: '#38bdf8' }}>
+          <span className="text-[7px] font-black uppercase tracking-widest" style={{ color: LOGO.redHot }}>
             CH A
           </span>
-          <Knob value={eqA.hi}  onChange={(v) => onEqAChange('hi', v)}  size={26} color="#38bdf8" label="HI" title="High EQ" />
-          <Knob value={eqA.mid} onChange={(v) => onEqAChange('mid', v)} size={26} color="#38bdf8" label="MID" title="Mid EQ" />
-          <Knob value={eqA.lo}  onChange={(v) => onEqAChange('lo', v)}  size={26} color="#38bdf8" label="LO" title="Low EQ" />
-          <Knob value={gainA}   onChange={onGainAChange}                size={22} color="#38bdf8" label="GAIN" title="Gain / Trim" />
+          <Knob value={eqA.hi}  onChange={(v) => onEqAChange('hi', v)}  size={26} color={LOGO.gold} label="HI" title="High EQ" />
+          <Knob value={eqA.mid} onChange={(v) => onEqAChange('mid', v)} size={26} color={LOGO.amber} label="MID" title="Mid EQ" />
+          <Knob value={eqA.lo}  onChange={(v) => onEqAChange('lo', v)}  size={26} color={LOGO.redHot} label="LO" title="Low EQ" />
+          <Knob value={gainA}   onChange={onGainAChange}                size={22} color={LOGO.redHot} label="GAIN" title="Gain / Trim" />
           <VuStrip active={playing} level={levelA} segments={10} />
-          <VFader value={faderA} onChange={onFaderAChange} height={90} color="#38bdf8" title="Channel A Fader" />
+          <VFader value={faderA} onChange={onFaderAChange} height={90} color={LOGO.redHot} title="Channel A Fader" />
           <button
             onClick={onPflAToggle}
             className="w-full h-6 rounded text-[7px] font-black transition-colors"
             title="Pre-Fader Listen (Monitor in headphones)"
             style={{
-              backgroundColor: pflA ? '#38bdf820' : '#1a1d24',
-              color: pflA ? '#38bdf8' : '#4b5563',
-              border: `1px solid ${pflA ? '#38bdf860' : '#2d3340'}`,
+              backgroundColor: pflA ? `${LOGO.redHot}22` : '#1a1d24',
+              color: pflA ? LOGO.redHot : '#4b5563',
+              border: `1px solid ${pflA ? `${LOGO.redHot}66` : '#2d3340'}`,
             }}
           >
             PFL
@@ -1011,10 +1020,10 @@ function CenterMixer({
           <span className="text-[7px] font-black uppercase tracking-widest" style={{ color: '#fbbf24' }}>
             CH B
           </span>
-          <Knob value={eqB.hi}  onChange={(v) => onEqBChange('hi', v)}  size={26} color="#fbbf24" label="HI" title="High EQ" />
-          <Knob value={eqB.mid} onChange={(v) => onEqBChange('mid', v)} size={26} color="#fbbf24" label="MID" title="Mid EQ" />
-          <Knob value={eqB.lo}  onChange={(v) => onEqBChange('lo', v)}  size={26} color="#fbbf24" label="LO" title="Low EQ" />
-          <Knob value={gainB}   onChange={onGainBChange}                size={22} color="#fbbf24" label="GAIN" title="Gain / Trim" />
+          <Knob value={eqB.hi}  onChange={(v) => onEqBChange('hi', v)}  size={26} color={LOGO.gold} label="HI" title="High EQ" />
+          <Knob value={eqB.mid} onChange={(v) => onEqBChange('mid', v)} size={26} color={LOGO.amber} label="MID" title="Mid EQ" />
+          <Knob value={eqB.lo}  onChange={(v) => onEqBChange('lo', v)}  size={26} color={LOGO.redHot} label="LO" title="Low EQ" />
+          <Knob value={gainB}   onChange={onGainBChange}                size={22} color={LOGO.gold} label="GAIN" title="Gain / Trim" />
           <VuStrip active={playingB} level={levelB} segments={10} />
           <VFader value={faderB} onChange={onFaderBChange} height={90} color="#fbbf24" title="Channel B Fader" />
           <button
@@ -1047,10 +1056,10 @@ function CenterMixer({
       </div>
 
       <div className="flex gap-2 justify-center mt-1 flex-wrap">
-          <Knob value={masterVol}   onChange={onMasterVolChange}    size={30} color="#d1d5db" label="MASTER" title="Master Volume" />
-          <Knob value={masterEqHi}  onChange={onMasterEqHiChange}   size={26} color="#fbbf24" label="HI" title="Master High EQ" />
-          <Knob value={masterEqMid} onChange={onMasterEqMidChange}  size={26} color="#c084fc" label="MID" title="Master Mid EQ" />
-          <Knob value={masterEqLo}  onChange={onMasterEqLoChange}   size={26} color="#34d399" label="LO" title="Master Low EQ" />
+          <Knob value={masterVol}   onChange={onMasterVolChange}    size={30} color={LOGO.cream} label="MASTER" title="Master Volume" />
+          <Knob value={masterEqHi}  onChange={onMasterEqHiChange}   size={26} color={LOGO.gold} label="HI" title="Master High EQ" />
+          <Knob value={masterEqMid} onChange={onMasterEqMidChange}  size={26} color={LOGO.amber} label="MID" title="Master Mid EQ" />
+          <Knob value={masterEqLo}  onChange={onMasterEqLoChange}   size={26} color={LOGO.redHot} label="LO" title="Master Low EQ" />
       </div>
 
       {/* Auto DJ toggle */}
@@ -1060,10 +1069,10 @@ function CenterMixer({
           className="w-full h-7 rounded text-[7px] font-black tracking-wider transition-all"
             title="Toggle Auto DJ"
           style={{
-            backgroundColor: autoDJ ? '#6d28d922' : '#1a1d24',
-            color:            autoDJ ? '#a78bfa'   : '#4b5563',
-            border:           `1px solid ${autoDJ ? '#6d28d960' : '#2d3340'}`,
-            boxShadow:        autoDJ ? '0 0 8px #6d28d930' : 'none',
+            backgroundColor: autoDJ ? `${LOGO.gold}22` : '#1a1d24',
+            color:            autoDJ ? LOGO.gold   : '#4b5563',
+            border:           `1px solid ${autoDJ ? `${LOGO.gold}66` : '#2d3340'}`,
+            boxShadow:        autoDJ ? `0 0 8px ${LOGO.gold}33` : 'none',
           }}
         >
           ⚡ AUTO DJ {autoDJ ? 'ON' : 'OFF'}
@@ -1098,12 +1107,12 @@ function VideoGoLiveButton({ streamKey, isSuspended = false }) {
       }
       className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-bold text-xs uppercase tracking-widest transition-all duration-150 shrink-0 ${
         videoLive
-          ? 'bg-purple-600 text-white shadow-[0_0_14px_#7c3aed55] animate-pulse'
+          ? 'bg-red-600 text-white shadow-[0_0_14px_#e0001255] animate-pulse'
           : isDisabled
           ? 'bg-gray-800/50 text-gray-600 cursor-not-allowed border border-gray-700'
           : videoStatus === 'error'
           ? 'bg-red-900 text-red-300 border border-red-700 hover:border-red-500 hover:text-white'
-          : 'bg-gray-800 text-gray-400 border border-gray-700 hover:border-purple-500 hover:text-purple-400'
+          : 'bg-gray-800 text-gray-400 border border-gray-700 hover:border-amber-500 hover:text-amber-400'
       }`}
     >
       {isSuspended && !videoLive && (
@@ -2057,7 +2066,7 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
           )}
           <div className="flex flex-col lg:flex-row">
             <DeckUnit
-              side="A" color="#38bdf8"
+              side="A" color={LOGO.redHot}
               active={true} playing={playing} onTogglePlay={togglePlay}
               streamLive={streamLive} stationName={trackA?.name ?? config?.stationName}
               waveData={WAVE_A} progress={progressA}
@@ -2171,7 +2180,7 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
             />
 
             <DeckUnit
-              side="B" color="#fbbf24"
+              side="B" color={LOGO.gold}
               active={!!trackB} playing={playingB} onTogglePlay={togglePlayB}
               streamLive={false} stationName={trackB?.name ?? config?.stationName}
               waveData={WAVE_B} progress={progressB}

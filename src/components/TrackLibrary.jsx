@@ -263,8 +263,8 @@ export default function TrackLibrary({
             onClick={() => setTab(t.id)}
             className="flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest transition-colors"
             style={{
-              color: tab === t.id ? '#38bdf8' : '#4b5563',
-              borderBottom: tab === t.id ? '2px solid #38bdf8' : '2px solid transparent',
+              color: tab === t.id ? '#fbbf24' : '#4b5563',
+              borderBottom: tab === t.id ? '2px solid #fbbf24' : '2px solid transparent',
               background: 'transparent',
             }}
           >
@@ -280,7 +280,7 @@ export default function TrackLibrary({
           <div className="flex gap-2 p-2 border-b border-gray-800 shrink-0">
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-sky-600/20 hover:bg-sky-600/30 text-sky-400 border border-sky-600/30 transition-colors"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-600/30 transition-colors"
             >
               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
@@ -289,7 +289,7 @@ export default function TrackLibrary({
             </button>
             <button
               onClick={() => dirInputRef.current?.click()}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 border border-purple-600/30 transition-colors"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 border border-amber-600/30 transition-colors"
             >
               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
@@ -340,9 +340,9 @@ export default function TrackLibrary({
                       {track.duration}
                     </span>
                     <div className="flex items-center justify-end gap-1">
-                      <button onClick={() => loadToDeck(track, 'A')} style={deckBtn('#38bdf8', '#38bdf840')} title="Load to Deck A">A</button>
+                      <button onClick={() => loadToDeck(track, 'A')} style={deckBtn('#ff2a1f', '#ff2a1f40')} title="Load to Deck A">A</button>
                       <button onClick={() => loadToDeck(track, 'B')} style={deckBtn('#fbbf24', '#fbbf2440')} title="Load to Deck B">B</button>
-                      <button onClick={() => addToQueue(track)}      style={deckBtn('#a78bfa', '#a78bfa40')} title="Add to Auto Playlist">+</button>
+                      <button onClick={() => addToQueue(track)}      style={deckBtn('#f97316', '#f9731640')} title="Add to Auto Playlist">+</button>
                       <button
                         onClick={() => removeFromLibrary(track.name)}
                         className="text-gray-700 hover:text-red-500 text-xs ml-0.5 transition-colors"
@@ -373,9 +373,9 @@ export default function TrackLibrary({
                 title={repeatPlaylist ? 'Repeat on — click to turn off' : 'Repeat off — click to loop playlist'}
                 className="flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest transition-colors border"
                 style={{
-                  color:      repeatPlaylist ? '#a78bfa' : '#4b5563',
-                  background: repeatPlaylist ? '#a78bfa18' : 'transparent',
-                  borderColor: repeatPlaylist ? '#a78bfa40' : '#374151',
+                  color:      repeatPlaylist ? '#fbbf24' : '#4b5563',
+                  background: repeatPlaylist ? '#fbbf2418' : 'transparent',
+                  borderColor: repeatPlaylist ? '#fbbf2440' : '#374151',
                 }}
               >
                 <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24">
@@ -441,12 +441,12 @@ export default function TrackLibrary({
                     onDragEnd={() => { setDragOverIdx(null); dragIndexRef.current = null }}
                     className={`grid items-center px-3 py-2 group transition-colors cursor-grab active:cursor-grabbing${
                         (track.name === nowPlayingA?.name || track.name === nowPlayingB?.name)
-                          ? ' bg-purple-900/40 border-l-2 border-purple-400'
+                          ? ' bg-red-900/40 border-l-2 border-amber-400'
                           : ' hover:bg-gray-800/50'
-                      }${dragOverIdx === idx ? ' border-t-2 border-purple-500' : ''}`}
+                      }${dragOverIdx === idx ? ' border-t-2 border-amber-500' : ''}`}
                     style={{ gridTemplateColumns: '22px 1fr 44px 84px' }}
                   >
-                    <span className="text-[10px] font-mono text-purple-500 font-bold">{idx + 1}</span>
+                    <span className="text-[10px] font-mono text-amber-500 font-bold">{idx + 1}</span>
                     <div className="flex flex-col min-w-0 pr-2">
                       <span className="text-white text-[11px] font-semibold truncate leading-tight">
                         {track.title}
@@ -457,7 +457,7 @@ export default function TrackLibrary({
                       {track.duration}
                     </span>
                     <div className="flex items-center justify-end gap-0.5">
-                      <button onClick={() => loadToDeck(track, 'A')} style={deckBtn('#38bdf8', '#38bdf840')} title="Load to Deck A">A</button>
+                      <button onClick={() => loadToDeck(track, 'A')} style={deckBtn('#ff2a1f', '#ff2a1f40')} title="Load to Deck A">A</button>
                       <button onClick={() => loadToDeck(track, 'B')} style={deckBtn('#fbbf24', '#fbbf2440')} title="Load to Deck B">B</button>
                       <button
                         onClick={() => moveUp(idx)}

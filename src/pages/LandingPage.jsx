@@ -15,9 +15,9 @@ const FEATURES = [
     ),
     title: 'Multistream Everywhere',
     desc: 'Push your live stream simultaneously to YouTube, Facebook, TikTok, and Instagram — from a single RTMP source.',
-    accent: 'text-purple-400',
-    border: 'border-purple-900/40',
-    bg: 'bg-purple-900/10',
+    accent: 'text-red-400',
+    border: 'border-red-900/40',
+    bg: 'bg-red-900/10',
   },
   {
     icon: (
@@ -27,9 +27,9 @@ const FEATURES = [
     ),
     title: 'Low-Latency HLS',
     desc: 'LL-HLS delivery with 1-second segments. Handle 500+ concurrent listeners without breaking a sweat.',
-    accent: 'text-blue-400',
-    border: 'border-blue-900/40',
-    bg: 'bg-blue-900/10',
+    accent: 'text-amber-400',
+    border: 'border-amber-900/40',
+    bg: 'bg-amber-900/10',
   },
   {
     icon: (
@@ -63,9 +63,9 @@ const FEATURES = [
     ),
     title: 'Your Own Stream Key',
     desc: 'Every account gets a unique, cryptographically secure RTMP ingest URL — no shared keys.',
-    accent: 'text-pink-400',
-    border: 'border-pink-900/40',
-    bg: 'bg-pink-900/10',
+    accent: 'text-red-300',
+    border: 'border-red-900/40',
+    bg: 'bg-red-900/10',
   },
   {
     icon: (
@@ -75,9 +75,9 @@ const FEATURES = [
     ),
     title: 'OBS Ready',
     desc: 'Works with OBS Studio, vMix, Liquidsoap, and any RTMP-compatible broadcaster out of the box.',
-    accent: 'text-cyan-400',
-    border: 'border-cyan-900/40',
-    bg: 'bg-cyan-900/10',
+    accent: 'text-yellow-300',
+    border: 'border-yellow-900/40',
+    bg: 'bg-yellow-900/10',
   },
 ]
 
@@ -218,7 +218,7 @@ export default function LandingPage() {
               <>
                 <button
                   onClick={() => goTo('/pricing')}
-                  className="px-5 py-2 rounded-lg bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold text-sm transition-all shadow-lg shadow-purple-900/30 hover:shadow-purple-900/50"
+                  className="px-5 py-2 rounded-lg rio-logo-gradient text-white font-semibold text-sm transition-all shadow-lg shadow-red-900/30 hover:shadow-red-900/50"
                 >
                   Start Broadcasting
                 </button>
@@ -235,7 +235,7 @@ export default function LandingPage() {
           <button
             type="button"
             onClick={() => setMobileMenuOpen((open) => !open)}
-            className="md:hidden inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 text-gray-300 transition-colors hover:border-white/20 hover:bg-white/5 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-400"
+            className="md:hidden inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 text-gray-300 transition-colors hover:border-white/20 hover:bg-white/5 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
             aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
             aria-expanded={mobileMenuOpen}
             aria-controls="landing-mobile-menu"
@@ -294,7 +294,7 @@ export default function LandingPage() {
                   <div className="flex flex-col gap-2">
                     <button
                       onClick={() => goTo('/pricing')}
-                      className="w-full rounded-lg bg-linear-to-r from-purple-600 to-blue-600 px-3 py-3 text-left text-sm font-semibold text-white shadow-lg shadow-purple-900/30 transition-all hover:from-purple-500 hover:to-blue-500 hover:shadow-purple-900/50"
+                      className="w-full rounded-lg rio-logo-gradient px-3 py-3 text-left text-sm font-semibold text-white shadow-lg shadow-red-900/30 transition-all hover:shadow-red-900/50"
                     >
                       Start Broadcasting
                     </button>
@@ -321,14 +321,14 @@ export default function LandingPage() {
         </div>
 
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-28 text-center">
-          <div className="inline-flex items-center gap-2 text-xs font-semibold text-purple-400 bg-purple-900/20 border border-purple-800/40 rounded-full px-3 py-1 mb-8">
-            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+          <div className="inline-flex items-center gap-2 text-xs font-semibold text-amber-300 bg-red-900/20 border border-red-800/40 rounded-full px-3 py-1 mb-8">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
             Your personal radio studio
           </div>
 
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.05] mb-6">
             Your Radio Station.{' '}
-            <span className="bg-linear-to-r from-purple-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
+            <span className="rio-logo-gradient-text">
               Live to the World.
             </span>
           </h1>
@@ -366,7 +366,7 @@ export default function LandingPage() {
             {stations.length > 8 && (
               <button
                 onClick={() => navigate('/stations')}
-                className="shrink-0 text-sm font-semibold text-purple-400 hover:text-purple-300 transition-colors"
+                className="shrink-0 text-sm font-semibold text-amber-400 hover:text-amber-300 transition-colors"
               >
                 {`Browse All ${stations.length} →`}
               </button>
@@ -376,7 +376,7 @@ export default function LandingPage() {
             {stations.slice(0, 8).map(station => (
               <div
                 key={station.slug}
-                className="group relative rounded-xl border border-white/5 bg-white/3 hover:border-purple-800/60 hover:bg-white/5 transition-all duration-200 overflow-hidden cursor-pointer"
+                className="group relative rounded-xl border border-white/5 bg-white/3 hover:border-red-800/60 hover:bg-white/5 transition-all duration-200 overflow-hidden cursor-pointer"
                 onClick={() => setSelectedStation(station)}
               >
                 {/* Card body */}
@@ -386,7 +386,7 @@ export default function LandingPage() {
                     {station.logo_url ? (
                       <img src={station.logo_url} alt={station.name} className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-2xl font-black text-purple-400">
+                      <span className="text-2xl font-black text-amber-400">
                         {station.name?.[0]?.toUpperCase() ?? '♫'}
                       </span>
                     )}
@@ -402,7 +402,7 @@ export default function LandingPage() {
                       )}
                     </div>
                     {station.genre && (
-                      <p className="text-[10px] text-purple-400 font-semibold mb-1">{station.genre}</p>
+                      <p className="text-[10px] text-amber-400 font-semibold mb-1">{station.genre}</p>
                     )}
                     {station.description && (
                       <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">{station.description}</p>
@@ -417,7 +417,7 @@ export default function LandingPage() {
 
                 {/* Hover overlay */}
                 <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-xl">
-                  <span className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-linear-to-r from-purple-600 to-blue-600 text-white text-sm font-bold shadow-lg">
+                  <span className="flex items-center gap-2 px-5 py-2.5 rounded-xl rio-logo-gradient text-white text-sm font-bold shadow-lg">
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M8 5v14l11-7z"/>
                     </svg>
@@ -431,7 +431,7 @@ export default function LandingPage() {
             <div className="mt-8 text-center">
               <button
                 onClick={() => navigate('/stations')}
-                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl border border-white/10 hover:border-purple-800/60 text-gray-300 hover:text-white text-sm font-semibold transition-all hover:bg-white/5"
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl border border-white/10 hover:border-red-800/60 text-gray-300 hover:text-white text-sm font-semibold transition-all hover:bg-white/5"
               >
                 Browse All {stations.length} Stations
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -473,7 +473,7 @@ export default function LandingPage() {
           <p className="text-gray-500 text-sm mb-8">Choose your plan and start broadcasting in minutes.</p>
           <button
             onClick={() => navigate('/pricing')}
-            className="px-8 py-3 rounded-xl bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold text-sm transition-all shadow-lg shadow-purple-900/40"
+            className="px-8 py-3 rounded-xl rio-logo-gradient text-white font-semibold text-sm transition-all shadow-lg shadow-red-900/40"
           >
             View Pricing Plans
           </button>

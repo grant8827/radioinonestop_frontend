@@ -13,8 +13,18 @@ const T = {
   faint:   '#2d3748',
 }
 
+const LOGO = {
+  red: '#e00012',
+  redHot: '#ff2a1f',
+  redDark: '#6b0608',
+  amber: '#f97316',
+  gold: '#fbbf24',
+  cream: '#fff4cf',
+  metal: '#cfd6dc',
+}
+
 // ─── Arc-track Knob ──────────────────────────────────────────────────────────
-function Knob({ value, onChange, size = 44, color = '#38bdf8', label, title }) {
+function Knob({ value, onChange, size = 44, color = LOGO.redHot, label, title }) {
   const dragRef = useRef(null)
   const onPointerDown = (e) => {
     e.preventDefault()
@@ -90,7 +100,7 @@ function Knob({ value, onChange, size = 44, color = '#38bdf8', label, title }) {
 }
 
 // ─── Vertical fader ───────────────────────────────────────────────────────────
-function VFader({ value, onChange, height = 140, color = '#e2e8f0', label, title }) {
+function VFader({ value, onChange, height = 140, color = LOGO.gold, label, title }) {
   const trackRef = useRef(null)
   const dragRef  = useRef(null)
   const getVal = (clientY) => {
@@ -241,7 +251,7 @@ function Pill({ on, onToggle, label, color = '#22c55e', width = '100%', title })
 }
 
 // ─── Segment selector ─────────────────────────────────────────────────────────
-function SegSel({ value, options, onChange, color = '#38bdf8' }) {
+function SegSel({ value, options, onChange, color = LOGO.gold }) {
   return (
     <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', border: `1px solid ${T.border}`, background: T.surface }}>
       {options.map((o) => (
@@ -311,7 +321,7 @@ function ChannelSettings({ anchorRef, ch, onUpdate, onClose }) {
   const [devices, setDevices] = useState([])
   const [permNeeded, setPermNeeded] = useState(false)
   const [pos, setPos] = useState({ top: 0, left: 0 })
-  const color = ch.isMic ? '#e879a0' : '#38bdf8'
+  const color = ch.isMic ? LOGO.redHot : LOGO.gold
 
   // Position below the gear button
   useEffect(() => {
@@ -441,7 +451,7 @@ function ChannelSettings({ anchorRef, ch, onUpdate, onClose }) {
                   {(() => {
                     const t = deviceType(ch.deviceLabel)
                     const g = DEVICE_GROUPS.find(x => x.key === t) || DEVICE_GROUPS[4]
-                    const typeColors = { bluetooth: '#38bdf8', usb: '#34d399', linein: '#fb923c', builtin: '#a78bfa', other: T.muted }
+                    const typeColors = { bluetooth: LOGO.gold, usb: LOGO.amber, linein: LOGO.redHot, builtin: LOGO.cream, other: T.muted }
                     return (
                       <span style={{
                         fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
@@ -475,12 +485,12 @@ function ChannelSettings({ anchorRef, ch, onUpdate, onClose }) {
             <option value="line-in">External Line In / USB</option>
           </select>
           {(ch.sourceType === 'dj') && (
-            <p style={{ fontSize: 8, color: '#38bdf8', margin: '4px 0 0', fontStyle: 'italic' }}>
+            <p style={{ fontSize: 8, color: LOGO.gold, margin: '4px 0 0', fontStyle: 'italic' }}>
               Audio routed from DJ Player
             </p>
           )}
           {(ch.sourceType === 'podcast') && (
-            <p style={{ fontSize: 8, color: '#a78bfa', margin: '4px 0 0', fontStyle: 'italic' }}>
+            <p style={{ fontSize: 8, color: LOGO.cream, margin: '4px 0 0', fontStyle: 'italic' }}>
               Audio routed from Podcast / Video
             </p>
           )}
@@ -527,7 +537,7 @@ function ChannelSettings({ anchorRef, ch, onUpdate, onClose }) {
                       {(() => {
                         const t = deviceType(ch.deviceLabel)
                         const g = DEVICE_GROUPS.find(x => x.key === t) || DEVICE_GROUPS[4]
-                        const typeColors = { bluetooth: '#38bdf8', usb: '#34d399', linein: '#fb923c', builtin: '#a78bfa', other: T.muted }
+                        const typeColors = { bluetooth: LOGO.gold, usb: LOGO.amber, linein: LOGO.redHot, builtin: LOGO.cream, other: T.muted }
                         return (
                           <span style={{
                             fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
@@ -554,7 +564,7 @@ function ChannelSettings({ anchorRef, ch, onUpdate, onClose }) {
       {ch.isMic && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <Pill on={ch.phantom} onToggle={() => onUpdate('phantom', !ch.phantom)}
-            label="+48V Phantom Power" color="#a78bfa" />
+            label="+48V Phantom Power" color={LOGO.gold} />
           <div>
             <label style={lbl}>PAD</label>
             <SegSel value={ch.pad} options={['0 dB', '-20 dB']}
@@ -582,7 +592,7 @@ function ChannelSettings({ anchorRef, ch, onUpdate, onClose }) {
 
 // ─── Channel strip ────────────────────────────────────────────────────────────
 function ChannelStrip({ ch, onUpdate, level = 0 }) {
-  const color  = ch.isMic ? '#e879a0' : '#38bdf8'
+  const color  = ch.isMic ? LOGO.redHot : LOGO.gold
   const [settingsOpen, setSettingsOpen] = useState(false)
   const gearRef = useRef(null)
 
@@ -665,13 +675,13 @@ function ChannelStrip({ ch, onUpdate, level = 0 }) {
         border: `1px solid ${T.borderFaint}`,
       }}>
         <SectionLabel color={T.faint}>EQ</SectionLabel>
-        <Knob value={ch.hi}  onChange={(v) => onUpdate('hi', v)}  size={28} color="#fbbf24" label="Hi" title="High EQ" />
-        <Knob value={ch.mid} onChange={(v) => onUpdate('mid', v)} size={28} color="#c084fc" label="Mid" title="Mid EQ" />
-        <Knob value={ch.lo}  onChange={(v) => onUpdate('lo', v)}  size={28} color="#34d399" label="Lo" title="Low EQ" />
+        <Knob value={ch.hi}  onChange={(v) => onUpdate('hi', v)}  size={28} color={LOGO.gold} label="Hi" title="High EQ" />
+        <Knob value={ch.mid} onChange={(v) => onUpdate('mid', v)} size={28} color={LOGO.amber} label="Mid" title="Mid EQ" />
+        <Knob value={ch.lo}  onChange={(v) => onUpdate('lo', v)}  size={28} color={LOGO.redHot} label="Lo" title="Low EQ" />
       </div>
 
-      <Knob value={ch.aux} onChange={(v) => onUpdate('aux', v)} size={26} color="#fb923c" label="Aux" title="Auxiliary Send" />
-      <Knob value={ch.pan} onChange={(v) => onUpdate('pan', v)} size={26} color="#94a3b8" label="Pan" title="Panning (Left/Right)" />
+      <Knob value={ch.aux} onChange={(v) => onUpdate('aux', v)} size={26} color={LOGO.amber} label="Aux" title="Auxiliary Send" />
+      <Knob value={ch.pan} onChange={(v) => onUpdate('pan', v)} size={26} color={LOGO.metal} label="Pan" title="Panning (Left/Right)" />
 
       {/* VU */}
       <VuMeter level={level} segments={22} width={8} active={ch.on && !ch.mute} />
@@ -681,9 +691,9 @@ function ChannelStrip({ ch, onUpdate, level = 0 }) {
 
       {/* Buttons */}
       <div style={{ display: 'flex', gap: 4, width: '100%' }}>
-        <Pill on={ch.pfl}  onToggle={() => onUpdate('pfl', !ch.pfl)}   label="PFL"  color="#f59e0b" width="33%" title="Pre-Fader Listen" />
-        <Pill on={ch.mute} onToggle={() => onUpdate('mute', !ch.mute)} label="M"    color="#ef4444" width="33%" title="Mute Channel" />
-        <Pill on={ch.on}   onToggle={() => onUpdate('on', !ch.on)}     label="ON"   color="#22c55e" width="33%" title="Channel On" />
+        <Pill on={ch.pfl}  onToggle={() => onUpdate('pfl', !ch.pfl)}   label="PFL"  color={LOGO.gold} width="33%" title="Pre-Fader Listen" />
+        <Pill on={ch.mute} onToggle={() => onUpdate('mute', !ch.mute)} label="M"    color={LOGO.redHot} width="33%" title="Mute Channel" />
+        <Pill on={ch.on}   onToggle={() => onUpdate('on', !ch.on)}     label="ON"   color={LOGO.amber} width="33%" title="Channel On" />
       </div>
     </div>
   )
@@ -702,7 +712,7 @@ function MasterSection({ master, onUpdate, vuL = 0, vuR = 0, onRecToggle, record
     }}>
       {/* Title */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <div style={{ width: 3, height: 14, borderRadius: 2, background: '#e2e8f0' }} />
+        <div style={{ width: 3, height: 14, borderRadius: 2, background: LOGO.gold }} />
         <span style={{ fontSize: 11, fontWeight: 900, color: T.text, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
           Master
         </span>
@@ -725,23 +735,23 @@ function MasterSection({ master, onUpdate, vuL = 0, vuR = 0, onRecToggle, record
 
       {/* Master fader */}
       <VFader value={master.fader} onChange={(v) => onUpdate('fader', v)}
-        height={150} color="#e2e8f0" label="Master" title="Master Volume Fader" />
+        height={150} color={LOGO.cream} label="Master" title="Master Volume Fader" />
 
       <Divider />
 
       {/* Monitor / headphone knobs */}
       <SectionLabel>Monitor</SectionLabel>
-      <Knob value={master.monitor} onChange={(v) => onUpdate('monitor', v)} size={36} color="#d1d5db" label="Mon" title="Monitor Volume" />
-      <Knob value={master.booth}   onChange={(v) => onUpdate('booth', v)}   size={30} color="#818cf8" label="HDPH" title="Headphones Volume" />
-      <Knob value={master.phones}  onChange={(v) => onUpdate('phones', v)}  size={30} color="#f97316" label="CUE" title="Cue/Master Mix (Headphones)" />
+      <Knob value={master.monitor} onChange={(v) => onUpdate('monitor', v)} size={36} color={LOGO.cream} label="Mon" title="Monitor Volume" />
+      <Knob value={master.booth}   onChange={(v) => onUpdate('booth', v)}   size={30} color={LOGO.gold} label="HDPH" title="Headphones Volume" />
+      <Knob value={master.phones}  onChange={(v) => onUpdate('phones', v)}  size={30} color={LOGO.redHot} label="CUE" title="Cue/Master Mix (Headphones)" />
 
       <Divider />
 
       {/* AUX returns */}
       <SectionLabel>AUX Ret</SectionLabel>
       <div style={{ display: 'flex', gap: 10 }}>
-        <Knob value={master.aux1} onChange={(v) => onUpdate('aux1', v)} size={28} color="#fb923c" label="A1" title="Aux 1 Return" />
-        <Knob value={master.aux2} onChange={(v) => onUpdate('aux2', v)} size={28} color="#fb923c" label="A2" title="Aux 2 Return" />
+        <Knob value={master.aux1} onChange={(v) => onUpdate('aux1', v)} size={28} color={LOGO.amber} label="A1" title="Aux 1 Return" />
+        <Knob value={master.aux2} onChange={(v) => onUpdate('aux2', v)} size={28} color={LOGO.amber} label="A2" title="Aux 2 Return" />
       </div>
 
       <Divider />
@@ -755,7 +765,7 @@ function MasterSection({ master, onUpdate, vuL = 0, vuR = 0, onRecToggle, record
             onToggle={() => onUpdate('fx', master.fx.includes(lbl)
               ? master.fx.filter(x => x !== lbl)
               : [...master.fx, lbl])}
-            label={lbl} color="#38bdf8" width="33%" title={`Toggle ${lbl}`}
+            label={lbl} color={LOGO.gold} width="33%" title={`Toggle ${lbl}`}
           />
         ))}
       </div>
@@ -861,7 +871,7 @@ function loadSavedMaster() {
 
 // ─── Conference channel strip ─────────────────────────────────────────────────
 function ConferenceStrip({ conf, onUpdate, onOpenConference, level = 0 }) {
-  const color = '#a78bfa'
+  const color = LOGO.cream
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
@@ -896,8 +906,8 @@ function ConferenceStrip({ conf, onUpdate, onOpenConference, level = 0 }) {
       <VFader value={conf.fader} onChange={(v) => onUpdate('fader', v)} height={130} color={color} title="Conference Fader" />
 
       <div style={{ display: 'flex', gap: 4, width: '100%' }}>
-        <Pill on={conf.mute} onToggle={() => onUpdate('mute', !conf.mute)} label="M" color="#ef4444" width="50%" title="Mute Conference" />
-        <Pill on={conf.on}   onToggle={() => onUpdate('on',   !conf.on)}   label="ON" color="#22c55e" width="50%" title="Conference On" />
+        <Pill on={conf.mute} onToggle={() => onUpdate('mute', !conf.mute)} label="M" color={LOGO.redHot} width="50%" title="Mute Conference" />
+        <Pill on={conf.on}   onToggle={() => onUpdate('on',   !conf.on)}   label="ON" color={LOGO.gold} width="50%" title="Conference On" />
       </div>
     </div>
   )
@@ -1156,12 +1166,12 @@ export default function Mixer({ config, onOpenConference }) {
           background: T.bg,
         }}>
           <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
-            <span style={{ fontSize: 9, fontWeight: 800, color: '#e879a0', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e879a0', display: 'inline-block' }} />
+            <span style={{ fontSize: 9, fontWeight: 800, color: LOGO.redHot, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: LOGO.redHot, display: 'inline-block' }} />
               Mic Inputs
             </span>
-            <span style={{ fontSize: 9, fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#38bdf8', display: 'inline-block' }} />
+            <span style={{ fontSize: 9, fontWeight: 800, color: LOGO.gold, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: LOGO.gold, display: 'inline-block' }} />
               Line Inputs
             </span>
           </div>
@@ -1178,7 +1188,7 @@ export default function Mixer({ config, onOpenConference }) {
 
             {/* Mic group */}
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-              <GroupHeader label="Mic Inputs" color="#e879a0" count={micChs.length} />
+              <GroupHeader label="Mic Inputs" color={LOGO.redHot} count={micChs.length} />
               <div style={{ display: 'flex', gap: 8, flex: 1 }}>
                 {micChs.map(ch => (
                   <ChannelStrip key={ch.id} ch={ch} onUpdate={(k, v) => updateChannel(ch.id, k, v)} level={levels[ch.id] ?? 0} />
@@ -1194,7 +1204,7 @@ export default function Mixer({ config, onOpenConference }) {
 
             {/* Line group */}
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-              <GroupHeader label="Line Inputs" color="#38bdf8" count={lineChs.length} />
+              <GroupHeader label="Line Inputs" color={LOGO.gold} count={lineChs.length} />
               <div style={{ display: 'flex', gap: 8, flex: 1 }}>
                 {lineChs.map(ch => (
                   <ChannelStrip key={ch.id} ch={ch} onUpdate={(k, v) => updateChannel(ch.id, k, v)} level={levels[ch.id] ?? 0} />
@@ -1210,7 +1220,7 @@ export default function Mixer({ config, onOpenConference }) {
 
             {/* Dedicated conference return */}
             <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-              <GroupHeader label="Conference" color="#a78bfa" count={1} />
+              <GroupHeader label="Conference" color={LOGO.cream} count={1} />
               <ConferenceStrip
                 conf={confState}
                 onUpdate={updateConf}
@@ -1248,8 +1258,8 @@ export default function Mixer({ config, onOpenConference }) {
                 <div key={ch.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <div style={{
                     width: 5, height: 5, borderRadius: '50%',
-                    background: active ? (ch.isMic ? '#e879a0' : '#38bdf8') : T.faint,
-                    boxShadow: active ? `0 0 6px ${ch.isMic ? '#e879a0' : '#38bdf8'}` : 'none',
+                    background: active ? (ch.isMic ? LOGO.redHot : LOGO.gold) : T.faint,
+                    boxShadow: active ? `0 0 6px ${ch.isMic ? LOGO.redHot : LOGO.gold}` : 'none',
                     transition: 'all 0.2s',
                   }} />
                   <span style={{ fontSize: 8, color: active ? '#94a3b8' : T.faint, fontWeight: 600 }}>

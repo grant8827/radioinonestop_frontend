@@ -63,7 +63,7 @@ export default function LoginModal({ onSuccess, onClose, onSwitchToRegister }) {
       <div className="w-full max-w-sm bg-[#0f0f17] border border-white/8 rounded-2xl shadow-2xl shadow-black/60">
 
         {/* Top accent line */}
-        <div className="h-0.5 w-full rounded-t-2xl bg-linear-to-r from-purple-600 to-blue-500" />
+        <div className="h-0.5 w-full rounded-t-2xl rio-logo-gradient" />
 
         <div className="p-7">
           {/* Header */}
@@ -95,7 +95,7 @@ export default function LoginModal({ onSuccess, onClose, onSwitchToRegister }) {
                 required
                 autoComplete="email"
                 placeholder="you@example.com"
-                className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition-colors"
+                  className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-amber-500 transition-colors"
               />
             </div>
 
@@ -110,7 +110,7 @@ export default function LoginModal({ onSuccess, onClose, onSwitchToRegister }) {
                   required
                   autoComplete="current-password"
                   placeholder="Your password"
-                  className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2.5 pr-10 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 transition-colors"
+                  className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2.5 pr-10 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-amber-500 transition-colors"
                 />
                 <button
                   type="button"
@@ -136,7 +136,7 @@ export default function LoginModal({ onSuccess, onClose, onSwitchToRegister }) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 rounded-xl bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm transition-all shadow-lg shadow-purple-900/30 mt-2"
+              className="w-full py-2.5 rounded-xl rio-logo-gradient disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm transition-all shadow-lg shadow-red-900/30 mt-2"
             >
               {loading ? 'Signing in…' : 'Sign In'}
             </button>
@@ -149,7 +149,7 @@ export default function LoginModal({ onSuccess, onClose, onSwitchToRegister }) {
               <button
                 type="button"
                 onClick={onSwitchToRegister}
-                className="text-purple-400 hover:text-purple-300 font-semibold"
+                className="text-amber-400 hover:text-amber-300 font-semibold"
               >
                 Create one free →
               </button>

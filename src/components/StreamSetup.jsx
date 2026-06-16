@@ -239,10 +239,10 @@ function StreamSettingsTab({ audioKey, liveStreams, viewers, host, sourcePasswor
       <IcecastCard host={host} audioKey={audioKey} sourcePassword={sourcePassword} />
 
       {/* ── Your RTMP Credentials ── */}
-      <div className="bg-gray-900 border border-purple-900/40 rounded-xl overflow-hidden">
-        <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-purple-900/20 to-transparent border-b border-purple-900/30">
-          <span className="w-8 h-8 rounded-lg bg-purple-600/20 border border-purple-500/30 flex items-center justify-center shrink-0">
-            <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+      <div className="bg-gray-900 border border-red-900/40 rounded-xl overflow-hidden">
+        <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-red-900/20 to-transparent border-b border-red-900/30">
+          <span className="w-8 h-8 rounded-lg bg-red-600/20 border border-red-500/30 flex items-center justify-center shrink-0">
+            <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
             </svg>
           </span>
@@ -250,7 +250,7 @@ function StreamSettingsTab({ audioKey, liveStreams, viewers, host, sourcePasswor
             <h3 className="font-semibold text-white text-sm">Your RTMP Credentials</h3>
             <p className="text-xs text-gray-400">Use these in OBS Studio or any RTMP broadcaster</p>
           </div>
-          <span className="ml-auto text-[10px] font-bold text-purple-400 bg-purple-900/30 border border-purple-700/40 rounded px-2 py-0.5">PERSONAL</span>
+          <span className="ml-auto text-[10px] font-bold text-amber-400 bg-red-900/30 border border-red-700/40 rounded px-2 py-0.5">PERSONAL</span>
         </div>
         <div className="px-5 py-4 space-y-3">
           {creds ? (
@@ -269,8 +269,8 @@ function StreamSettingsTab({ audioKey, liveStreams, viewers, host, sourcePasswor
       {/* ── Channel Playback URLs ── */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
         <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-gray-800/60 to-gray-900 border-b border-gray-800">
-          <span className="w-8 h-8 rounded-lg bg-purple-600/20 border border-purple-500/30 flex items-center justify-center flex-shrink-0">
-            <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <span className="w-8 h-8 rounded-lg bg-amber-600/20 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
+            <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12 20.25h.008v.008H12v-.008z" />
             </svg>
           </span>
@@ -1109,10 +1109,10 @@ function AudioEncoderTab({ audioKey, host, listenUrl, isSuspended = false }) {
 function VideoEncoderTab() {
   return (
     <div className="space-y-5">
-      <div className="bg-gray-900 border border-blue-900/40 rounded-xl overflow-hidden">
-        <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-blue-900/30 to-gray-900 border-b border-blue-900/30">
-          <span className="w-8 h-8 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center flex-shrink-0">
-            <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+      <div className="bg-gray-900 border border-amber-900/40 rounded-xl overflow-hidden">
+        <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-amber-900/30 to-gray-900 border-b border-amber-900/30">
+          <span className="w-8 h-8 rounded-lg bg-amber-600/20 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
+            <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
             </svg>
           </span>
@@ -1120,7 +1120,7 @@ function VideoEncoderTab() {
             <h3 className="font-semibold text-white text-sm">Video Encoder</h3>
             <p className="text-xs text-gray-400">Recommended settings for H.264 video streams</p>
           </div>
-          <span className="ml-auto text-[10px] font-bold text-blue-400 bg-blue-900/30 border border-blue-700/40 rounded px-2 py-0.5">H.264</span>
+          <span className="ml-auto text-[10px] font-bold text-amber-400 bg-amber-900/30 border border-amber-700/40 rounded px-2 py-0.5">H.264</span>
         </div>
         <div className="px-5 py-4 space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1141,13 +1141,13 @@ function VideoEncoderTab() {
               </div>
             ))}
           </div>
-          <div className="bg-blue-950/20 border border-blue-800/30 rounded-lg p-4">
-            <p className="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-3">OBS Configuration</p>
+          <div className="bg-amber-950/20 border border-amber-800/30 rounded-lg p-4">
+            <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-3">OBS Configuration</p>
             <ol className="space-y-2 text-sm text-gray-300 list-decimal list-inside">
-              <li>Go to <strong>Settings → Output → Video Encoder</strong> → select <span className="text-blue-300 font-mono">x264</span> or <span className="text-blue-300 font-mono">NVENC H.264</span></li>
-              <li>Set <strong>Rate Control</strong> to <span className="text-blue-300 font-mono">CBR</span>, bitrate to <span className="text-blue-300 font-mono">4000 kbps</span></li>
-              <li>Set <strong>Keyframe Interval</strong> to <span className="text-blue-300 font-mono">1 s</span> — critical for low-latency HLS</li>
-              <li>Go to <strong>Settings → Video</strong> → set resolution and frame rate to <span className="text-blue-300 font-mono">30</span></li>
+              <li>Go to <strong>Settings → Output → Video Encoder</strong> → select <span className="text-amber-300 font-mono">x264</span> or <span className="text-amber-300 font-mono">NVENC H.264</span></li>
+              <li>Set <strong>Rate Control</strong> to <span className="text-amber-300 font-mono">CBR</span>, bitrate to <span className="text-amber-300 font-mono">4000 kbps</span></li>
+              <li>Set <strong>Keyframe Interval</strong> to <span className="text-amber-300 font-mono">1 s</span> — critical for low-latency HLS</li>
+              <li>Go to <strong>Settings → Video</strong> → set resolution and frame rate to <span className="text-amber-300 font-mono">30</span></li>
             </ol>
           </div>
           <div className="bg-gray-800/40 border border-gray-700/50 rounded-lg px-4 py-3">
@@ -1183,10 +1183,10 @@ const SOCIAL_PLATFORMS = [
     badge: 'RTMPS',
     keyUrl: 'https://www.facebook.com/live/producer',
     keyNote: 'Facebook → Create → Live Video → Streaming Software',
-    colorBorder: 'border-blue-900/40',
-    colorFrom: 'from-blue-900/30',
-    colorIcon: 'bg-blue-600/20 border-blue-500/30 text-blue-400',
-    colorBadge: 'text-blue-400 bg-blue-900/30 border-blue-700/40',
+    colorBorder: 'border-amber-900/40',
+    colorFrom: 'from-amber-900/30',
+    colorIcon: 'bg-amber-600/20 border-amber-500/30 text-amber-400',
+    colorBadge: 'text-amber-400 bg-amber-900/30 border-amber-700/40',
   },
   {
     id: 'twitch',
@@ -1195,10 +1195,10 @@ const SOCIAL_PLATFORMS = [
     badge: 'RTMP',
     keyUrl: 'https://dashboard.twitch.tv/settings/stream',
     keyNote: 'Twitch Dashboard → Settings → Stream → copy Stream Key',
-    colorBorder: 'border-purple-900/40',
-    colorFrom: 'from-purple-900/30',
-    colorIcon: 'bg-purple-600/20 border-purple-500/30 text-purple-400',
-    colorBadge: 'text-purple-400 bg-purple-900/30 border-purple-700/40',
+    colorBorder: 'border-red-900/40',
+    colorFrom: 'from-red-900/30',
+    colorIcon: 'bg-red-600/20 border-red-500/30 text-red-400',
+    colorBadge: 'text-amber-400 bg-red-900/30 border-red-700/40',
   },
   {
     id: 'tiktok',
@@ -1470,8 +1470,8 @@ function PlatformConnections({ connectedPlatforms = {}, onConnect, onDisconnect,
     <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-800">
-        <span className="w-8 h-8 rounded-lg bg-purple-900/30 border border-purple-700/40 flex items-center justify-center shrink-0">
-          <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <span className="w-8 h-8 rounded-lg bg-red-900/30 border border-red-700/40 flex items-center justify-center shrink-0">
+          <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
           </svg>
         </span>
@@ -1479,7 +1479,7 @@ function PlatformConnections({ connectedPlatforms = {}, onConnect, onDisconnect,
           <h3 className="font-semibold text-white text-sm">Platform Connections</h3>
           <p className="text-xs text-gray-400">Login-to-Stream — connect accounts for automatic credential provisioning</p>
         </div>
-        <span className="text-[9px] font-bold text-purple-400 bg-purple-900/20 border border-purple-700/30 rounded px-2 py-1 uppercase tracking-wider shrink-0">OAuth 2.0</span>
+        <span className="text-[9px] font-bold text-amber-400 bg-red-900/20 border border-red-700/30 rounded px-2 py-1 uppercase tracking-wider shrink-0">OAuth 2.0</span>
       </div>
 
       {/* Platform grid */}
@@ -1562,7 +1562,7 @@ function PlatformConnections({ connectedPlatforms = {}, onConnect, onDisconnect,
       {/* Footer: info + sync button */}
       <div className="px-5 py-3 border-t border-gray-800 bg-gray-950/40 flex items-center gap-3">
         <div className="flex items-start gap-2 flex-1 min-w-0">
-          <svg className="w-3.5 h-3.5 text-blue-500 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
           </svg>
           <p className="text-[10px] text-gray-500 leading-relaxed">
@@ -1575,7 +1575,7 @@ function PlatformConnections({ connectedPlatforms = {}, onConnect, onDisconnect,
           onClick={handleSync}
           disabled={syncing || disabled}
           className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold
-            bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500
+            bg-red-600 hover:bg-red-500 disabled:bg-gray-700 disabled:text-gray-500
             text-white transition-colors cursor-pointer disabled:cursor-not-allowed"
         >
           {syncing ? (
@@ -2233,8 +2233,8 @@ function ChannelTab({ host, audioKey, isSuspended = false, manualOnly = false })
         <div className="bg-black border border-gray-800 rounded-xl overflow-hidden relative">
           <div className="relative w-full" style={{ aspectRatio: '16/9', background: '#0a0a0a' }}>
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-purple-600/20 border-2 border-purple-500/30 flex items-center justify-center">
-                <svg className="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <div className="w-16 h-16 rounded-full bg-red-600/20 border-2 border-red-500/30 flex items-center justify-center">
+                <svg className="w-8 h-8 text-amber-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                 </svg>
               </div>
@@ -2243,7 +2243,7 @@ function ChannelTab({ host, audioKey, isSuspended = false, manualOnly = false })
                 <p className="text-gray-400 text-sm mb-4">Upgrade to Enterprise or Ultimate to broadcast live video</p>
                 <button
                   onClick={() => setUpgradeModal({ show: true, feature: 'Video Live Streaming', requiredPlan: 'enterprise' })}
-                  className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold text-sm transition-all shadow-lg shadow-purple-900/40"
+                  className="px-5 py-2.5 rounded-lg rio-logo-gradient text-white font-semibold text-sm transition-all shadow-lg shadow-red-900/40"
                 >
                   Upgrade to Unlock
                 </button>
@@ -2254,7 +2254,7 @@ function ChannelTab({ host, audioKey, isSuspended = false, manualOnly = false })
             <svg className="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
             </svg>
-            <p className="text-xs text-gray-500">Available in <span className="text-purple-400 font-semibold">Enterprise</span> and <span className="text-purple-400 font-semibold">Ultimate</span> plans</p>
+            <p className="text-xs text-gray-500">Available in <span className="text-amber-400 font-semibold">Enterprise</span> and <span className="text-amber-400 font-semibold">Ultimate</span> plans</p>
           </div>
         </div>
       ))}
@@ -2357,15 +2357,15 @@ function ChannelTab({ host, audioKey, isSuspended = false, manualOnly = false })
         <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden relative opacity-60">
           <div className="absolute inset-0 bg-black/40 z-10 flex items-center justify-center backdrop-blur-sm">
             <div className="text-center px-4">
-              <div className="w-12 h-12 rounded-full bg-purple-600/20 border-2 border-purple-500/30 flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <div className="w-12 h-12 rounded-full bg-red-600/20 border-2 border-red-500/30 flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-amber-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                 </svg>
               </div>
               <p className="text-white font-semibold mb-1">Enterprise Feature</p>
               <button
                 onClick={() => setUpgradeModal({ show: true, feature: 'Social Media Platform Connections', requiredPlan: 'enterprise' })}
-                className="mt-2 px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition-all"
+                className="mt-2 px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition-all"
               >
                 Upgrade
               </button>
@@ -2406,7 +2406,7 @@ function ChannelTab({ host, audioKey, isSuspended = false, manualOnly = false })
               value={formPlatform}
               onChange={(e) => handlePlatformChange(e.target.value)}
               disabled={isLive}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-purple-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed appearance-none cursor-pointer"
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-amber-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed appearance-none cursor-pointer"
             >
               {SOCIAL_PLATFORMS.map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
@@ -2426,7 +2426,7 @@ function ChannelTab({ host, audioKey, isSuspended = false, manualOnly = false })
                 onChange={(e) => setFormLabel(e.target.value)}
                 disabled={isLive}
                 placeholder={selectedPlatform?.name || 'My channel'}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-purple-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-amber-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
             <div>
@@ -2439,7 +2439,7 @@ function ChannelTab({ host, audioKey, isSuspended = false, manualOnly = false })
                 onChange={(e) => setFormUrl(e.target.value)}
                 disabled={isLive || (formPlatform !== 'custom' && !!selectedPlatform?.defaultUrl)}
                 placeholder="rtmp://"
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-purple-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed font-mono text-xs"
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-amber-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed font-mono text-xs"
               />
             </div>
           </div>
@@ -2457,7 +2457,7 @@ function ChannelTab({ host, audioKey, isSuspended = false, manualOnly = false })
                 onKeyDown={(e) => { if (e.key === 'Enter') addChannel() }}
                 disabled={isLive}
                 placeholder={`Paste your ${selectedPlatform?.name || ''} stream key`}
-                className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-purple-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed font-mono"
+                className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-amber-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed font-mono"
               />
               <button
                 type="button"
@@ -2507,7 +2507,7 @@ function ChannelTab({ host, audioKey, isSuspended = false, manualOnly = false })
             <button
               onClick={addChannel}
               disabled={isLive || channels.length >= maxChannels}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 border border-purple-600/30 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-red-600/20 hover:bg-red-600/30 text-amber-400 border border-red-600/30 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -2631,8 +2631,8 @@ function ChannelTab({ host, audioKey, isSuspended = false, manualOnly = false })
         <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden relative opacity-60">
           <div className="absolute inset-0 bg-black/40 z-10 flex items-center justify-center backdrop-blur-sm">
             <div className="text-center px-4">
-              <div className="w-12 h-12 rounded-full bg-purple-600/20 border-2 border-purple-500/30 flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <div className="w-12 h-12 rounded-full bg-red-600/20 border-2 border-red-500/30 flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-amber-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                 </svg>
               </div>
@@ -2640,7 +2640,7 @@ function ChannelTab({ host, audioKey, isSuspended = false, manualOnly = false })
               <p className="text-gray-400 text-sm mb-3">Multistream to multiple platforms simultaneously</p>
               <button
                 onClick={() => setUpgradeModal({ show: true, feature: 'Multistream Destinations', requiredPlan: 'enterprise' })}
-                className="mt-2 px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition-all"
+                className="mt-2 px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition-all"
               >
                 Upgrade
               </button>

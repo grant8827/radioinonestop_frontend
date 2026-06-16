@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import appLogo from '../assets/radioinonestop_logo .png'
 
 const RAW_API_BASE = import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_BASE_URL || ''
 const API_BASE = import.meta.env.DEV ? '' : RAW_API_BASE
@@ -144,9 +145,7 @@ export default function PricingPage() {
       <nav className="border-b border-white/5 backdrop-blur-lg bg-gray-950/80 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => navigate('/')}>
-            <svg className="w-7 h-7 text-purple-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 19.5l2.25-2.25m0 0l.75-.75m-.75.75A8.953 8.953 0 0112 15a8.953 8.953 0 015.999 2.25m-12-2.25A8.953 8.953 0 0112 6a8.953 8.953 0 016 3m-12 0L3.75 7.5M3.75 4.5l2.25 2.25m12-2.25l-2.25 2.25m0 0l-.75.75m.75-.75A8.953 8.953 0 0112 9a8.953 8.953 0 016 3m-6-3V3m0 18v-1.5" />
-            </svg>
+            <img src={appLogo} alt="Radio In One Stop logo" className="w-7 h-7 rounded-sm object-contain" />
             <span className="font-bold text-sm tracking-tight">Radio In One Stop</span>
           </div>
           
@@ -159,7 +158,7 @@ export default function PricingPage() {
             </button>
             <button
               onClick={() => navigate('/pricing')}
-              className="text-sm font-medium text-purple-400 transition-colors px-4 py-1.5 rounded-lg bg-purple-900/20"
+              className="text-sm font-medium text-amber-400 transition-colors px-4 py-1.5 rounded-lg bg-red-900/20"
             >
               Pricing
             </button>
@@ -205,7 +204,7 @@ export default function PricingPage() {
         </div>
 
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-12 text-center">
-          <div className="inline-flex items-center gap-2 text-xs font-semibold text-purple-400 bg-purple-900/20 border border-purple-800/40 rounded-full px-3 py-1 mb-6">
+          <div className="inline-flex items-center gap-2 text-xs font-semibold text-amber-300 bg-red-900/20 border border-red-800/40 rounded-full px-3 py-1 mb-6">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z" />
             </svg>
@@ -227,10 +226,10 @@ export default function PricingPage() {
             </span>
             <button
               onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
-              className="relative w-14 h-7 bg-white/10 rounded-full transition-colors hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-950"
+              className="relative w-14 h-7 bg-white/10 rounded-full transition-colors hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-gray-950"
             >
               <div
-                className={`absolute top-0.5 left-0.5 w-6 h-6 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full transition-transform shadow-lg ${
+                className={`absolute top-0.5 left-0.5 w-6 h-6 rio-logo-gradient rounded-full transition-transform shadow-lg ${
                   billingCycle === 'yearly' ? 'translate-x-7' : 'translate-x-0'
                 }`}
               />
@@ -259,13 +258,13 @@ export default function PricingPage() {
                 key={plan.id}
                 className={`relative rounded-2xl border ${
                   isHighlighted
-                    ? 'border-purple-500/60 bg-purple-900/10 shadow-xl shadow-purple-900/20'
+                    ? 'border-red-500/60 bg-red-900/10 shadow-xl shadow-red-900/20'
                     : 'border-white/10 bg-white/3'
-                } p-8 transition-all hover:border-purple-500/40 hover:shadow-lg`}
+                } p-8 transition-all hover:border-amber-500/40 hover:shadow-lg`}
               >
                 {isHighlighted && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="inline-block bg-linear-to-r from-purple-600 to-blue-600 text-white text-xs font-bold uppercase tracking-wider px-4 py-1 rounded-full">
+                    <span className="inline-block rio-logo-gradient text-white text-xs font-bold uppercase tracking-wider px-4 py-1 rounded-full">
                       Most Popular
                     </span>
                   </div>
@@ -306,7 +305,7 @@ export default function PricingPage() {
                   onClick={() => selectPlan(plan.id)}
                   className={`w-full py-3 rounded-xl font-semibold text-sm transition-all mb-6 ${
                     isHighlighted
-                      ? 'bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-lg shadow-purple-900/40'
+                      ? 'rio-logo-gradient text-white shadow-lg shadow-red-900/40'
                       : 'bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-white/20'
                   }`}
                 >
@@ -318,7 +317,7 @@ export default function PricingPage() {
                     <div key={idx} className="flex items-start gap-3">
                       <svg
                         className={`w-5 h-5 shrink-0 mt-0.5 ${
-                          isHighlighted ? 'text-purple-400' : 'text-gray-500'
+                          isHighlighted ? 'text-amber-400' : 'text-gray-500'
                         }`}
                         fill="none"
                         stroke="currentColor"
@@ -343,7 +342,7 @@ export default function PricingPage() {
           </p>
           <p className="text-gray-500 text-xs">
             Need a custom enterprise solution?{' '}
-            <button className="text-purple-400 hover:text-purple-300 underline">
+            <button className="text-amber-400 hover:text-amber-300 underline">
               Contact our sales team
             </button>
           </p>
