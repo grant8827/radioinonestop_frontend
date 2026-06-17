@@ -278,11 +278,11 @@ export default function StationModal({ station, onClose }) {
     if (!audio) return
     setConnecting(true)
     setPlayError('')
-    const sessionID = await startListenerSession()
+    const hasIcecastStream = !!info.icecast_listen_url
+    const sessionID = hasIcecastStream ? null : await startListenerSession()
     const countedStreamUrl = sessionID
       ? `${streamUrl}?listener_session=${encodeURIComponent(sessionID)}`
       : streamUrl
-    const fallbackUrl = info.icecast_listen_url || countedStreamUrl
     const playAudio = async (src) => {
       audio.src = src
       audio.load()
@@ -291,13 +291,11 @@ export default function StationModal({ station, onClose }) {
       setConnecting(false)
     }
 
-    if (info.icecast_listen_url) {
+    if (hasIcecastStream) {
       playAudio(info.icecast_listen_url).catch(() => {
-        playAudio(countedStreamUrl).catch(() => {
-          setPlaying(false)
-          setConnecting(false)
-          setPlayError('Stream is not ready yet')
-        })
+        setPlaying(false)
+        setConnecting(false)
+        setPlayError('Icecast stream is offline or source authentication failed')
       })
       return
     }
@@ -368,7 +366,7 @@ export default function StationModal({ station, onClose }) {
         if (!playing && hlsRef.current === hls) {
           hls.destroy()
           hlsRef.current = null
-          playAudio(fallbackUrl).catch(() => {
+          playAudio(countedStreamUrl).catch(() => {
             setPlaying(false)
             setConnecting(false)
             setPlayError('Stream is not ready yet')
@@ -382,7 +380,7 @@ export default function StationModal({ station, onClose }) {
         audio.play().then(() => {
           setPlaying(true)
           setConnecting(false)
-        }).catch(() => playAudio(fallbackUrl).catch(() => {
+        }).catch(() => playAudio(countedStreamUrl).catch(() => {
           setPlaying(false)
           setConnecting(false)
           setPlayError('Stream is not ready yet')
@@ -391,10 +389,10 @@ export default function StationModal({ station, onClose }) {
       hls.on(Hls.Events.ERROR, (_e, data) => {
         if (data.fatal) {
           window.clearTimeout(fallbackTimer)
-          // HLS not ready — try Icecast URL if available, else raw WebM hub stream
+          // HLS not ready — try the raw WebM hub stream.
           hls.destroy()
           hlsRef.current = null
-          playAudio(fallbackUrl).catch(() => {
+          playAudio(countedStreamUrl).catch(() => {
             setPlaying(false)
             setConnecting(false)
             setPlayError('Stream is not ready yet')
@@ -410,15 +408,15 @@ export default function StationModal({ station, onClose }) {
       audio.play().then(() => {
         setPlaying(true)
         setConnecting(false)
-      }).catch(() => playAudio(fallbackUrl).catch(() => {
+      }).catch(() => playAudio(countedStreamUrl).catch(() => {
         setPlaying(false)
         setConnecting(false)
         setPlayError('Stream is not ready yet')
       }))
     } else {
-      // Final fallback: Icecast stream or raw WebM
+      // Final fallback: raw WebM station hub
       hlsRef.current = null
-      playAudio(fallbackUrl).catch(() => {
+      playAudio(countedStreamUrl).catch(() => {
         setPlaying(false)
         setConnecting(false)
         setPlayError('Stream is not ready yet')
