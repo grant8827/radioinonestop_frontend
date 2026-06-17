@@ -278,27 +278,8 @@ export default function StationModal({ station, onClose }) {
     if (!audio) return
     setConnecting(true)
     setPlayError('')
-    const hasIcecastStream = !!info.icecast_listen_url
-    const sessionID = hasIcecastStream ? null : await startListenerSession()
-    const countedStreamUrl = sessionID
-      ? `${streamUrl}?listener_session=${encodeURIComponent(sessionID)}`
-      : streamUrl
-    const playAudio = async (src) => {
-      audio.src = src
-      audio.load()
-      await audio.play()
-      setPlaying(true)
-      setConnecting(false)
-    }
-
-    if (hasIcecastStream) {
-      playAudio(info.icecast_listen_url).catch(() => {
-        setPlaying(false)
-        setConnecting(false)
-        setPlayError('Icecast stream is offline or source authentication failed')
-      })
-      return
-    }
+    hlsRef.current?.destroy()
+    hlsRef.current = null
 
     // Build AudioContext + analyser for visualizer.
     // IMPORTANT: On iOS, routing audio through AudioContext (createMediaElementSource)
@@ -358,71 +339,61 @@ export default function StationModal({ station, onClose }) {
       } catch (e) { /* MediaSession unavailable */ }
     }
 
-    if (Hls.isSupported()) {
-      // Desktop Chrome / Firefox / Android — use hls.js
-      hlsRef.current?.destroy()
-      const hls = new Hls({ lowLatencyMode: false, liveSyncDurationCount: 3 })
-      const fallbackTimer = window.setTimeout(() => {
-        if (!playing && hlsRef.current === hls) {
-          hls.destroy()
-          hlsRef.current = null
-          playAudio(countedStreamUrl).catch(() => {
-            setPlaying(false)
-            setConnecting(false)
-            setPlayError('Stream is not ready yet')
-          })
-        }
-      }, 2500)
-      hls.loadSource(hlsUrl)
-      hls.attachMedia(audio)
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        window.clearTimeout(fallbackTimer)
-        audio.play().then(() => {
-          setPlaying(true)
-          setConnecting(false)
-        }).catch(() => playAudio(countedStreamUrl).catch(() => {
-          setPlaying(false)
-          setConnecting(false)
-          setPlayError('Stream is not ready yet')
-        }))
-      })
-      hls.on(Hls.Events.ERROR, (_e, data) => {
-        if (data.fatal) {
-          window.clearTimeout(fallbackTimer)
-          // HLS not ready — try the raw WebM hub stream.
-          hls.destroy()
-          hlsRef.current = null
-          playAudio(countedStreamUrl).catch(() => {
-            setPlaying(false)
-            setConnecting(false)
-            setPlayError('Stream is not ready yet')
-          })
-        }
-      })
-      hlsRef.current = hls
-    } else if (audio.canPlayType('application/vnd.apple.mpegurl')) {
-      // iOS Safari — native HLS support
-      hlsRef.current = null
-      audio.src = hlsUrl
-      audio.load()
-      audio.play().then(() => {
-        setPlaying(true)
-        setConnecting(false)
-      }).catch(() => playAudio(countedStreamUrl).catch(() => {
-        setPlaying(false)
-        setConnecting(false)
-        setPlayError('Stream is not ready yet')
-      }))
-    } else {
-      // Final fallback: raw WebM station hub
-      hlsRef.current = null
-      playAudio(countedStreamUrl).catch(() => {
-        setPlaying(false)
-        setConnecting(false)
-        setPlayError('Stream is not ready yet')
-      })
+    const hasIcecastStream = !!info.icecast_listen_url
+    const primaryStreamUrl = hasIcecastStream ? info.icecast_listen_url : streamUrl
+    const startTracking = () => {
+      if (!hasIcecastStream) startListenerSession().catch(() => {})
     }
-  }, [hlsUrl, info.genre, info.icecast_listen_url, info.logo_url, info.name, playing, startListenerSession, stopListenerSession, streamUrl])
+    const markPlaying = () => {
+      setPlaying(true)
+      setConnecting(false)
+    }
+    const fail = (message = 'Stream is not ready yet') => {
+      setPlaying(false)
+      setConnecting(false)
+      setPlayError(message)
+    }
+    const playDirect = async (src) => {
+      audio.src = src
+      audio.load()
+      await audio.play()
+      markPlaying()
+    }
+    const playHlsFallback = () => {
+      if (hasIcecastStream) {
+        fail('Icecast stream is offline or source authentication failed')
+        return
+      }
+      if (Hls.isSupported()) {
+        hlsRef.current?.destroy()
+        const hls = new Hls({ lowLatencyMode: false, liveSyncDurationCount: 3 })
+        hls.loadSource(hlsUrl)
+        hls.attachMedia(audio)
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          audio.play().then(() => {
+            markPlaying()
+            startTracking()
+          }).catch(() => fail())
+        })
+        hls.on(Hls.Events.ERROR, (_e, data) => {
+          if (data.fatal) {
+            hls.destroy()
+            hlsRef.current = null
+            fail()
+          }
+        })
+        hlsRef.current = hls
+        return
+      }
+      if (audio.canPlayType('application/vnd.apple.mpegurl')) {
+        playDirect(hlsUrl).then(startTracking).catch(() => fail())
+        return
+      }
+      fail()
+    }
+
+    playDirect(primaryStreamUrl).catch(() => playHlsFallback())
+  }, [hlsUrl, info.genre, info.icecast_listen_url, info.logo_url, info.name, startListenerSession, stopListenerSession, streamUrl])
 
   const stop = useCallback(() => {
     hlsRef.current?.destroy()
