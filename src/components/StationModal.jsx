@@ -161,6 +161,7 @@ export default function StationModal({ station, onClose }) {
   const [playing, setPlaying]   = useState(false)
   const [connecting, setConnecting] = useState(false)
   const [playError, setPlayError] = useState('')
+  const [icecastUnavailable, setIcecastUnavailable] = useState(false)
   const [volume, setVolume]     = useState(80)
   const [muted, setMuted]       = useState(false)
   const [analyser, setAnalyser] = useState(null)
@@ -195,6 +196,12 @@ export default function StationModal({ station, onClose }) {
     pollRef.current = setInterval(poll, 10_000)
     return () => clearInterval(pollRef.current)
   }, [info.slug])
+
+  // If backend publishes a new Icecast URL while this modal is open,
+  // allow trying Icecast again on the next play attempt.
+  useEffect(() => {
+    setIcecastUnavailable(false)
+  }, [info.icecast_listen_url])
 
   // Resume AudioContext if the OS suspended it while the tab/app was backgrounded
   // (e.g. device woke from sleep, user switches back from another app).
@@ -339,7 +346,7 @@ export default function StationModal({ station, onClose }) {
       } catch (e) { /* MediaSession unavailable */ }
     }
 
-    const hasIcecastStream = !!info.icecast_listen_url
+    const hasIcecastStream = !!info.icecast_listen_url && !icecastUnavailable
     const primaryStreamUrl = hasIcecastStream ? info.icecast_listen_url : streamUrl
     const startTracking = (forceWebListener = false) => {
       if (forceWebListener || !hasIcecastStream) startListenerSession().catch(() => {})
@@ -424,8 +431,11 @@ export default function StationModal({ station, onClose }) {
       fail(hasIcecastStream ? 'Icecast stream is offline and HLS fallback is unavailable' : 'Stream is not ready yet')
     }
 
-    playDirect(primaryStreamUrl).catch(() => playHlsFallback())
-  }, [hlsUrl, info.genre, info.icecast_listen_url, info.logo_url, info.name, startListenerSession, stopListenerSession, streamUrl])
+    playDirect(primaryStreamUrl, hasIcecastStream ? 2000 : 8000).catch(() => {
+      if (hasIcecastStream) setIcecastUnavailable(true)
+      playHlsFallback()
+    })
+  }, [hlsUrl, icecastUnavailable, info.genre, info.icecast_listen_url, info.logo_url, info.name, startListenerSession, stopListenerSession, streamUrl])
 
   const stop = useCallback(() => {
     hlsRef.current?.destroy()
