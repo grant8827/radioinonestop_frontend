@@ -696,6 +696,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
   const rafRef = useRef(null)
   const statusRef = useRef('idle')
   const logsEndRef = useRef(null)
+  const terminalErrorRef = useRef(false)
 
   function setStatusBoth(s) {
     if (broadcastMode === 'hub') {
@@ -794,6 +795,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
     if (!token) { addLog('Error: not signed in'); return }
     try {
       setStatusBoth('requesting')
+      terminalErrorRef.current = false
       addLog('Tapping Mixer main output…')
 
       // Resume the AudioEngine AudioContext (requires a user gesture)
@@ -855,6 +857,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
             addLog(msg.msg || 'Broadcast stopped')
             doCleanup()
           } else if (msg.status === 'error') {
+            terminalErrorRef.current = true
             setStatusBoth('error')
             addLog('Error: ' + msg.msg)
             doCleanup()
@@ -867,6 +870,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
       }
 
       ws.onclose = () => {
+        if (terminalErrorRef.current) return
         if (statusRef.current === 'live' || statusRef.current === 'connecting') {
           addLog('Connection lost. Reconnecting in 3s...')
           setStatusBoth('reconnecting')
