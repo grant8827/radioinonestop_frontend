@@ -159,6 +159,8 @@ function VinylRecord({ isSpinning, logoUrl, stationName }) {
 export default function StationModal({ station, onClose }) {
   const [info, setInfo]         = useState(station)
   const [playing, setPlaying]   = useState(false)
+  const [connecting, setConnecting] = useState(false)
+  const [playError, setPlayError] = useState('')
   const [volume, setVolume]     = useState(80)
   const [muted, setMuted]       = useState(false)
   const [analyser, setAnalyser] = useState(null)
@@ -274,6 +276,8 @@ export default function StationModal({ station, onClose }) {
   const play = useCallback(async () => {
     const audio = audioRef.current
     if (!audio) return
+    setConnecting(true)
+    setPlayError('')
     const sessionID = await startListenerSession()
     const countedStreamUrl = sessionID
       ? `${streamUrl}?listener_session=${encodeURIComponent(sessionID)}`
@@ -284,6 +288,18 @@ export default function StationModal({ station, onClose }) {
       audio.load()
       await audio.play()
       setPlaying(true)
+      setConnecting(false)
+    }
+
+    if (info.icecast_listen_url) {
+      playAudio(info.icecast_listen_url).catch(() => {
+        playAudio(countedStreamUrl).catch(() => {
+          setPlaying(false)
+          setConnecting(false)
+          setPlayError('Stream is not ready yet')
+        })
+      })
+      return
     }
 
     // Build AudioContext + analyser for visualizer.
@@ -348,17 +364,41 @@ export default function StationModal({ station, onClose }) {
       // Desktop Chrome / Firefox / Android — use hls.js
       hlsRef.current?.destroy()
       const hls = new Hls({ lowLatencyMode: false, liveSyncDurationCount: 3 })
+      const fallbackTimer = window.setTimeout(() => {
+        if (!playing && hlsRef.current === hls) {
+          hls.destroy()
+          hlsRef.current = null
+          playAudio(fallbackUrl).catch(() => {
+            setPlaying(false)
+            setConnecting(false)
+            setPlayError('Stream is not ready yet')
+          })
+        }
+      }, 2500)
       hls.loadSource(hlsUrl)
       hls.attachMedia(audio)
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        audio.play().then(() => setPlaying(true)).catch(() => playAudio(fallbackUrl).catch(() => setPlaying(false)))
+        window.clearTimeout(fallbackTimer)
+        audio.play().then(() => {
+          setPlaying(true)
+          setConnecting(false)
+        }).catch(() => playAudio(fallbackUrl).catch(() => {
+          setPlaying(false)
+          setConnecting(false)
+          setPlayError('Stream is not ready yet')
+        }))
       })
       hls.on(Hls.Events.ERROR, (_e, data) => {
         if (data.fatal) {
+          window.clearTimeout(fallbackTimer)
           // HLS not ready — try Icecast URL if available, else raw WebM hub stream
           hls.destroy()
           hlsRef.current = null
-          playAudio(fallbackUrl).catch(() => setPlaying(false))
+          playAudio(fallbackUrl).catch(() => {
+            setPlaying(false)
+            setConnecting(false)
+            setPlayError('Stream is not ready yet')
+          })
         }
       })
       hlsRef.current = hls
@@ -367,13 +407,24 @@ export default function StationModal({ station, onClose }) {
       hlsRef.current = null
       audio.src = hlsUrl
       audio.load()
-      audio.play().then(() => setPlaying(true)).catch(() => playAudio(fallbackUrl).catch(() => setPlaying(false)))
+      audio.play().then(() => {
+        setPlaying(true)
+        setConnecting(false)
+      }).catch(() => playAudio(fallbackUrl).catch(() => {
+        setPlaying(false)
+        setConnecting(false)
+        setPlayError('Stream is not ready yet')
+      }))
     } else {
       // Final fallback: Icecast stream or raw WebM
       hlsRef.current = null
-      playAudio(fallbackUrl).catch(() => setPlaying(false))
+      playAudio(fallbackUrl).catch(() => {
+        setPlaying(false)
+        setConnecting(false)
+        setPlayError('Stream is not ready yet')
+      })
     }
-  }, [hlsUrl, info.genre, info.icecast_listen_url, info.logo_url, info.name, startListenerSession, stopListenerSession, streamUrl])
+  }, [hlsUrl, info.genre, info.icecast_listen_url, info.logo_url, info.name, playing, startListenerSession, stopListenerSession, streamUrl])
 
   const stop = useCallback(() => {
     hlsRef.current?.destroy()
@@ -384,6 +435,8 @@ export default function StationModal({ station, onClose }) {
     }
     stopListenerSession(true)
     setPlaying(false)
+    setConnecting(false)
+    setPlayError('')
     if ('mediaSession' in navigator) {
       try { navigator.mediaSession.playbackState = 'paused' } catch (e) {}
     }
@@ -540,7 +593,7 @@ export default function StationModal({ station, onClose }) {
               {/* Play / Stop */}
               <button
                 onClick={playing ? stop : play}
-                disabled={!info.is_live}
+                disabled={!info.is_live || connecting}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8,
                   padding: '10px 22px', borderRadius: 12,
@@ -555,11 +608,19 @@ export default function StationModal({ station, onClose }) {
                       ? '1px solid rgba(239,68,68,0.35)'
                       : 'none',
                   color: !info.is_live ? '#4b5563' : playing ? '#ef4444' : '#fff',
-                  fontWeight: 700, fontSize: 13, cursor: info.is_live ? 'pointer' : 'default',
+                  fontWeight: 700, fontSize: 13, cursor: info.is_live && !connecting ? 'pointer' : 'default',
                   transition: 'all 0.15s',
+                  opacity: connecting ? 0.8 : 1,
                 }}
               >
-                {playing ? (
+                {connecting ? (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 5v5l4 2-.8 1.4L11 13V7h2z"/>
+                    </svg>
+                    Connecting...
+                  </>
+                ) : playing ? (
                   <>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
@@ -575,6 +636,11 @@ export default function StationModal({ station, onClose }) {
                   </>
                 )}
               </button>
+              {playError && (
+                <p style={{ margin: '8px 0 0', color: '#f87171', fontSize: 11, fontWeight: 600 }}>
+                  {playError}
+                </p>
+              )}
             </div>
           </div>
 
