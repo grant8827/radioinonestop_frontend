@@ -278,6 +278,13 @@ export default function StationModal({ station, onClose }) {
     const countedStreamUrl = sessionID
       ? `${streamUrl}?listener_session=${encodeURIComponent(sessionID)}`
       : streamUrl
+    const fallbackUrl = info.icecast_listen_url || countedStreamUrl
+    const playAudio = async (src) => {
+      audio.src = src
+      audio.load()
+      await audio.play()
+      setPlaying(true)
+    }
 
     // Build AudioContext + analyser for visualizer.
     // IMPORTANT: On iOS, routing audio through AudioContext (createMediaElementSource)
@@ -343,14 +350,15 @@ export default function StationModal({ station, onClose }) {
       const hls = new Hls({ lowLatencyMode: false, liveSyncDurationCount: 3 })
       hls.loadSource(hlsUrl)
       hls.attachMedia(audio)
-      hls.on(Hls.Events.MANIFEST_PARSED, () => audio.play().catch(() => {}))
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        audio.play().then(() => setPlaying(true)).catch(() => playAudio(fallbackUrl).catch(() => setPlaying(false)))
+      })
       hls.on(Hls.Events.ERROR, (_e, data) => {
         if (data.fatal) {
           // HLS not ready — try Icecast URL if available, else raw WebM hub stream
           hls.destroy()
           hlsRef.current = null
-          audio.src = info.icecast_listen_url || countedStreamUrl
-          audio.play().catch(() => {})
+          playAudio(fallbackUrl).catch(() => setPlaying(false))
         }
       })
       hlsRef.current = hls
@@ -359,15 +367,12 @@ export default function StationModal({ station, onClose }) {
       hlsRef.current = null
       audio.src = hlsUrl
       audio.load()
-      audio.play().catch(() => {})
+      audio.play().then(() => setPlaying(true)).catch(() => playAudio(fallbackUrl).catch(() => setPlaying(false)))
     } else {
       // Final fallback: Icecast stream or raw WebM
       hlsRef.current = null
-      audio.src = info.icecast_listen_url || countedStreamUrl
-      audio.play().catch(() => {})
+      playAudio(fallbackUrl).catch(() => setPlaying(false))
     }
-
-    setPlaying(true)
   }, [hlsUrl, info.genre, info.icecast_listen_url, info.logo_url, info.name, startListenerSession, stopListenerSession, streamUrl])
 
   const stop = useCallback(() => {
