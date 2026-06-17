@@ -14,6 +14,7 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 ENV PORT=80
 ENV BACKEND_URL=http://backend:8080
 ENV ICECAST_URL=http://icecast:8000
+ENV WEBRTC_URL=http://mediamtx:8889
 COPY nginx.conf /etc/nginx/templates/default.conf.template
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
