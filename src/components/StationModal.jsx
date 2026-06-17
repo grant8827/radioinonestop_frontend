@@ -341,8 +341,8 @@ export default function StationModal({ station, onClose }) {
 
     const hasIcecastStream = !!info.icecast_listen_url
     const primaryStreamUrl = hasIcecastStream ? info.icecast_listen_url : streamUrl
-    const startTracking = () => {
-      if (!hasIcecastStream) startListenerSession().catch(() => {})
+    const startTracking = (forceWebListener = false) => {
+      if (forceWebListener || !hasIcecastStream) startListenerSession().catch(() => {})
     }
     const markPlaying = () => {
       setPlaying(true)
@@ -353,17 +353,49 @@ export default function StationModal({ station, onClose }) {
       setConnecting(false)
       setPlayError(message)
     }
-    const playDirect = async (src) => {
+    const playDirect = async (src, timeoutMs = 8000) => {
       audio.src = src
       audio.load()
-      await audio.play()
+      await new Promise((resolve, reject) => {
+        let settled = false
+        const timer = setTimeout(() => {
+          if (settled) return
+          settled = true
+          cleanup()
+          reject(new Error('playback timeout'))
+        }, timeoutMs)
+        const cleanup = () => {
+          clearTimeout(timer)
+          audio.removeEventListener('playing', onPlaying)
+          audio.removeEventListener('error', onError)
+        }
+        const onPlaying = () => {
+          if (settled) return
+          settled = true
+          cleanup()
+          resolve()
+        }
+        const onError = () => {
+          if (settled) return
+          settled = true
+          cleanup()
+          reject(new Error('audio error'))
+        }
+        audio.addEventListener('playing', onPlaying)
+        audio.addEventListener('error', onError)
+        const playPromise = audio.play()
+        if (playPromise && typeof playPromise.catch === 'function') {
+          playPromise.catch((err) => {
+            if (settled) return
+            settled = true
+            cleanup()
+            reject(err)
+          })
+        }
+      })
       markPlaying()
     }
     const playHlsFallback = () => {
-      if (hasIcecastStream) {
-        fail('Icecast stream is offline or source authentication failed')
-        return
-      }
       if (Hls.isSupported()) {
         hlsRef.current?.destroy()
         const hls = new Hls({ lowLatencyMode: false, liveSyncDurationCount: 3 })
@@ -372,7 +404,7 @@ export default function StationModal({ station, onClose }) {
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           audio.play().then(() => {
             markPlaying()
-            startTracking()
+            startTracking(true)
           }).catch(() => fail())
         })
         hls.on(Hls.Events.ERROR, (_e, data) => {
@@ -386,10 +418,10 @@ export default function StationModal({ station, onClose }) {
         return
       }
       if (audio.canPlayType('application/vnd.apple.mpegurl')) {
-        playDirect(hlsUrl).then(startTracking).catch(() => fail())
+        playDirect(hlsUrl).then(() => startTracking(true)).catch(() => fail())
         return
       }
-      fail()
+      fail(hasIcecastStream ? 'Icecast stream is offline and HLS fallback is unavailable' : 'Stream is not ready yet')
     }
 
     playDirect(primaryStreamUrl).catch(() => playHlsFallback())
