@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useAudioEngine } from '../../context/AudioEngine'
 import { useStream } from '../../context/StreamContext'
 import { useStudio } from './StudioContext'
@@ -53,6 +53,102 @@ function drawTicker(ctx, ticker, frame, w, h) {
   ctx.fillText(text, x, y + barH / 2)
 }
 
+export function VideoStage({ canvasRef, videoRef }) {
+  return (
+    <>
+      <video ref={videoRef} muted playsInline className="hidden" />
+      <div className="relative bg-black border border-gray-800 rounded-xl overflow-hidden shadow-2xl">
+        <canvas ref={canvasRef} width={1280} height={720} className="block w-full aspect-video bg-black" />
+      </div>
+    </>
+  )
+}
+
+export function FloatingLogoWatermark({ visible, logoUrl }) {
+  if (!visible || !logoUrl) return null
+  return (
+    <div className="hidden" aria-hidden="true" data-studio-layer="floating-logo-watermark">
+      {logoUrl}
+    </div>
+  )
+}
+
+export function OnScreenTicker({ ticker }) {
+  if (!ticker.visible) return null
+  return (
+    <div className="hidden" aria-hidden="true" data-studio-layer="on-screen-ticker">
+      <span>{ticker.label}</span>
+      <span>{ticker.text}</span>
+    </div>
+  )
+}
+
+export function DeviceControlStrip({
+  audioDevices,
+  broadcast,
+  devices,
+  isSuspended,
+  mediaError,
+  onGoLive,
+  onStop,
+  setDevices,
+  videoDevices,
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 bg-gray-900 border border-gray-800 p-3 rounded-xl mt-4">
+      <button
+        onClick={() => setDevices((p) => ({ ...p, cameraEnabled: !p.cameraEnabled }))}
+        className={`px-3 py-2 rounded-lg text-xs font-bold ${devices.cameraEnabled ? 'bg-gray-800 text-white' : 'bg-red-900/50 text-red-400'}`}
+      >
+        {devices.cameraEnabled ? 'Camera On' : 'Camera Off'}
+      </button>
+      <button
+        onClick={() => setDevices((p) => ({ ...p, micEnabled: !p.micEnabled }))}
+        className={`px-3 py-2 rounded-lg text-xs font-bold ${devices.micEnabled ? 'bg-gray-800 text-white' : 'bg-red-900/50 text-red-400'}`}
+      >
+        {devices.micEnabled ? 'Mic On' : 'Mic Off'}
+      </button>
+
+      <div className="h-6 w-px bg-gray-800" />
+
+      <select
+        className="bg-gray-950 border border-gray-800 text-white text-xs p-2 rounded-lg max-w-[180px]"
+        value={devices.videoDeviceId}
+        onChange={(e) => setDevices((p) => ({ ...p, videoDeviceId: e.target.value }))}
+      >
+        <option value="">Default Camera</option>
+        {videoDevices.map((d) => <option key={d.deviceId} value={d.deviceId}>{d.label || 'Camera'}</option>)}
+      </select>
+      <select
+        className="bg-gray-950 border border-gray-800 text-white text-xs p-2 rounded-lg max-w-[180px]"
+        value={devices.audioDeviceId}
+        onChange={(e) => setDevices((p) => ({ ...p, audioDeviceId: e.target.value }))}
+      >
+        <option value="">Default Mic</option>
+        {audioDevices.map((d) => <option key={d.deviceId} value={d.deviceId}>{d.label || 'Microphone'}</option>)}
+      </select>
+
+      {mediaError && <span className="text-xs text-red-400">{mediaError}</span>}
+
+      <div className="ml-auto">
+        {broadcast.isLive ? (
+          <button onClick={onStop} className="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-6 rounded-lg shadow-lg shadow-red-900/20 transition-all">
+            End Broadcast
+          </button>
+        ) : (
+          <button
+            onClick={onGoLive}
+            disabled={broadcast.webrtcStatus === 'connecting' || isSuspended}
+            className="rio-logo-gradient disabled:bg-none disabled:bg-gray-700 disabled:opacity-60 text-white font-bold py-2 px-6 rounded-lg shadow-lg shadow-red-900/20 transition-all"
+          >
+            {broadcast.webrtcStatus === 'connecting' ? 'Connecting...' : isSuspended ? 'Suspended' : 'Start Multicast'}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function StreamMonitor({ videoKey, isSuspended = false }) {
   const canvasRef = useRef(null)
   const videoRef = useRef(null)
@@ -66,12 +162,14 @@ export function StreamMonitor({ videoKey, isSuspended = false }) {
   const [videoDevices, setVideoDevices] = useState([])
   const [audioDevices, setAudioDevices] = useState([])
   const [mediaError, setMediaError] = useState('')
+  const statusLabel = useMemo(() => String(broadcast.webrtcStatus || 'idle').toUpperCase(), [broadcast.webrtcStatus])
 
   useEffect(() => {
     setBroadcast((prev) => ({
       ...prev,
       isLive: videoStatus === 'live',
       webrtcStatus: videoStatus === 'stopped' ? 'idle' : videoStatus,
+      startedAt: videoStatus === 'live' ? (prev.startedAt || Date.now()) : null,
     }))
   }, [setBroadcast, videoStatus])
 
@@ -223,60 +321,20 @@ export function StreamMonitor({ videoKey, isSuspended = false }) {
         </div>
       </div>
 
-      <video ref={videoRef} muted playsInline className="hidden" />
-      <div className="relative bg-black border border-gray-800 rounded-xl overflow-hidden shadow-2xl">
-        <canvas ref={canvasRef} width={1280} height={720} className="block w-full aspect-video bg-black" />
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3 bg-gray-900 border border-gray-800 p-3 rounded-xl mt-4">
-        <button
-          onClick={() => setDevices((p) => ({ ...p, cameraEnabled: !p.cameraEnabled }))}
-          className={`px-3 py-2 rounded-lg text-xs font-bold ${devices.cameraEnabled ? 'bg-gray-800 text-white' : 'bg-red-900/50 text-red-400'}`}
-        >
-          {devices.cameraEnabled ? 'Camera On' : 'Camera Off'}
-        </button>
-        <button
-          onClick={() => setDevices((p) => ({ ...p, micEnabled: !p.micEnabled }))}
-          className={`px-3 py-2 rounded-lg text-xs font-bold ${devices.micEnabled ? 'bg-gray-800 text-white' : 'bg-red-900/50 text-red-400'}`}
-        >
-          {devices.micEnabled ? 'Mic On' : 'Mic Off'}
-        </button>
-
-        <div className="h-6 w-px bg-gray-800" />
-
-        <select
-          className="bg-gray-950 border border-gray-800 text-white text-xs p-2 rounded-lg max-w-[180px]"
-          value={devices.videoDeviceId}
-          onChange={(e) => setDevices((p) => ({ ...p, videoDeviceId: e.target.value }))}
-        >
-          <option value="">Default Camera</option>
-          {videoDevices.map((d) => <option key={d.deviceId} value={d.deviceId}>{d.label || 'Camera'}</option>)}
-        </select>
-        <select
-          className="bg-gray-950 border border-gray-800 text-white text-xs p-2 rounded-lg max-w-[180px]"
-          value={devices.audioDeviceId}
-          onChange={(e) => setDevices((p) => ({ ...p, audioDeviceId: e.target.value }))}
-        >
-          <option value="">Default Mic</option>
-          {audioDevices.map((d) => <option key={d.deviceId} value={d.deviceId}>{d.label || 'Microphone'}</option>)}
-        </select>
-
-        <div className="ml-auto">
-          {broadcast.isLive ? (
-            <button onClick={handleStop} className="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-6 rounded-lg shadow-lg shadow-red-900/20 transition-all">
-              End Broadcast
-            </button>
-          ) : (
-            <button
-              onClick={handleGoLive}
-              disabled={broadcast.webrtcStatus === 'connecting' || isSuspended}
-              className="rio-logo-gradient disabled:bg-none disabled:bg-gray-700 disabled:opacity-60 text-white font-bold py-2 px-6 rounded-lg shadow-lg shadow-red-900/20 transition-all"
-            >
-              {broadcast.webrtcStatus === 'connecting' ? 'Connecting...' : isSuspended ? 'Suspended' : 'Start Multicast'}
-            </button>
-          )}
-        </div>
-      </div>
+      <VideoStage canvasRef={canvasRef} videoRef={videoRef} />
+      <FloatingLogoWatermark visible={theme.logoVisible} logoUrl={theme.logoUrl} />
+      <OnScreenTicker ticker={ticker} />
+      <DeviceControlStrip
+        audioDevices={audioDevices}
+        broadcast={{ ...broadcast, webrtcStatus: statusLabel }}
+        devices={devices}
+        isSuspended={isSuspended}
+        mediaError={mediaError}
+        onGoLive={handleGoLive}
+        onStop={handleStop}
+        setDevices={setDevices}
+        videoDevices={videoDevices}
+      />
     </div>
   )
 }

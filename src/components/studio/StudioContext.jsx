@@ -27,7 +27,11 @@ export function StudioProvider({ children }) {
   const [broadcast, setBroadcast] = useState({
     isLive: false,
     webrtcStatus: 'idle', // idle, connecting, live, error
+    startedAt: null,
+    viewerCount: 0,
   });
+
+  const [channelsModalOpen, setChannelsModalOpen] = useState(false);
   
   const [devices, setDevices] = useState({
     videoDeviceId: '',
@@ -90,6 +94,7 @@ export function StudioProvider({ children }) {
     theme, setTheme,
     channels, setChannels,
     broadcast, setBroadcast,
+    channelsModalOpen, setChannelsModalOpen,
     devices, setDevices,
     wsRef,
     persistChannel,

@@ -120,7 +120,7 @@ export function ThemeDesigner() {
 }
 
 export function ChannelController() {
-  const { channels, setChannels, wsRef, persistChannel } = useStudio();
+  const { channels, setChannels, wsRef, persistChannel, setChannelsModalOpen } = useStudio();
 
   const toggleChannel = (id) => {
     let toggled = null;
@@ -170,6 +170,13 @@ export function ChannelController() {
           </div>
         ))}
       </div>
+      <button
+        type="button"
+        onClick={() => setChannelsModalOpen(true)}
+        className="mt-3 w-full rounded-lg border border-red-700/60 bg-red-950/20 px-3 py-2 text-xs font-bold text-red-100 hover:bg-red-900/30"
+      >
+        Open Channel Hub
+      </button>
     </div>
   );
 }
@@ -180,6 +187,55 @@ export function SidebarControls() {
       <ChannelController />
       <TickerCustomizer />
       <ThemeDesigner />
+    </div>
+  );
+}
+
+export function ChannelsModal({ children }) {
+  const { channels, channelsModalOpen, setChannelsModalOpen } = useStudio();
+
+  if (!channelsModalOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+      <div className="w-full max-w-5xl max-h-[86vh] overflow-hidden rounded-xl border border-gray-800 bg-gray-950 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-gray-800 px-5 py-4">
+          <div>
+            <h3 className="text-base font-bold text-white">Channels Hub</h3>
+            <p className="text-xs text-gray-500">{channels.length} configured multicast target{channels.length === 1 ? '' : 's'}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setChannelsModalOpen(false)}
+            className="rounded-lg border border-gray-800 bg-gray-900 px-3 py-2 text-xs font-bold text-gray-300 hover:text-white"
+          >
+            Close
+          </button>
+        </div>
+        <div className="max-h-[calc(86vh-76px)] overflow-y-auto p-5">
+          <div className="mb-5 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {channels.map((channel) => (
+              <div key={channel.id} className="rounded-lg border border-gray-800 bg-gray-900 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-white">{channel.name}</p>
+                    <p className="text-[10px] uppercase text-gray-500">{channel.platform}</p>
+                  </div>
+                  <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${channel.active ? 'bg-red-600 text-white' : 'bg-gray-800 text-gray-400'}`}>
+                    {channel.active ? 'Armed' : 'Saved'}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {channels.length === 0 && (
+              <div className="rounded-lg border border-gray-800 bg-gray-900 p-4 text-sm text-gray-500">
+                No multicast targets configured.
+              </div>
+            )}
+          </div>
+          {children}
+        </div>
+      </div>
     </div>
   );
 }

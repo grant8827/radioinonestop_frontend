@@ -2795,10 +2795,11 @@ export default function StreamSetup({ isSuspended = false }) {
         <AudioEncoderTab audioKey={audioKey} host={host} listenUrl={creds?.listen_url} isSuspended={isSuspended} />
       </div>
       <div style={{ display: tab === 'channel' ? undefined : 'none' }}>
-        <Workspace videoKey={audioKey} isSuspended={isSuspended} />
-        <div className="mt-6">
-          <ChannelTab host={host} audioKey={audioKey} isSuspended={isSuspended} manualOnly={true} />
-        </div>
+        <Workspace
+          videoKey={audioKey}
+          isSuspended={isSuspended}
+          channelManager={<ChannelTab host={host} audioKey={audioKey} isSuspended={isSuspended} manualOnly={true} />}
+        />
       </div>
       {tab === 'listeners' && <ListenersPage />}
     </div>
