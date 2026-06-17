@@ -15,7 +15,7 @@ const HLS_CONFIG = {
   maxMaxBufferLength: 15,
   maxLoadingDelay: 4,
   maxBufferHole: 0.5,
-  manifestLoadingMaxRetry: Infinity,
+  manifestLoadingMaxRetry: 0,
   manifestLoadingRetryDelay: 1000,
   manifestLoadingMaxRetryTimeout: 8000,
   levelLoadingMaxRetry: 6,
@@ -1136,6 +1136,7 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
   const mediaRefB = useRef(null)
   const hlsRef   = useRef(null)
   const retryTimer = useRef(null)
+  const retryCount = useRef(0)
   const prevLocalUrlRef = useRef(null)
   const prevLocalUrlRefB = useRef(null)
 
@@ -1782,7 +1783,7 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
       hlsRef.current = hls
       hls.loadSource(streamUrl)
       hls.attachMedia(media)
-      hls.on(Hls.Events.MANIFEST_PARSED, () => { setError(null); setStreamLive(true) })
+      hls.on(Hls.Events.MANIFEST_PARSED, () => { setError(null); setStreamLive(true); retryCount.current = 0 })
       hls.on(Hls.Events.FRAG_CHANGED, () => {
         if (hls.latency != null) setLatency(hls.latency.toFixed(1))
       })
@@ -1793,7 +1794,9 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
           data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR
         ) {
           setStreamLive(false)
-          retryTimer.current = setTimeout(setupHls, 3000)
+          retryCount.current += 1
+          const delay = retryCount.current > 5 ? 30000 : 3000 * retryCount.current
+          retryTimer.current = setTimeout(setupHls, delay)
         } else if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
           hls.startLoad()
         } else {
@@ -1816,6 +1819,7 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
     setError(null)
     setLatency(null)
     clearTimeout(retryTimer.current)
+    retryCount.current = 0
     if (!streamUrl) {
       setError('No stream URL configured \u2014 open Settings to add one.')
       return
