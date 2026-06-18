@@ -47,7 +47,7 @@ function Field({ label, value }) {
   )
 }
 
-function useStreamDashboard() {
+function useStreamDashboard(token) {
   const [liveStreams, setLiveStreams] = useState([])
   const [viewers, setViewers] = useState(0)
 
@@ -55,17 +55,27 @@ function useStreamDashboard() {
     let cancelled = false
     async function poll() {
       try {
-        const [sRes, vRes] = await Promise.all([fetch('/api/streams'), fetch('/api/viewers')])
+        const [sRes, analyticsRes] = await Promise.all([
+          fetch('/api/streams'),
+          token
+            ? fetch('/api/analytics', { headers: { Authorization: `Bearer ${token}` } })
+            : Promise.resolve(null),
+        ])
         if (!cancelled) {
           if (sRes.ok) setLiveStreams(await sRes.json())
-          if (vRes.ok) { const v = await vRes.json(); setViewers(v.viewers ?? 0) }
+          if (analyticsRes?.ok) {
+            const analytics = await analyticsRes.json()
+            setViewers(analytics.live_count ?? 0)
+          } else {
+            setViewers(0)
+          }
         }
       } catch (_) {}
     }
     poll()
     const id = setInterval(poll, 5000)
     return () => { cancelled = true; clearInterval(id) }
-  }, [])
+  }, [token])
 
   return { liveStreams, viewers }
 }
@@ -2597,7 +2607,7 @@ export default function StreamSetup({ isSuspended = false }) {
   const audioKey = creds?.stream_key ?? fallbackAudioKey
 
   const [tab, setTab] = useState('listeners')
-  const { liveStreams, viewers } = useStreamDashboard()
+  const { liveStreams, viewers } = useStreamDashboard(token)
 
   return (
     <div className="max-w-7xl mx-auto w-full px-2 py-2">

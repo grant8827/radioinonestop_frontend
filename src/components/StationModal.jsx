@@ -161,7 +161,6 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
   const [playing, setPlaying]   = useState(false)
   const [connecting, setConnecting] = useState(false)
   const [playError, setPlayError] = useState('')
-  const [icecastUnavailable, setIcecastUnavailable] = useState(false)
   const [volume, setVolume]     = useState(80)
   const [muted, setMuted]       = useState(false)
   const [analyser, setAnalyser] = useState(null)
@@ -201,12 +200,6 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
     pollRef.current = setInterval(poll, 10_000)
     return () => clearInterval(pollRef.current)
   }, [info.slug])
-
-  // If backend publishes a new Icecast URL while this modal is open,
-  // allow trying Icecast again on the next play attempt.
-  useEffect(() => {
-    setIcecastUnavailable(false)
-  }, [info.icecast_listen_url])
 
   // Resume AudioContext if the OS suspended it while the tab/app was backgrounded
   // (e.g. device woke from sleep, user switches back from another app).
@@ -311,7 +304,7 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
         srcRef.current.connect(analyserNode)
         analyserNode.connect(ac.destination)
         setAnalyser(analyserNode)
-      } catch (e) {
+      } catch {
         // createMediaElementSource unavailable on this platform — idle animation only
       }
     }
@@ -348,10 +341,10 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
           if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none'
         })
         navigator.mediaSession.playbackState = 'playing'
-      } catch (e) { /* MediaSession unavailable */ }
+      } catch { /* MediaSession unavailable */ }
     }
 
-    const hasIcecastStream = !!info.icecast_listen_url && !icecastUnavailable
+    const hasIcecastStream = !!info.icecast_listen_url
     const markPlaying = () => { setPlaying(true); setConnecting(false) }
     const fail = (message = 'Stream is not ready yet') => {
       setPlaying(false); setConnecting(false); setPlayError(message)
@@ -419,8 +412,11 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
     if (hasIcecastStream) {
       // Icecast path: station is streaming via external encoder — play directly, no HLS needed.
       playDirect(info.icecast_listen_url, 8000)
-        .catch(() => {
-          setIcecastUnavailable(true)
+        .catch((err) => {
+          if (err?.name === 'NotAllowedError') {
+            fail('Tap Listen Live to start audio')
+            return
+          }
           // Icecast failed — fall back to HLS (browser broadcaster) then WebM
           return playHlsWithRetry()
         })
@@ -432,11 +428,10 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
         .catch(() => { startListenerSession().catch(() => {}); return playDirect(streamUrl, 8000) })
         .catch(() => fail('Stream is not ready yet'))
     }
-  }, [hlsUrl, icecastUnavailable, info.icecast_listen_url, info.genre, info.logo_url, info.name, startListenerSession, stopListenerSession, streamUrl])
+  }, [hlsUrl, info.icecast_listen_url, info.genre, info.logo_url, info.name, startListenerSession, stopListenerSession, streamUrl])
 
   useEffect(() => {
-    if (!info.is_live || playing || connecting) return
-    if (!autoPlay && autoPlayStartedRef.current) return
+    if (!autoPlay || autoPlayStartedRef.current || !info.is_live || playing || connecting) return
     autoPlayStartedRef.current = true
     play().catch(() => {})
   }, [info.is_live, play, playing, connecting, autoPlay])
@@ -453,7 +448,11 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
     setConnecting(false)
     setPlayError('')
     if ('mediaSession' in navigator) {
-      try { navigator.mediaSession.playbackState = 'paused' } catch (e) {}
+      try {
+        navigator.mediaSession.playbackState = 'paused'
+      } catch {
+        // MediaSession unavailable.
+      }
     }
   }, [stopListenerSession])
 
