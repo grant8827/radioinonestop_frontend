@@ -129,13 +129,39 @@ function DashboardCard({ label, colorClass, iconPath, stream, viewers }) {
 /* ─── Tab content ─────────────────────────────────────────────── */
 
 function StreamSettingsTab({ audioKey, liveStreams, viewers, creds }) {
+  const { broadcastMode } = useStream()
   const audioStream = liveStreams.find(s => s.key === audioKey)
   const anyLive = liveStreams.some(s => s.live)
   const otherStreams = liveStreams.filter(s => s.key !== audioKey)
   const hubListenPath = creds?.hub_listen_url || creds?.listen_url || ''
   const icecastListenPath = creds?.icecast_listen_url || (creds?.stream_key ? `/icecast/${creds.stream_key}` : '')
   const hubListenUrl = hubListenPath ? new URL(hubListenPath, window.location.origin).toString() : ''
-  const icecastListenUrl = icecastListenPath ? new URL(icecastListenPath, window.location.origin).toString() : ''
+  const radioBossListenUrl = icecastListenPath
+    ? new URL(icecastListenPath, 'https://radioinonestop.com').toString()
+    : ''
+  const [encoderSettings, setEncoderSettings] = useState({
+    mount: `/${audioKey}`,
+    codec: 'mp3',
+    bitrate: '192k',
+  })
+
+  useEffect(() => {
+    const loadEncoderSettings = () => {
+      try {
+        const saved = JSON.parse(localStorage.getItem('icecast_encoder_cfg') || '{}')
+        setEncoderSettings({
+          mount: saved.mount || `/${audioKey}`,
+          codec: saved.codec || 'mp3',
+          bitrate: saved.bitrate || '192k',
+        })
+      } catch {
+        setEncoderSettings({ mount: `/${audioKey}`, codec: 'mp3', bitrate: '192k' })
+      }
+    }
+    loadEncoderSettings()
+    window.addEventListener('radio-encoder-config-saved', loadEncoderSettings)
+    return () => window.removeEventListener('radio-encoder-config-saved', loadEncoderSettings)
+  }, [audioKey])
 
   return (
     <div className="space-y-6">
@@ -186,14 +212,30 @@ function StreamSettingsTab({ audioKey, liveStreams, viewers, creds }) {
           {creds && (
             <>
               {hubListenUrl && <Field label="Station Hub — browser broadcast" value={hubListenUrl} />}
-              {icecastListenUrl && <Field label="Icecast — audio encoder broadcast" value={icecastListenUrl} />}
+              {radioBossListenUrl && (
+                <Field label="RadioBOSS / External Player URL" value={radioBossListenUrl} />
+              )}
               {hubListenPath && <LiveListenerPlayer listenPath={hubListenPath} />}
             </>
           )}
           <div className="bg-gray-800/40 border border-gray-700/50 rounded-lg px-4 py-3 text-sm text-gray-400">
-            Use the Station Hub link when the Audio Encoder is in Hub mode. Use the Icecast link when the
-            Audio Encoder is connected to Icecast. A link becomes playable after its matching broadcast starts.
+            Add the RadioBOSS URL to a playlist as an internet stream. It becomes playable after the Icecast
+            encoder is live. Use the Station Hub link only for Hub-mode browser listening.
           </div>
+        </div>
+      </div>
+
+      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-800">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Audio Encoder Settings</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 px-5 py-4">
+          <Field label="Broadcast Mode" value={broadcastMode === 'icecast' ? 'Icecast' : 'Station Hub'} />
+          <Field label="Mount Point" value={encoderSettings.mount} />
+          <Field label="Output Codec" value={encoderSettings.codec.toUpperCase()} />
+          <Field label="Bitrate" value={encoderSettings.bitrate.replace(/k$/i, ' kbps')} />
+          <Field label="Sample Rate" value="44.1 kHz" />
+          <Field label="Channels" value="Stereo (2 channels)" />
         </div>
       </div>
 
@@ -473,7 +515,10 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
 
   const [cfgSaved, setCfgSaved] = useState(false)
   function saveConfig() {
-    try { localStorage.setItem('icecast_encoder_cfg', JSON.stringify(cfg)) } catch {}
+    try {
+      localStorage.setItem('icecast_encoder_cfg', JSON.stringify(cfg))
+      window.dispatchEvent(new Event('radio-encoder-config-saved'))
+    } catch {}
     setCfgSaved(true)
     setTimeout(() => setCfgSaved(false), 1500)
   }
