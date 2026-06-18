@@ -67,6 +67,7 @@ export function StreamProvider({ children }) {
           const msg = JSON.parse(e.data)
           if (msg.status === 'live') {
             setRadioStatusBoth('live')
+            if (radioRecorderRef.current && radioRecorderRef.current.state !== 'inactive') return
             const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
               ? 'audio/webm;codecs=opus' : 'audio/webm'
             const recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 128_000 })

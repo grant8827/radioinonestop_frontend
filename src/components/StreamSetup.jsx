@@ -686,6 +686,9 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
   const statusRef = useRef('idle')
   const logsEndRef = useRef(null)
   const terminalErrorRef = useRef(false)
+  const reconnectTimerRef = useRef(null)
+  const connectionAttemptRef = useRef(0)
+  const manualStopRef = useRef(false)
 
   function setStatusBoth(s) {
     if (broadcastMode === 'hub') {
@@ -706,8 +709,13 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
   // Auto-scroll the console log
   useEffect(() => { logsEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [logs])
 
-  // Cleanup on unmount
-  useEffect(() => () => doCleanup(), []) // eslint-disable-line react-hooks/exhaustive-deps
+  // Cleanup on unmount without allowing the close event to schedule a reconnect.
+  useEffect(() => () => {
+    manualStopRef.current = true
+    connectionAttemptRef.current += 1
+    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
+    doCleanup()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Register start/stop handlers into context so NowPlaying's GO LIVE button works.
   // No deps: runs every render so the refs always point to the latest closures.
@@ -757,19 +765,24 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
     rafRef.current = requestAnimationFrame(drawSpectrum)
   }
 
-  function doCleanup() {
+  function doCleanup({ closeSocket = true } = {}) {
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
     analyserRef.current = null
     if (keepaliveRef.current) { clearInterval(keepaliveRef.current); keepaliveRef.current = null }
     if (recorderRef.current) { try { recorderRef.current.stop() } catch {} recorderRef.current = null }
     // Don't stop the mixer's stream tracks — they are owned by AudioEngine
     streamRef.current = null
-    if (wsRef.current) { try { wsRef.current.close() } catch {} wsRef.current = null }
+    if (closeSocket && wsRef.current) { try { wsRef.current.close() } catch {} }
+    wsRef.current = null
     const canvas = canvasRef.current
     if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height)
   }
 
   function startRecorder(stream, ws) {
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      addLog('MediaRecorder already active — duplicate live signal ignored')
+      return
+    }
     const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
       ? 'audio/webm;codecs=opus' : 'audio/webm'
     const recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 128_000 })
@@ -783,6 +796,17 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
 
   async function goLive() {
     if (!token) { addLog('Error: not signed in'); return }
+    if (['requesting', 'connecting', 'live'].includes(statusRef.current)) {
+      addLog('Encoder start ignored — a connection is already active')
+      return
+    }
+    const attempt = connectionAttemptRef.current + 1
+    connectionAttemptRef.current = attempt
+    manualStopRef.current = false
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current)
+      reconnectTimerRef.current = null
+    }
     try {
       setStatusBoth('requesting')
       terminalErrorRef.current = false
@@ -817,6 +841,10 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
       ws.binaryType = 'arraybuffer'
 
       ws.onopen = () => {
+        if (connectionAttemptRef.current !== attempt) {
+          ws.close(1000, 'stale encoder attempt')
+          return
+        }
         if (broadcastMode === 'hub') {
           addLog('Connected — starting hub broadcast…')
           ws.send(JSON.stringify({ action: 'broadcast' }))
@@ -836,6 +864,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
       }
 
       ws.onmessage = (e) => {
+        if (connectionAttemptRef.current !== attempt) return
         try {
           const msg = JSON.parse(e.data)
           if (msg.status === 'live') {
@@ -859,17 +888,22 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
       }
 
       ws.onerror = () => { 
-        // We rely on ws.onclose to handle the reconnect loop smoothly
+        addLog('WebSocket transport error')
       }
 
-      ws.onclose = () => {
-        if (terminalErrorRef.current) return
+      ws.onclose = (event) => {
+        if (connectionAttemptRef.current !== attempt) return
+        wsRef.current = null
+        addLog(`WebSocket closed (code=${event.code}${event.reason ? ` reason=${event.reason}` : ''})`)
+        if (terminalErrorRef.current || manualStopRef.current) return
         if (statusRef.current === 'live' || statusRef.current === 'connecting') {
           addLog('Connection lost. Reconnecting in 3s...')
           setStatusBoth('reconnecting')
-          doCleanup()
-          setTimeout(() => {
-            if (statusRef.current === 'reconnecting') {
+          doCleanup({ closeSocket: false })
+          if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
+          reconnectTimerRef.current = setTimeout(() => {
+            reconnectTimerRef.current = null
+            if (statusRef.current === 'reconnecting' && connectionAttemptRef.current === attempt) {
               goLive()
             }
           }, 3000)
@@ -884,6 +918,12 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
 
   function stopStream() {
     addLog('Stopping broadcast…')
+    manualStopRef.current = true
+    connectionAttemptRef.current += 1
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current)
+      reconnectTimerRef.current = null
+    }
     if (recorderRef.current) { try { recorderRef.current.stop() } catch {} recorderRef.current = null }
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ action: 'stop' }))
