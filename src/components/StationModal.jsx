@@ -175,6 +175,7 @@ export default function StationModal({ station, onClose }) {
   const pollRef   = useRef(null)
   const listenerSessionRef = useRef(null)
   const heartbeatRef       = useRef(null)
+  const autoPlayStartedRef = useRef(false)
 
   const hlsUrl    = `/hls/${info.slug}/index.m3u8`
   const streamUrl  = `/listen/${info.slug}` // WebM fallback (desktop Chrome/Firefox)
@@ -183,6 +184,16 @@ export default function StationModal({ station, onClose }) {
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true))
   }, [])
+
+  useEffect(() => {
+    autoPlayStartedRef.current = false
+  }, [station.slug])
+
+  useEffect(() => {
+    if (!info.is_live || autoPlayStartedRef.current || playing || connecting) return
+    autoPlayStartedRef.current = true
+    play().catch(() => {})
+  }, [info.is_live, play, playing, connecting])
 
   // Poll station status every 10 s
   useEffect(() => {
