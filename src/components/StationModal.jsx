@@ -407,7 +407,7 @@ export default function StationModal({ station, onClose }) {
       })
       markPlaying()
     }
-    const playHlsFallback = () => {
+    const playHls = () => new Promise((resolve, reject) => {
       if (Hls.isSupported()) {
         hlsRef.current?.destroy()
         const hls = new Hls({ lowLatencyMode: false, liveSyncDurationCount: 3 })
@@ -417,29 +417,38 @@ export default function StationModal({ station, onClose }) {
           audio.play().then(() => {
             markPlaying()
             startTracking(true)
+            resolve()
           }).catch(() => fail())
         })
         hls.on(Hls.Events.ERROR, (_e, data) => {
           if (data.fatal) {
             hls.destroy()
             hlsRef.current = null
-            fail()
+            reject(new Error('HLS playback failed'))
           }
         })
         hlsRef.current = hls
         return
       }
       if (audio.canPlayType('application/vnd.apple.mpegurl')) {
-        playDirect(hlsUrl).then(() => startTracking(true)).catch(() => fail())
+        playDirect(hlsUrl).then(() => {
+          startTracking(true)
+          resolve()
+        }).catch((err) => reject(err))
         return
       }
-      fail(hasIcecastStream ? 'Icecast stream is offline and HLS fallback is unavailable' : 'Stream is not ready yet')
-    }
-
-    playDirect(primaryStreamUrl, hasIcecastStream ? 2000 : 8000).catch(() => {
-      if (hasIcecastStream) setIcecastUnavailable(true)
-      playHlsFallback()
+      reject(new Error('HLS is not supported in this browser'))
     })
+
+    playHls()
+      .catch(() => playDirect(streamUrl, 8000))
+      .catch(() => {
+        if (hasIcecastStream) setIcecastUnavailable(true)
+        return playDirect(primaryStreamUrl, hasIcecastStream ? 2000 : 8000)
+      })
+      .catch(() => {
+        fail(hasIcecastStream ? 'Icecast stream is offline and HLS fallback is unavailable' : 'Stream is not ready yet')
+      })
   }, [hlsUrl, icecastUnavailable, info.genre, info.icecast_listen_url, info.logo_url, info.name, startListenerSession, stopListenerSession, streamUrl])
 
   useEffect(() => {
