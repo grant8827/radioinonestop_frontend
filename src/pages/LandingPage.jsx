@@ -491,7 +491,6 @@ export default function LandingPage() {
       {selectedStation && (
         <StationModal
           station={selectedStation}
-          autoPlay
           onClose={() => setSelectedStation(null)}
         />
       )}

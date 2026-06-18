@@ -627,14 +627,7 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
                   opacity: connecting ? 0.8 : 1,
                 }}
               >
-                {connecting ? (
-                  <>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 5v5l4 2-.8 1.4L11 13V7h2z"/>
-                    </svg>
-                    Connecting...
-                  </>
-                ) : playing ? (
+                {playing ? (
                   <>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
@@ -646,7 +639,7 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M8 5v14l11-7z"/>
                     </svg>
-                    {info.is_live ? 'Listen Live' : 'Off Air'}
+                    {info.is_live ? 'Listen Now' : 'Off Air'}
                   </>
                 )}
               </button>
