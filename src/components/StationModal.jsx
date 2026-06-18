@@ -401,19 +401,34 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
       reject(new Error('HLS not supported'))
     })
 
+    const playHlsWithRetry = async (attempts = 6, delayMs = 1500) => {
+      let lastError = null
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        try {
+          await playHls()
+          return
+        } catch (err) {
+          lastError = err
+          if (attempt === attempts - 1) break
+          await new Promise((resolve) => setTimeout(resolve, delayMs))
+        }
+      }
+      throw lastError || new Error('HLS failed')
+    }
+
     if (hasIcecastStream) {
       // Icecast path: station is streaming via external encoder — play directly, no HLS needed.
       playDirect(info.icecast_listen_url, 8000)
         .catch(() => {
           setIcecastUnavailable(true)
           // Icecast failed — fall back to HLS (browser broadcaster) then WebM
-          return playHls()
+          return playHlsWithRetry()
         })
         .catch(() => playDirect(streamUrl, 8000))
         .catch(() => fail('Stream is not ready yet'))
     } else {
       // Browser broadcaster path: try HLS first, then WebM fallback.
-      playHls()
+      playHlsWithRetry()
         .catch(() => { startListenerSession().catch(() => {}); return playDirect(streamUrl, 8000) })
         .catch(() => fail('Stream is not ready yet'))
     }

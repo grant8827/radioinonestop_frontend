@@ -678,6 +678,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
 
   const wsRef = useRef(null)
   const recorderRef = useRef(null)
+  const keepaliveRef = useRef(null)
   const streamRef = useRef(null)
   const analyserRef = useRef(null)
   const canvasRef = useRef(null)
@@ -759,6 +760,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
   function doCleanup() {
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
     analyserRef.current = null
+    if (keepaliveRef.current) { clearInterval(keepaliveRef.current); keepaliveRef.current = null }
     if (recorderRef.current) { try { recorderRef.current.stop() } catch {} recorderRef.current = null }
     // Don't stop the mixer's stream tracks — they are owned by AudioEngine
     streamRef.current = null
@@ -840,6 +842,9 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
             setStatusBoth('live')
             addLog('🔴 ' + (msg.msg || 'Live'))
             startRecorder(stream, ws)
+            keepaliveRef.current = setInterval(() => {
+              if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ action: 'ping' }))
+            }, 10_000)
           } else if (msg.status === 'stopped') {
             setStatusBoth('stopped')
             addLog(msg.msg || 'Broadcast stopped')
