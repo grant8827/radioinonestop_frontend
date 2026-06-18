@@ -189,12 +189,6 @@ export default function StationModal({ station, onClose }) {
     autoPlayStartedRef.current = false
   }, [station.slug])
 
-  useEffect(() => {
-    if (!info.is_live || autoPlayStartedRef.current || playing || connecting) return
-    autoPlayStartedRef.current = true
-    play().catch(() => {})
-  }, [info.is_live, play, playing, connecting])
-
   // Poll station status every 10 s
   useEffect(() => {
     const poll = async () => {
@@ -447,6 +441,12 @@ export default function StationModal({ station, onClose }) {
       playHlsFallback()
     })
   }, [hlsUrl, icecastUnavailable, info.genre, info.icecast_listen_url, info.logo_url, info.name, startListenerSession, stopListenerSession, streamUrl])
+
+  useEffect(() => {
+    if (!info.is_live || autoPlayStartedRef.current || playing || connecting) return
+    autoPlayStartedRef.current = true
+    play().catch(() => {})
+  }, [info.is_live, play, playing, connecting])
 
   const stop = useCallback(() => {
     hlsRef.current?.destroy()
