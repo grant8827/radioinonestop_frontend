@@ -69,6 +69,8 @@ export function AudioEngineProvider({ children }) {
   const schedulerElementRef = useRef(null)
   const schedulerSourceRef = useRef(null)
   const schedulerAnalyserRef = useRef(null)
+  const schedulerGainRef = useRef(null)
+  const schedulerEqRef = useRef(null)
 
   // true once a Mixer channel has DJ Player assigned
   const [djConnected, setDjConnected] = useState(false)
@@ -573,6 +575,17 @@ export function AudioEngineProvider({ children }) {
     })
     if (schedulerElementRef.current) {
       if (!schedulerSourceRef.current) schedulerSourceRef.current = ac.createMediaElementSource(schedulerElementRef.current)
+      if (!schedulerGainRef.current) {
+        schedulerGainRef.current = ac.createGain()
+        schedulerGainRef.current.gain.value = 1
+      }
+      if (!schedulerEqRef.current) {
+        const low = ac.createBiquadFilter(); low.type = 'lowshelf'; low.frequency.value = 200
+        const mid = ac.createBiquadFilter(); mid.type = 'peaking'; mid.frequency.value = 1000; mid.Q.value = 0.8
+        const high = ac.createBiquadFilter(); high.type = 'highshelf'; high.frequency.value = 8000
+        low.connect(mid); mid.connect(high)
+        schedulerEqRef.current = { low, mid, high }
+      }
       if (!schedulerAnalyserRef.current) {
         const analyser = ac.createAnalyser()
         analyser.fftSize = 256
@@ -580,8 +593,12 @@ export function AudioEngineProvider({ children }) {
         schedulerAnalyserRef.current = analyser
       }
       try { schedulerSourceRef.current.disconnect() } catch { /* not connected */ }
+      try { schedulerGainRef.current.disconnect() } catch { /* not connected */ }
+      try { schedulerEqRef.current.high.disconnect() } catch { /* not connected */ }
       try { schedulerAnalyserRef.current.disconnect() } catch { /* not connected */ }
-      schedulerSourceRef.current.connect(schedulerAnalyserRef.current)
+      schedulerSourceRef.current.connect(schedulerGainRef.current)
+      schedulerGainRef.current.connect(schedulerEqRef.current.low)
+      schedulerEqRef.current.high.connect(schedulerAnalyserRef.current)
       schedulerAnalyserRef.current.connect(nodes.gainNode)
     }
   }, [getAC])
@@ -598,6 +615,17 @@ export function AudioEngineProvider({ children }) {
     if (!schedulerSourceRef.current) {
       schedulerSourceRef.current = ac.createMediaElementSource(element)
     }
+    if (!schedulerGainRef.current) {
+      schedulerGainRef.current = ac.createGain()
+      schedulerGainRef.current.gain.value = 1
+    }
+    if (!schedulerEqRef.current) {
+      const low = ac.createBiquadFilter(); low.type = 'lowshelf'; low.frequency.value = 200
+      const mid = ac.createBiquadFilter(); mid.type = 'peaking'; mid.frequency.value = 1000; mid.Q.value = 0.8
+      const high = ac.createBiquadFilter(); high.type = 'highshelf'; high.frequency.value = 8000
+      low.connect(mid); mid.connect(high)
+      schedulerEqRef.current = { low, mid, high }
+    }
     if (!schedulerAnalyserRef.current) {
       const analyser = ac.createAnalyser()
       analyser.fftSize = 256
@@ -605,12 +633,30 @@ export function AudioEngineProvider({ children }) {
       schedulerAnalyserRef.current = analyser
     }
     try { schedulerSourceRef.current.disconnect() } catch { /* not connected */ }
+    try { schedulerGainRef.current.disconnect() } catch { /* not connected */ }
+    try { schedulerEqRef.current.high.disconnect() } catch { /* not connected */ }
     try { schedulerAnalyserRef.current.disconnect() } catch { /* not connected */ }
-    schedulerSourceRef.current.connect(schedulerAnalyserRef.current)
+    schedulerSourceRef.current.connect(schedulerGainRef.current)
+    schedulerGainRef.current.connect(schedulerEqRef.current.low)
+    schedulerEqRef.current.high.connect(schedulerAnalyserRef.current)
     schedulerAnalyserRef.current.connect(nodes.gainNode)
   }, [getAC])
 
   const getSchedulerAnalyser = useCallback(() => schedulerAnalyserRef.current, [])
+
+  const updateSchedulerVolume = useCallback((value) => {
+    getAC()
+    if (!schedulerGainRef.current) return
+    schedulerGainRef.current.gain.setTargetAtTime(Math.max(0, Math.min(1, value)), acRef.current.currentTime, 0.02)
+  }, [getAC])
+
+  const updateSchedulerEq = useCallback((band, value) => {
+    getAC()
+    const node = schedulerEqRef.current?.[band]
+    if (!node) return
+    const dB = (Math.max(0, Math.min(1, value)) - 0.5) * 24
+    node.gain.setTargetAtTime(dB, acRef.current.currentTime, 0.02)
+  }, [getAC])
 
   // ── Enable / disable DJ-connect gate ─────────────────────────────────────
   const setDjActive = useCallback((active) => {
@@ -1043,6 +1089,8 @@ export function AudioEngineProvider({ children }) {
       getMasterAnalyser,
       getDeckAnalyser,
       getSchedulerAnalyser,
+      updateSchedulerVolume,
+      updateSchedulerEq,
       updateDeckMix,
       updateDeckEq,
       setDjActive,

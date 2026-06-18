@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useAudioEngine } from '../context/AudioEngine'
+import Knob from './RotaryKnob'
 
 function formatClock(seconds) {
   const safe = Math.max(0, Math.floor(seconds || 0))
@@ -62,6 +63,8 @@ export default function SchedulerRadioMonitor() {
   const [schedules, setSchedules] = useState([])
   const [playback, setPlayback] = useState(null)
   const [now, setNow] = useState(() => Date.now())
+  const [volume, setVolume] = useState(1)
+  const [eq, setEq] = useState({ low: 0.5, mid: 0.5, high: 0.5 })
 
   useEffect(() => {
     if (!token) return
@@ -102,7 +105,7 @@ export default function SchedulerRadioMonitor() {
         return new Date(schedule.trigger_time).getTime() >= now
       })
       .sort((a, b) => new Date(a.trigger_time) - new Date(b.trigger_time))[0] || null
-  }, [isPlaying, now, playback?.schedule?.id, schedules])
+  }, [isPlaying, now, playback, schedules])
 
   const remaining = nextSchedule ? new Date(nextSchedule.trigger_time).getTime() - now : null
   const alerting = remaining !== null && remaining > 0 && remaining <= 30_000
@@ -113,6 +116,16 @@ export default function SchedulerRadioMonitor() {
 
   function stopPlayback() {
     window.dispatchEvent(new CustomEvent('scheduler:stop'))
+  }
+
+  function changeVolume(value) {
+    setVolume(value)
+    audioEngine?.updateSchedulerVolume?.(value)
+  }
+
+  function changeEq(band, value) {
+    setEq((previous) => ({ ...previous, [band]: value }))
+    audioEngine?.updateSchedulerEq?.(band, value)
   }
 
   return (
@@ -142,13 +155,7 @@ export default function SchedulerRadioMonitor() {
           )}
         </div>
         {isPlaying ? (
-          <button
-            type="button"
-            onClick={stopPlayback}
-            className="shrink-0 rounded-lg bg-red-600 hover:bg-red-500 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white"
-          >
-            ■ Stop
-          </button>
+          <span className="shrink-0 rounded-full bg-red-900/40 border border-red-700/50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-red-300 animate-pulse">On Air</span>
         ) : (
           <div className={`shrink-0 text-right ${alerting ? 'text-red-300' : 'text-amber-400'}`}>
             <p className="text-[9px] uppercase font-bold tracking-wider">{alerting ? 'Starting soon' : 'Countdown'}</p>
@@ -177,6 +184,23 @@ export default function SchedulerRadioMonitor() {
             className="h-full bg-gradient-to-r from-red-600 via-orange-500 to-amber-400 transition-[width] duration-200"
             style={{ width: `${progress}%` }}
           />
+        </div>
+
+        <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={stopPlayback}
+            disabled={!isPlaying}
+            className="h-9 rounded-lg bg-red-600 hover:bg-red-500 disabled:bg-gray-800 disabled:text-gray-600 px-3 text-[10px] font-black uppercase tracking-wider text-white"
+          >
+            ■ Stop
+          </button>
+          <div className="flex items-end justify-end gap-2">
+            <Knob value={volume} onChange={changeVolume} size={34} color="#fff4cf" label="VOL" title="Scheduler Volume" />
+            <Knob value={eq.high} onChange={(value) => changeEq('high', value)} size={30} color="#fbbf24" label="HI" title="Scheduler High EQ" />
+            <Knob value={eq.mid} onChange={(value) => changeEq('mid', value)} size={30} color="#f97316" label="MID" title="Scheduler Mid EQ" />
+            <Knob value={eq.low} onChange={(value) => changeEq('low', value)} size={30} color="#ff2a1f" label="LO" title="Scheduler Low EQ" />
+          </div>
         </div>
       </div>
     </section>

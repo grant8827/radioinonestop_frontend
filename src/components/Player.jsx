@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import Hls from 'hls.js'
 import { useAudioEngine } from '../context/AudioEngine'
 import { useStream } from '../context/StreamContext'
+import Knob from './RotaryKnob'
 
 // ── LL-HLS config ──────────────────────────────────────────────────────────────
 const HLS_CONFIG = {
@@ -56,77 +57,6 @@ const mkWave = (seed) =>
   })
 const WAVE_A = mkWave(0)
 const WAVE_B = mkWave(1.4)
-
-// ── Rotary Knob ────────────────────────────────────────────────────────────────
-function Knob({ value, onChange, size = 36, color = LOGO.redHot, label, title }) {
-  const dragRef = useRef(null)
-  const onPointerDown = (e) => {
-    e.preventDefault()
-    e.currentTarget.setPointerCapture(e.pointerId)
-    dragRef.current = { startY: e.clientY, startVal: value }
-  }
-  const onPointerMove = (e) => {
-    if (!dragRef.current) return
-    const delta = (dragRef.current.startY - e.clientY) / 100
-    onChange(Math.max(0, Math.min(1, dragRef.current.startVal + delta)))
-  }
-  const onPointerUp   = () => { dragRef.current = null }
-  const onDoubleClick = () => onChange(0.5)
-
-  const cx = size / 2, cy = size / 2
-  const LEDS     = 11
-  const ledDot   = 2.2
-  const ringR    = size * 0.43
-  const capR     = size * 0.28
-  const startDeg = -225, sweep = 270
-  const toRad    = d => d * Math.PI / 180
-  const litCount = Math.round(value * (LEDS - 1))
-  const tickAngle = toRad(startDeg + sweep * value - 90)
-  const [mx1, my1] = [cx + capR * 0.28 * Math.cos(tickAngle), cy + capR * 0.28 * Math.sin(tickAngle)]
-  const [mx2, my2] = [cx + capR * 0.88 * Math.cos(tickAngle), cy + capR * 0.88 * Math.sin(tickAngle)]
-
-  return (
-    <div className="flex flex-col items-center select-none" style={{ gap: 3 }} title={title || label}>
-      {label && (
-        <span className="text-[7px] font-bold uppercase tracking-wide leading-none" style={{ color: '#64748b' }}>
-          {label}
-        </span>
-      )}
-      <svg width={size} height={size}
-        style={{ touchAction: 'none', cursor: 'ns-resize', overflow: 'visible' }}
-        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
-        onDoubleClick={onDoubleClick}>
-        <circle cx={cx} cy={cy + 2.5} r={capR + 2} fill="#00000077" />
-        {/* Unlit LED slots */}
-        {Array.from({ length: LEDS }).map((_, i) => {
-          const deg = startDeg - 90 + (sweep / (LEDS - 1)) * i
-          const lx = cx + ringR * Math.cos(toRad(deg))
-          const ly = cy + ringR * Math.sin(toRad(deg))
-          return <circle key={i} cx={lx} cy={ly} r={ledDot} fill="#0e1420" stroke="#1e2840" strokeWidth="0.5" />
-        })}
-        {/* Lit LED segments */}
-        {Array.from({ length: LEDS }).map((_, i) => {
-          if (i > litCount) return null
-          const deg = startDeg - 90 + (sweep / (LEDS - 1)) * i
-          const lx = cx + ringR * Math.cos(toRad(deg))
-          const ly = cy + ringR * Math.sin(toRad(deg))
-          return (
-            <circle key={i} cx={lx} cy={ly} r={ledDot}
-              fill={color}
-              style={{ filter: `drop-shadow(0 0 ${ledDot * 2}px ${color})` }}
-            />
-          )
-        })}
-        <circle cx={cx} cy={cy} r={capR} fill="#0d1520" />
-        <ellipse cx={cx - capR * 0.18} cy={cy - capR * 0.28} rx={capR * 0.55} ry={capR * 0.28} fill="#ffffff0a" />
-        <circle cx={cx} cy={cy} r={capR} fill="none" stroke="#ffffff10" strokeWidth="1" />
-        <line x1={mx1} y1={my1} x2={mx2} y2={my2}
-          stroke={color} strokeWidth="2" strokeLinecap="round"
-          style={{ filter: `drop-shadow(0 0 3px ${color})` }} />
-      </svg>
-    </div>
-  )
-}
 
 // ── Vertical channel fader ─────────────────────────────────────────────────────
 function VFader({ value, onChange, height = 100, color = LOGO.gold, title }) {
