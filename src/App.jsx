@@ -7,8 +7,9 @@ import NowPlaying from './components/NowPlaying'
 import Sidebar from './components/Sidebar'
 import StreamSetup from './components/StreamSetup'
 import Mixer from './components/Mixer'
-import SocialLive from './components/SocialLive'
 import TrackLibrary from './components/TrackLibrary'
+import Scheduler from './components/Scheduler'
+import SchedulerRadioMonitor from './components/SchedulerRadioMonitor'
 import ConferenceRoom from './pages/ConferenceRoom'
 import SettingsPage from './components/SettingsPage'
 import ProfileSettings from './components/ProfileSettings'
@@ -39,7 +40,6 @@ function MainApp() {
   const { user, token } = useAuth()
   const { reconnectNeeded, doReconnect, dismissReconnect } = useStream()
   const [mode, setMode] = useState('radio')
-  const [playerMode, setPlayerMode] = useState('radio')  // sticky: only updates on radio/video
   const [config, setConfig] = useState(null)
   const [stationName, setStationName] = useState('')
   const [stationLogoUrl, setStationLogoUrl] = useState('')
@@ -85,7 +85,6 @@ function MainApp() {
       .catch(() =>
         setConfig({
           radioUrl: '',
-          videoUrl: '',
           stationName: 'Radio In One Stop',
         })
       )
@@ -129,7 +128,6 @@ function MainApp() {
 
   const handleModeChange = (m) => {
     setMode(m)
-    if (m === 'radio' || m === 'video') setPlayerMode(m)
   }
 
   if (!config) {
@@ -224,9 +222,12 @@ function MainApp() {
           <div className={mode !== 'stream' ? 'hidden' : 'contents'}>
             <StreamSetup isSuspended={listenerStatus?.status === 'suspended'} />
           </div>
+          {/* Keep Scheduler mounted so SSE triggers fire from every app tab. */}
+          <div className={mode !== 'scheduler' ? 'hidden' : 'contents'}>
+            <Scheduler />
+          </div>
           {mode === 'mixer' && <Mixer config={config} onOpenConference={() => handleModeChange('conference')} />}
-          {/* Keep ConferenceRoom mounted so LiveKit session + conference audio bridge
-              continue when user switches tabs (Mixer/Radio/Profile/etc). */}
+          {/* Keep the live-chat Conference room mounted across tab changes. */}
           <div className={mode !== 'conference' ? 'hidden' : 'contents'}>
             <ConferenceRoom roomId="studio" username={user?.stationName} onLeave={() => handleModeChange('radio')} onGoToMixer={() => handleModeChange('mixer')} />
           </div>
@@ -234,17 +235,17 @@ function MainApp() {
           {mode === 'profile' && <ProfileSettings />}
           {mode === 'settings' && <SettingsPage />}
 
-          {/* Player + NowPlaying + Chat — always mounted so audio elements survive
-              mode switches. Hidden (display:none) when not in radio/video mode. */}
+          {/* Radio player stays mounted so audio elements survive mode switches. */}
           <div className={`flex flex-col lg:flex-row gap-4 w-full${
-            mode !== 'radio' && mode !== 'video' ? ' hidden' : ''
+            mode !== 'radio' ? ' hidden' : ''
           }`}>
             <div className="flex-1 flex flex-col gap-4 min-w-0">
-              <Player mode={playerMode} config={config} trackA={trackA} trackB={trackB} queue={queue} onQueuePop={repeatPlaylist ? () => setQueue((q) => q.length > 0 ? [...q.slice(1), q[0]] : [...repeatBackupRef.current]) : () => setQueue((q) => q.slice(1))} onLoadTrackA={setTrackA} onLoadTrackB={setTrackB} onDeckPlaybackChange={handleDeckPlaybackChange} repeatPlaylist={repeatPlaylist} onRepeatReload={onRepeatReload} isSuspended={listenerStatus?.status === 'suspended'} />
+              <Player mode="radio" config={config} trackA={trackA} trackB={trackB} queue={queue} onQueuePop={repeatPlaylist ? () => setQueue((q) => q.length > 0 ? [...q.slice(1), q[0]] : [...repeatBackupRef.current]) : () => setQueue((q) => q.slice(1))} onLoadTrackA={setTrackA} onLoadTrackB={setTrackB} onDeckPlaybackChange={handleDeckPlaybackChange} repeatPlaylist={repeatPlaylist} onRepeatReload={onRepeatReload} isSuspended={listenerStatus?.status === 'suspended'} />
               <NowPlaying config={config} mode={mode} />
             </div>
             <div className="lg:w-80 xl:w-96 shrink-0 flex flex-col gap-3 min-h-0">
-              <SocialLive />
+              {/* VIDEO DISABLED: SocialLive camera preview removed. */}
+              <SchedulerRadioMonitor />
               <div className="min-h-0 overflow-hidden" style={{ height: 530 }}>
                 <TrackLibrary onTrackLoadA={loadTrackAFromLibrary} onTrackLoadB={loadTrackBFromLibrary} queue={queue} onQueueChange={setQueue} repeatPlaylist={repeatPlaylist} onRepeatChange={setRepeatPlaylist} nowPlayingA={trackA} nowPlayingB={trackB} />
               </div>

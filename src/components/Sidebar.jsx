@@ -4,10 +4,10 @@ import UpgradeModal from './UpgradeModal'
 
 // Define which features are available in each plan
 const PLAN_FEATURES = {
-  starter: ['radio', 'mixer', 'stream'],
-  professional: ['radio', 'mixer', 'stream', 'conference'],
-  enterprise: ['radio', 'mixer', 'stream', 'conference'],
-  ultimate: ['radio', 'mixer', 'stream', 'conference'],
+  starter: ['radio', 'mixer', 'stream', 'scheduler'],
+  professional: ['radio', 'mixer', 'stream', 'scheduler', 'conference'],
+  enterprise: ['radio', 'mixer', 'stream', 'scheduler', 'conference'],
+  ultimate: ['radio', 'mixer', 'stream', 'scheduler', 'conference'],
 }
 
 // Define required plans for locked features
@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   { id: 'radio', label: 'Radio', icon: RadioIcon },
   { id: 'mixer', label: 'Mixer', icon: MixerIcon },
   { id: 'stream', label: 'Stream', icon: StreamIcon },
+  { id: 'scheduler', label: 'Scheduler', icon: SchedulerIcon },
   { id: 'conference', label: 'Conference', icon: ConferenceIcon },
 ]
 
@@ -58,6 +59,15 @@ function StreamIcon({ className }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12 20.25h.008v.008H12v-.008z" />
+    </svg>
+  )
+}
+
+function SchedulerIcon({ className }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 2h6" />
     </svg>
   )
 }

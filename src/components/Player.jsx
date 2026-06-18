@@ -1158,6 +1158,18 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
   const [streamLive, setStreamLive] = useState(false)
   const [latency,    setLatency]    = useState(null)
 
+  // Scheduled songs take immediate priority over either DJ deck.
+  useEffect(() => {
+    const interrupt = () => {
+      mediaRef.current?.pause()
+      mediaRefB.current?.pause()
+      setPlaying(false)
+      setPlayingB(false)
+    }
+    window.addEventListener('scheduler:interrupt', interrupt)
+    return () => window.removeEventListener('scheduler:interrupt', interrupt)
+  }, [])
+
   const [pitchA, setPitchA] = useState(0)
   const [pitchB, setPitchB] = useState(0)
   const [hotCuesA, setHotCuesA] = useState([null, null, null, null])
@@ -1712,8 +1724,9 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
     return () => { if (vuRafRef.current) cancelAnimationFrame(vuRafRef.current) }
   }, [audioEngine])
 
-  const streamUrl = mode === 'radio' ? config?.radioUrl : config?.videoUrl
-  const streamKey = streamKeyFromUrl(streamUrl) ?? (mode === 'radio' ? 'radio' : 'video')
+  // VIDEO DISABLED: the player always resolves the radio stream.
+  const streamUrl = config?.radioUrl
+  const streamKey = streamKeyFromUrl(streamUrl) ?? 'radio'
 
   // Load local track into Deck A
   useEffect(() => {
@@ -1940,7 +1953,8 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
 
   return (
     <div className="bg-[#0a0c10] rounded-2xl overflow-hidden border border-[#1e2128]">
-      {mode === 'video' ? (
+      {/* VIDEO DISABLED: keep the former video player branch unreachable. */}
+      {false ? (
         <>
           <div className="relative bg-black aspect-video">
             <video ref={mediaRef} className="w-full h-full object-contain" playsInline />

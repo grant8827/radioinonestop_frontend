@@ -65,6 +65,10 @@ export function AudioEngineProvider({ children }) {
 
   // channelId to connect once both dj-a and dj-b elements are registered
   const pendingDjChannel = useRef(null)
+  const djChannelIdRef = useRef(null)
+  const schedulerElementRef = useRef(null)
+  const schedulerSourceRef = useRef(null)
+  const schedulerAnalyserRef = useRef(null)
 
   // true once a Mixer channel has DJ Player assigned
   const [djConnected, setDjConnected] = useState(false)
@@ -500,6 +504,7 @@ export function AudioEngineProvider({ children }) {
         const isMic = id <= 3
         if (!isMic && (ch.sourceType === 'dj' || ch.sourceType === 'podcast')) {
           pendingDjChannel.current = id
+          djChannelIdRef.current = id
           setDjConnected(true)
         }
       })
@@ -518,6 +523,7 @@ export function AudioEngineProvider({ children }) {
 
     // Mark DJ as connected (user's intent is set — playback now allowed)
     setDjConnected(true)
+    djChannelIdRef.current = channelId
 
     const ac = getAC()
     let anyMissing = false
@@ -565,7 +571,46 @@ export function AudioEngineProvider({ children }) {
       deq.lo.connect(dka)
       dka.connect(nodes.gainNode)
     })
+    if (schedulerElementRef.current) {
+      if (!schedulerSourceRef.current) schedulerSourceRef.current = ac.createMediaElementSource(schedulerElementRef.current)
+      if (!schedulerAnalyserRef.current) {
+        const analyser = ac.createAnalyser()
+        analyser.fftSize = 256
+        analyser.smoothingTimeConstant = 0.8
+        schedulerAnalyserRef.current = analyser
+      }
+      try { schedulerSourceRef.current.disconnect() } catch { /* not connected */ }
+      try { schedulerAnalyserRef.current.disconnect() } catch { /* not connected */ }
+      schedulerSourceRef.current.connect(schedulerAnalyserRef.current)
+      schedulerAnalyserRef.current.connect(nodes.gainNode)
+    }
   }, [getAC])
+
+  // Dedicated Scheduler Monitor player routed into the same Mixer channel as
+  // DJ Player, without loading or controlling either DJ deck.
+  const registerSchedulerMediaElement = useCallback((element) => {
+    if (!element) return
+    schedulerElementRef.current = element
+    const channelId = djChannelIdRef.current ?? pendingDjChannel.current
+    const nodes = channelId !== null ? channelNodes.current[channelId] : null
+    if (!nodes) return
+    const ac = getAC()
+    if (!schedulerSourceRef.current) {
+      schedulerSourceRef.current = ac.createMediaElementSource(element)
+    }
+    if (!schedulerAnalyserRef.current) {
+      const analyser = ac.createAnalyser()
+      analyser.fftSize = 256
+      analyser.smoothingTimeConstant = 0.8
+      schedulerAnalyserRef.current = analyser
+    }
+    try { schedulerSourceRef.current.disconnect() } catch { /* not connected */ }
+    try { schedulerAnalyserRef.current.disconnect() } catch { /* not connected */ }
+    schedulerSourceRef.current.connect(schedulerAnalyserRef.current)
+    schedulerAnalyserRef.current.connect(nodes.gainNode)
+  }, [getAC])
+
+  const getSchedulerAnalyser = useCallback(() => schedulerAnalyserRef.current, [])
 
   // ── Enable / disable DJ-connect gate ─────────────────────────────────────
   const setDjActive = useCallback((active) => {
@@ -969,6 +1014,7 @@ export function AudioEngineProvider({ children }) {
       setChannelActive,
       updateMasterFader,
       connectPadAudio,
+      registerSchedulerMediaElement,
       updateMasterEq,
       updatePhonesVol,
       updateCueVol,
@@ -996,6 +1042,7 @@ export function AudioEngineProvider({ children }) {
       getAnalyser,
       getMasterAnalyser,
       getDeckAnalyser,
+      getSchedulerAnalyser,
       updateDeckMix,
       updateDeckEq,
       setDjActive,

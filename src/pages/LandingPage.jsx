@@ -13,8 +13,8 @@ const FEATURES = [
         <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
       </svg>
     ),
-    title: 'Multistream Everywhere',
-    desc: 'Push your live stream simultaneously to YouTube, Facebook, TikTok, and Instagram — from a single RTMP source.',
+    title: 'Radio Automation',
+    desc: 'Run live shows, playlists, and your station mixer from one focused radio workspace.',
     accent: 'text-red-400',
     border: 'border-red-900/40',
     bg: 'bg-red-900/10',
@@ -37,8 +37,8 @@ const FEATURES = [
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
       </svg>
     ),
-    title: 'Browser Broadcasting',
-    desc: 'Go live directly from Chrome or Firefox via WebRTC — no software download required.',
+    title: 'Browser Radio Broadcasting',
+    desc: 'Send your live radio mix directly from Chrome or Firefox — no extra encoder required.',
     accent: 'text-emerald-400',
     border: 'border-emerald-900/40',
     bg: 'bg-emerald-900/10',
@@ -334,8 +334,8 @@ export default function LandingPage() {
           </h1>
 
           <p className="max-w-2xl mx-auto text-lg text-gray-400 leading-relaxed mb-10">
-            Multistream to YouTube, Facebook, TikTok, and Instagram simultaneously.
-            Built-in HLS playback, live chat, and a browser broadcaster — all from one dashboard.
+            Broadcast your radio station, manage your mixer, and connect with listeners.
+            Built-in HLS audio playback, live chat, and browser broadcasting — all from one dashboard.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -491,6 +491,7 @@ export default function LandingPage() {
       {selectedStation && (
         <StationModal
           station={selectedStation}
+          autoPlay
           onClose={() => setSelectedStation(null)}
         />
       )}

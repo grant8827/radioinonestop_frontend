@@ -4,17 +4,17 @@ const PLAN_DETAILS = {
   professional: {
     name: 'Professional',
     price: { monthly: 39, yearly: 390 },
-    features: ['Conference calls', 'Up to 10 participants', 'Screen sharing', '1000 concurrent listeners']
+    features: ['Conference live chat', 'Up to 10 participants', 'Priority audio processing', '1000 concurrent listeners']
   },
   enterprise: {
     name: 'Enterprise',
     price: { monthly: 59, yearly: 590 },
-    features: ['Video live streaming', 'Up to 3 streaming channels', 'Social media multistream', '2000 concurrent listeners']
+    features: ['Higher bitrate radio', 'Advanced listener reporting', 'Priority support', '2000 concurrent listeners']
   },
   ultimate: {
     name: 'Ultimate',
     price: { monthly: 99, yearly: 990 },
-    features: ['Up to 6 streaming channels', 'Advanced analytics', 'Custom branding', 'Unlimited listeners']
+    features: ['Premium radio automation', 'Advanced analytics', 'Custom branding', 'Unlimited listeners']
   }
 }
 

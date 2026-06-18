@@ -4,7 +4,11 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const apiTarget = env.VITE_API_PROXY_TARGET || env.VITE_API_BASE || env.VITE_API_BASE_URL || 'http://localhost:8080'
+  // Local development must proxy API requests to the local Go backend.
+  // VITE_API_BASE is used by production builds and may point at Railway.
+  const apiTarget = env.VITE_API_PROXY_TARGET
+    || (mode === 'development' ? 'http://localhost:8080' : env.VITE_API_BASE || env.VITE_API_BASE_URL)
+    || 'http://localhost:8080'
   const webrtcTarget = env.VITE_WEBRTC_PROXY_TARGET || 'https://radioinonestop.com'
   const hlsTarget = env.VITE_HLS_PROXY_TARGET || 'https://radioinonestop.com'
   const rewriteWebRTC = env.VITE_WEBRTC_PROXY_REWRITE === 'true'

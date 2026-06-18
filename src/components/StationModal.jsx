@@ -156,7 +156,7 @@ function VinylRecord({ isSpinning, logoUrl, stationName }) {
 }
 
 // ─── Station Modal ─────────────────────────────────────────────────────────────
-export default function StationModal({ station, onClose }) {
+export default function StationModal({ station, onClose, autoPlay = false }) {
   const [info, setInfo]         = useState(station)
   const [playing, setPlaying]   = useState(false)
   const [connecting, setConnecting] = useState(false)
@@ -414,11 +414,17 @@ export default function StationModal({ station, onClose }) {
         hls.loadSource(hlsUrl)
         hls.attachMedia(audio)
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          // audio.play() is called here — may be too many async hops from user gesture.
+          // Attempt play; if blocked by autoplay policy the catch chain falls through to playDirect.
           audio.play().then(() => {
             markPlaying()
             startTracking(true)
             resolve()
-          }).catch(() => fail())
+          }).catch((err) => {
+            hls.destroy()
+            hlsRef.current = null
+            reject(err)
+          })
         })
         hls.on(Hls.Events.ERROR, (_e, data) => {
           if (data.fatal) {
@@ -441,10 +447,16 @@ export default function StationModal({ station, onClose }) {
     })
 
     playHls()
-      .catch(() => playDirect(streamUrl, 8000))
       .catch(() => {
-        if (hasIcecastStream) setIcecastUnavailable(true)
-        return playDirect(primaryStreamUrl, hasIcecastStream ? 2000 : 8000)
+        startTracking(true)
+        return playDirect(streamUrl, 8000)
+      })
+      .catch(() => {
+        if (hasIcecastStream) {
+          setIcecastUnavailable(true)
+          return playDirect(info.icecast_listen_url, 2000)
+        }
+        fail('Stream is not ready yet')
       })
       .catch(() => {
         fail(hasIcecastStream ? 'Icecast stream is offline and HLS fallback is unavailable' : 'Stream is not ready yet')
@@ -452,10 +464,11 @@ export default function StationModal({ station, onClose }) {
   }, [hlsUrl, icecastUnavailable, info.genre, info.icecast_listen_url, info.logo_url, info.name, startListenerSession, stopListenerSession, streamUrl])
 
   useEffect(() => {
-    if (!info.is_live || autoPlayStartedRef.current || playing || connecting) return
+    if (!info.is_live || playing || connecting) return
+    if (!autoPlay && autoPlayStartedRef.current) return
     autoPlayStartedRef.current = true
     play().catch(() => {})
-  }, [info.is_live, play, playing, connecting])
+  }, [info.is_live, play, playing, connecting, autoPlay])
 
   const stop = useCallback(() => {
     hlsRef.current?.destroy()

@@ -78,7 +78,7 @@ export default function AdminPanel({ config, onSave, onClose }) {
             <p className="text-xs text-gray-500">
               Derived stream URLs:<br />
               <code className="text-gray-400 break-all">{base}/hls/radio/index.m3u8</code><br />
-              <code className="text-gray-400 break-all">{base}/hls/video/index.m3u8</code>
+              {/* VIDEO DISABLED: video HLS URL removed. */}
             </p>
           </div>
 
@@ -86,7 +86,7 @@ export default function AdminPanel({ config, onSave, onClose }) {
           <div className="bg-gray-800 rounded-lg px-4 py-3 flex flex-col gap-1.5">
             <p className="text-xs font-medium text-gray-300">OBS / vMix RTMP ingest</p>
             <p className="text-xs text-gray-400">Server: <code className="text-red-400">rtmp://your-server:1935</code></p>
-            <p className="text-xs text-gray-400">Stream Key: <code className="text-red-400">radio</code> or <code className="text-red-400">video</code></p>
+            <p className="text-xs text-gray-400">Stream Key: <code className="text-red-400">radio</code></p>
             <p className="text-xs text-gray-500 mt-1">
               The backend auto-detects the stream key from the RTMP publish path and starts an FFmpeg LL-HLS transcode.
             </p>

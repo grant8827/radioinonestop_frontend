@@ -190,17 +190,7 @@ function StreamSettingsTab({ audioKey, liveStreams, viewers, host, sourcePasswor
         >
           Audio Settings
         </button>
-        <button
-          type="button"
-          onClick={() => setSettingsTab('video')}
-          className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-            settingsTab === 'video'
-              ? 'bg-gray-700 text-white'
-              : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/60'
-          }`}
-        >
-          Video Settings
-        </button>
+        {/* VIDEO DISABLED: video settings tab removed. */}
       </div>
 
       <div style={{ display: settingsTab === 'audio' ? undefined : 'none' }} className="space-y-6">
@@ -313,9 +303,7 @@ function StreamSettingsTab({ audioKey, liveStreams, viewers, host, sourcePasswor
 
       </div>
 
-      <div style={{ display: settingsTab === 'video' ? undefined : 'none' }}>
-        <ChannelTab host={host} audioKey={audioKey} isSuspended={isSuspended} manualOnly={true} />
-      </div>
+      {/* VIDEO DISABLED: video and multistream settings are not mounted. */}
     </div>
   )
 }
@@ -2706,15 +2694,7 @@ const TABS = [
       </svg>
     ),
   },
-  {
-    id: 'channel',
-    label: 'Video Stream',
-    icon: () => (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
-      </svg>
-    ),
-  },
+  // VIDEO DISABLED: video stream workspace tab removed.
   {
     id: 'settings',
     label: 'Stream Settings',
@@ -2798,13 +2778,7 @@ export default function StreamSetup({ isSuspended = false }) {
       <div style={{ display: tab === 'audio' ? undefined : 'none' }}>
         <AudioEncoderTab audioKey={audioKey} host={host} listenUrl={creds?.listen_url} isSuspended={isSuspended} />
       </div>
-      <div style={{ display: tab === 'channel' ? undefined : 'none' }}>
-        <Workspace
-          videoKey={audioKey}
-          isSuspended={isSuspended}
-          channelManager={<ChannelTab host={host} audioKey={audioKey} isSuspended={isSuspended} manualOnly={true} />}
-        />
-      </div>
+      {/* VIDEO DISABLED: camera compositor and multistream workspace are not mounted. */}
       {tab === 'listeners' && <ListenersPage />}
     </div>
   )
