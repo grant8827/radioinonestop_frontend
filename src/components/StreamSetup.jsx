@@ -47,58 +47,6 @@ function Field({ label, value }) {
   )
 }
 
-function MaskedField({ label, value, onChange, placeholder }) {
-  const [show, setShow] = useState(false)
-  const isEditable = typeof onChange === 'function'
-  return (
-    <div>
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">{label}</p>
-      <div className="flex items-center gap-2 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2">
-        {isEditable ? (
-          <input
-            type={show ? 'text' : 'password'}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={placeholder || ''}
-            className="flex-1 bg-transparent text-sm text-green-400 font-mono outline-none placeholder-gray-700"
-          />
-        ) : (
-          <code className="flex-1 text-sm text-green-400 font-mono truncate select-all">
-            {show ? value : '•'.repeat(Math.min(value.length, 32))}
-          </code>
-        )}
-        <button
-          type="button"
-          onClick={() => setShow((v) => !v)}
-          className="flex-shrink-0 text-gray-600 hover:text-white transition-colors p-0.5"
-          aria-label={show ? 'Hide' : 'Show'}
-        >
-          {show ? (
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
-            </svg>
-          ) : (
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          )}
-        </button>
-        {!isEditable && <CopyButton text={value} />}
-      </div>
-    </div>
-  )
-}
-
-function InfoRow({ icon, text }) {
-  return (
-    <li className="flex items-start gap-2 text-sm text-gray-400">
-      <span className="mt-0.5 flex-shrink-0 text-gray-600">{icon}</span>
-      <span>{text}</span>
-    </li>
-  )
-}
-
 function useStreamDashboard() {
   const [liveStreams, setLiveStreams] = useState([])
   const [viewers, setViewers] = useState(0)
@@ -170,32 +118,18 @@ function DashboardCard({ label, colorClass, iconPath, stream, viewers }) {
 
 /* ─── Tab content ─────────────────────────────────────────────── */
 
-function StreamSettingsTab({ audioKey, liveStreams, viewers, host, sourcePassword, creds, isSuspended = false }) {
+function StreamSettingsTab({ audioKey, liveStreams, viewers, creds }) {
   const audioStream = liveStreams.find(s => s.key === audioKey)
   const anyLive = liveStreams.some(s => s.live)
   const otherStreams = liveStreams.filter(s => s.key !== audioKey)
-  const [settingsTab, setSettingsTab] = useState('audio')
+  const hubListenPath = creds?.hub_listen_url || creds?.listen_url || ''
+  const icecastListenPath = creds?.icecast_listen_url || (creds?.stream_key ? `/icecast/${creds.stream_key}` : '')
+  const hubListenUrl = hubListenPath ? new URL(hubListenPath, window.location.origin).toString() : ''
+  const icecastListenUrl = icecastListenPath ? new URL(icecastListenPath, window.location.origin).toString() : ''
 
   return (
-    <div className="space-y-4">
-      <div className="flex gap-1 bg-gray-900/60 border border-gray-800 rounded-xl p-1">
-        <button
-          type="button"
-          onClick={() => setSettingsTab('audio')}
-          className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-            settingsTab === 'audio'
-              ? 'bg-gray-700 text-white'
-              : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/60'
-          }`}
-        >
-          Audio Settings
-        </button>
-        {/* VIDEO DISABLED: video settings tab removed. */}
-      </div>
-
-      <div style={{ display: settingsTab === 'audio' ? undefined : 'none' }} className="space-y-6">
-        {/* Dashboard */}
-        <div>
+    <div className="space-y-6">
+      <div>
         <div className="flex items-center gap-2 mb-3">
           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Live Dashboard</span>
           <span className={`flex items-center gap-1.5 text-[10px] font-bold border rounded px-2 py-0.5 ${anyLive ? 'text-green-400 bg-green-900/20 border-green-700/40' : 'text-gray-500 bg-gray-800/50 border-gray-700/40'}`}>
@@ -226,38 +160,6 @@ function StreamSettingsTab({ audioKey, liveStreams, viewers, host, sourcePasswor
         )}
       </div>
 
-      {/* Icecast / source client settings */}
-      <IcecastCard host={host} audioKey={audioKey} sourcePassword={sourcePassword} />
-
-      {/* ── Your RTMP Credentials ── */}
-      <div className="bg-gray-900 border border-red-900/40 rounded-xl overflow-hidden">
-        <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-red-900/20 to-transparent border-b border-red-900/30">
-          <span className="w-8 h-8 rounded-lg bg-red-600/20 border border-red-500/30 flex items-center justify-center shrink-0">
-            <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-            </svg>
-          </span>
-          <div>
-            <h3 className="font-semibold text-white text-sm">Your RTMP Credentials</h3>
-            <p className="text-xs text-gray-400">Use these in OBS Studio or any RTMP broadcaster</p>
-          </div>
-          <span className="ml-auto text-[10px] font-bold text-amber-400 bg-red-900/30 border border-red-700/40 rounded px-2 py-0.5">PERSONAL</span>
-        </div>
-        <div className="px-5 py-4 space-y-3">
-          {creds ? (
-            <>
-              <Field label="RTMP Server URL" value={creds.rtmp_ingest_base} />
-              <MaskedField label="Stream Key" value={creds.stream_key} />
-              <Field label="Full Publish URL" value={`${creds.rtmp_ingest_base}/${creds.stream_key}`} />
-              {creds.station_slug && <Field label="Station ID" value={creds.station_slug} />}
-            </>
-          ) : (
-            <p className="text-xs text-gray-500 py-2">Sign in to view your credentials</p>
-          )}
-        </div>
-      </div>
-
-      {/* ── Channel Playback URLs ── */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
         <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-gray-800/60 to-gray-900 border-b border-gray-800">
           <span className="w-8 h-8 rounded-lg bg-amber-600/20 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
@@ -266,122 +168,39 @@ function StreamSettingsTab({ audioKey, liveStreams, viewers, host, sourcePasswor
             </svg>
           </span>
           <div>
-            <h3 className="font-semibold text-white text-sm">Channel Playback URLs</h3>
-            <p className="text-xs text-gray-400">Share these links so listeners and viewers can tune in</p>
+            <h3 className="font-semibold text-white text-sm">Radio Listener Links</h3>
+            <p className="text-xs text-gray-400">The working links for the current radio broadcast modes</p>
           </div>
         </div>
         <div className="px-5 py-4 space-y-4">
           {creds && (
             <>
-              <Field label="Audio Stream (HLS)" value={`https://${host}/hls/${creds.stream_key}/index.m3u8`} />
-              {creds.listen_url && <LiveListenerPlayer listenPath={creds.listen_url} />}
+              {hubListenUrl && <Field label="Station Hub — browser broadcast" value={hubListenUrl} />}
+              {icecastListenUrl && <Field label="Icecast — audio encoder broadcast" value={icecastListenUrl} />}
+              {hubListenPath && <LiveListenerPlayer listenPath={hubListenPath} />}
             </>
           )}
           <div className="bg-gray-800/40 border border-gray-700/50 rounded-lg px-4 py-3 text-sm text-gray-400">
-            These HLS URLs work in VLC, any browser with HLS support, and can be embedded with an HLS.js player.
-            They go live automatically when you start streaming.
+            Use the Station Hub link when the Audio Encoder is in Hub mode. Use the Icecast link when the
+            Audio Encoder is connected to Icecast. A link becomes playable after its matching broadcast starts.
           </div>
         </div>
       </div>
 
-      {/* ── RTMP Ingest ── */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-800">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">RTMP Ingest (This Server)</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Station Identity</p>
         </div>
-        <div className="px-5 py-4 space-y-4">
+        <div className="px-5 py-4 space-y-3">
           {creds ? (
             <>
-              <Field label="RTMP Server URL" value={creds.rtmp_ingest_base} />
-              <MaskedField label="Your Stream Key" value={creds.stream_key} />
+              {creds.station_slug && <Field label="Station ID" value={creds.station_slug} />}
+              <Field label="Audio Stream Key" value={creds.stream_key} />
             </>
           ) : (
-            <p className="text-xs text-gray-500 py-2">Sign in to view your RTMP details</p>
+            <p className="text-xs text-gray-500 py-2">Sign in to view your station details</p>
           )}
         </div>
-      </div>
-
-      </div>
-
-      {/* VIDEO DISABLED: video and multistream settings are not mounted. */}
-    </div>
-  )
-}
-
-/* ─── Icecast / Shoutcast source-client card ────────────────── */
-
-function IcecastCard({ host, audioKey = 'radio', sourcePassword = '' }) {
-  const mount          = '/' + audioKey
-  const icecastPort    = '8000'
-  const listenUrl      = `https://${host}/icecast${mount}`
-
-  return (
-    <div className="bg-gray-900 border border-orange-900/40 rounded-xl overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-orange-900/30 to-gray-900 border-b border-orange-900/30">
-        <span className="w-8 h-8 rounded-lg bg-orange-600/20 border border-orange-500/30 flex items-center justify-center flex-shrink-0">
-          <svg className="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
-          </svg>
-        </span>
-        <div>
-          <h3 className="font-semibold text-white text-sm">Icecast / Shoutcast Source</h3>
-          <p className="text-xs text-gray-400">Connect BUTT, Mixxx, Liquidsoap, or Darkice</p>
-        </div>
-        <span className="ml-auto text-[10px] font-bold text-orange-400 bg-orange-900/30 border border-orange-700/40 rounded px-2 py-0.5">ICECAST 2</span>
-      </div>
-
-      <div className="px-5 py-4 space-y-4">
-        {/* Connection details */}
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Host / Address" value={host} />
-          <Field label="Port" value={icecastPort} />
-          <Field label="Mount Point" value={mount} />
-          <Field label="Source Password" value={sourcePassword} />
-        </div>
-        <Field label="Listener URL (HTTPS — works while stream is active)" value={listenUrl} />
-
-        {/* BUTT instructions */}
-        <div className="bg-orange-950/20 border border-orange-800/30 rounded-lg p-4">
-          <p className="text-xs font-semibold text-orange-400 uppercase tracking-wider mb-3">BUTT (Broadcast Using This Tool)</p>
-          <ol className="space-y-1.5 text-sm text-gray-300 list-decimal list-inside">
-            <li>Open BUTT → <strong>Settings → Main</strong> → click <strong>ADD</strong> under Servers</li>
-            <li>Type: <span className="text-orange-300 font-mono">Icecast</span></li>
-            <li>Address: <span className="text-orange-300 font-mono">{host}</span> &nbsp;·&nbsp; Port: <span className="text-orange-300 font-mono">{icecastPort}</span></li>
-            <li>Password: <span className="text-orange-300 font-mono">{sourcePassword}</span> &nbsp;·&nbsp; Mount: <span className="text-orange-300 font-mono">{mount}</span></li>
-            <li>Click <strong>Add</strong>, select that server, press the <strong>▶ Play</strong> button</li>
-          </ol>
-        </div>
-
-        {/* Mixxx */}
-        <div className="bg-gray-800/40 border border-gray-700/50 rounded-lg px-4 py-3">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Mixxx</p>
-          <ol className="space-y-1.5 text-sm text-gray-300 list-decimal list-inside">
-            <li>Preferences → <strong>Live Broadcasting</strong></li>
-            <li>Type: <span className="text-green-400 font-mono">Icecast 2</span> &nbsp;·&nbsp; Host: <span className="text-green-400 font-mono">{host}</span> &nbsp;·&nbsp; Port: <span className="text-green-400 font-mono">{icecastPort}</span></li>
-            <li>Mount: <span className="text-green-400 font-mono">{mount}</span> &nbsp;·&nbsp; Login: <span className="text-green-400 font-mono">source</span> &nbsp;·&nbsp; Password: <span className="text-green-400 font-mono">{sourcePassword}</span></li>
-            <li>Enable <strong>Enable Live Broadcasting</strong> and click <strong>Apply</strong></li>
-          </ol>
-        </div>
-
-        {/* Liquidsoap */}
-        <div className="bg-gray-800/40 border border-gray-700/50 rounded-lg px-4 py-3">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Liquidsoap</p>
-          <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap break-all leading-relaxed bg-gray-900 rounded-lg px-3 py-2 mt-2">{`output.icecast(
-  %mp3(bitrate = 192, samplerate = 44100, stereo = true),
-  host     = "${host}",
-  port     = ${icecastPort},
-  password = "${sourcePassword}",
-  mount    = "${mount}",
-  radio
-)`}</pre>
-        </div>
-
-        <ul className="space-y-1.5">
-          <InfoRow icon="•" text="The listener URL only works while you are actively streaming — Icecast drops the mount when the source disconnects." />
-          <InfoRow icon="•" text="For external source clients (BUTT, Mixxx) on Railway: use your Icecast service's own public URL from the Railway dashboard as the host, not this domain." />
-          <InfoRow icon="•" text="Supported formats: MP3, AAC, OGG Vorbis, OGG Opus, FLAC." />
-        </ul>
       </div>
     </div>
   )
@@ -2756,7 +2575,6 @@ const TABS = [
 
 export default function StreamSetup({ isSuspended = false }) {
   const host = window.location.hostname
-  const fallbackRtmpBase = `rtmp://${host}:1935/live`
   const fallbackAudioKey = 'radio'
 
   const { token } = useAuth()
@@ -2775,9 +2593,7 @@ export default function StreamSetup({ isSuspended = false }) {
       .catch(() => {})
   }, [token])
 
-  // Use personal credentials when available, otherwise fall back to shared defaults
-  // rtmp_ingest_base is the base without the key; fall back to derived hostname URL
-  const rtmpBase = creds?.rtmp_ingest_base ?? fallbackRtmpBase
+  // Use personal credentials when available, otherwise fall back to the shared audio mount.
   const audioKey = creds?.stream_key ?? fallbackAudioKey
 
   const [tab, setTab] = useState('listeners')
@@ -2814,10 +2630,7 @@ export default function StreamSetup({ isSuspended = false }) {
           audioKey={audioKey}
           liveStreams={liveStreams}
           viewers={viewers}
-          host={host}
-          sourcePassword={creds?.source_password ?? ''}
           creds={creds}
-          isSuspended={isSuspended}
         />
       </div>
       <div style={{ display: tab === 'audio' ? undefined : 'none' }}>
