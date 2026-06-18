@@ -352,18 +352,9 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
     }
 
     const hasIcecastStream = !!info.icecast_listen_url && !icecastUnavailable
-    const primaryStreamUrl = hasIcecastStream ? info.icecast_listen_url : streamUrl
-    const startTracking = (forceWebListener = false) => {
-      if (forceWebListener || !hasIcecastStream) startListenerSession().catch(() => {})
-    }
-    const markPlaying = () => {
-      setPlaying(true)
-      setConnecting(false)
-    }
+    const markPlaying = () => { setPlaying(true); setConnecting(false) }
     const fail = (message = 'Stream is not ready yet') => {
-      setPlaying(false)
-      setConnecting(false)
-      setPlayError(message)
+      setPlaying(false); setConnecting(false); setPlayError(message)
     }
     const playDirect = async (src, timeoutMs = 8000) => {
       audio.src = src
@@ -371,39 +362,19 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
       await new Promise((resolve, reject) => {
         let settled = false
         const timer = setTimeout(() => {
-          if (settled) return
-          settled = true
-          cleanup()
-          reject(new Error('playback timeout'))
+          if (settled) return; settled = true; cleanup(); reject(new Error('playback timeout'))
         }, timeoutMs)
         const cleanup = () => {
           clearTimeout(timer)
           audio.removeEventListener('playing', onPlaying)
           audio.removeEventListener('error', onError)
         }
-        const onPlaying = () => {
-          if (settled) return
-          settled = true
-          cleanup()
-          resolve()
-        }
-        const onError = () => {
-          if (settled) return
-          settled = true
-          cleanup()
-          reject(new Error('audio error'))
-        }
+        const onPlaying = () => { if (settled) return; settled = true; cleanup(); resolve() }
+        const onError   = () => { if (settled) return; settled = true; cleanup(); reject(new Error('audio error')) }
         audio.addEventListener('playing', onPlaying)
         audio.addEventListener('error', onError)
-        const playPromise = audio.play()
-        if (playPromise && typeof playPromise.catch === 'function') {
-          playPromise.catch((err) => {
-            if (settled) return
-            settled = true
-            cleanup()
-            reject(err)
-          })
-        }
+        const p = audio.play()
+        if (p?.catch) p.catch((err) => { if (settled) return; settled = true; cleanup(); reject(err) })
       })
       markPlaying()
     }
@@ -414,54 +385,39 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
         hls.loadSource(hlsUrl)
         hls.attachMedia(audio)
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          // audio.play() is called here — may be too many async hops from user gesture.
-          // Attempt play; if blocked by autoplay policy the catch chain falls through to playDirect.
-          audio.play().then(() => {
-            markPlaying()
-            startTracking(true)
-            resolve()
-          }).catch((err) => {
-            hls.destroy()
-            hlsRef.current = null
-            reject(err)
-          })
+          audio.play().then(() => { markPlaying(); startListenerSession().catch(() => {}); resolve() })
+                      .catch((err) => { hls.destroy(); hlsRef.current = null; reject(err) })
         })
         hls.on(Hls.Events.ERROR, (_e, data) => {
-          if (data.fatal) {
-            hls.destroy()
-            hlsRef.current = null
-            reject(new Error('HLS playback failed'))
-          }
+          if (data.fatal) { hls.destroy(); hlsRef.current = null; reject(new Error('HLS failed')) }
         })
         hlsRef.current = hls
         return
       }
       if (audio.canPlayType('application/vnd.apple.mpegurl')) {
-        playDirect(hlsUrl).then(() => {
-          startTracking(true)
-          resolve()
-        }).catch((err) => reject(err))
+        playDirect(hlsUrl).then(() => { startListenerSession().catch(() => {}); resolve() }).catch(reject)
         return
       }
-      reject(new Error('HLS is not supported in this browser'))
+      reject(new Error('HLS not supported'))
     })
 
-    playHls()
-      .catch(() => {
-        startTracking(true)
-        return playDirect(streamUrl, 8000)
-      })
-      .catch(() => {
-        if (hasIcecastStream) {
+    if (hasIcecastStream) {
+      // Icecast path: station is streaming via external encoder — play directly, no HLS needed.
+      playDirect(info.icecast_listen_url, 8000)
+        .catch(() => {
           setIcecastUnavailable(true)
-          return playDirect(info.icecast_listen_url, 2000)
-        }
-        fail('Stream is not ready yet')
-      })
-      .catch(() => {
-        fail(hasIcecastStream ? 'Icecast stream is offline and HLS fallback is unavailable' : 'Stream is not ready yet')
-      })
-  }, [hlsUrl, icecastUnavailable, info.genre, info.icecast_listen_url, info.logo_url, info.name, startListenerSession, stopListenerSession, streamUrl])
+          // Icecast failed — fall back to HLS (browser broadcaster) then WebM
+          return playHls()
+        })
+        .catch(() => playDirect(streamUrl, 8000))
+        .catch(() => fail('Stream is not ready yet'))
+    } else {
+      // Browser broadcaster path: try HLS first, then WebM fallback.
+      playHls()
+        .catch(() => { startListenerSession().catch(() => {}); return playDirect(streamUrl, 8000) })
+        .catch(() => fail('Stream is not ready yet'))
+    }
+  }, [hlsUrl, icecastUnavailable, info.icecast_listen_url, info.genre, info.logo_url, info.name, startListenerSession, stopListenerSession, streamUrl])
 
   useEffect(() => {
     if (!info.is_live || playing || connecting) return
