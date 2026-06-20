@@ -8,11 +8,11 @@ function formatClock(seconds) {
   return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, '0')}`
 }
 
+// Always M:SS so the display doesn't jump in width as it counts down
 function formatCountdown(milliseconds) {
   const seconds = Math.max(0, Math.ceil(milliseconds / 1000))
-  if (seconds < 60) return `${seconds}s`
   const minutes = Math.floor(seconds / 60)
-  return `${minutes}m ${seconds % 60}s`
+  return `${minutes}:${String(seconds % 60).padStart(2, '0')}`
 }
 
 function EncoderLevelMeter({ analyser, active }) {
@@ -91,7 +91,7 @@ export default function SchedulerRadioMonitor() {
   }, [])
 
   const nextSchedule = useMemo(() => schedules
-    .filter((schedule) => schedule.enabled && !schedule.triggered && new Date(schedule.trigger_time).getTime() >= now)
+    .filter((schedule) => schedule.enabled && !schedule.triggered && new Date(schedule.trigger_time).getTime() >= now - 30_000)
     .sort((a, b) => new Date(a.trigger_time) - new Date(b.trigger_time))[0] || null, [now, schedules])
 
   const isPlaying = !!playback?.playing
@@ -107,12 +107,20 @@ export default function SchedulerRadioMonitor() {
       .sort((a, b) => new Date(a.trigger_time) - new Date(b.trigger_time))[0] || null
   }, [isPlaying, now, playback, schedules])
 
-  const remaining = nextSchedule ? new Date(nextSchedule.trigger_time).getTime() - now : null
-  const alerting = remaining !== null && remaining > 0 && remaining <= 30_000
+  // Clamp to 0 — never go negative, never show "ago"
+  const remaining = nextSchedule ? Math.max(0, new Date(nextSchedule.trigger_time).getTime() - now) : null
+
+  // Within 60 s (or at 0, waiting for playback to start) — show large countdown
+  const countingDown = !isPlaying && remaining !== null && remaining <= 60_000
+  // Within 30 s (or at 0) — red flash
+  const alerting = !isPlaying && remaining !== null && remaining <= 30_000
+
   const progress = playback?.duration > 0
     ? Math.min(100, Math.max(0, playback.currentTime / playback.duration * 100))
     : 0
   const schedulerAnalyser = audioEngine?.getSchedulerAnalyser?.() || null
+
+  const nextLabel = nextSchedule ? (nextSchedule.name || nextSchedule.title) : null
 
   function stopPlayback() {
     window.dispatchEvent(new CustomEvent('scheduler:stop'))
@@ -129,50 +137,84 @@ export default function SchedulerRadioMonitor() {
   }
 
   return (
-    <section className={`rounded-xl border overflow-hidden transition-colors ${
+    <section className={`rounded-xl border overflow-hidden transition-colors duration-300 ${
       alerting
-        ? 'border-red-500 bg-red-950/60 animate-pulse shadow-[0_0_24px_rgba(239,68,68,0.25)]'
-        : 'border-gray-800 bg-gray-900'
+        ? 'border-red-500 bg-red-950/60 shadow-[0_0_28px_rgba(239,68,68,0.3)]'
+        : countingDown
+          ? 'border-amber-500/70 bg-amber-950/20 shadow-[0_0_18px_rgba(245,158,11,0.15)]'
+          : 'border-gray-800 bg-gray-900'
     }`}>
+
+      {/* Header */}
       <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <p className="text-[10px] uppercase tracking-[0.18em] font-bold text-gray-500">
             {isPlaying ? 'Now Playing' : 'Scheduler Monitor'}
           </p>
           <p className="text-xs text-gray-300 truncate">
             {isPlaying
               ? `${playback.schedule?.artist || 'Unknown'} — ${playback.schedule?.title || 'Scheduled song'}`
-              : nextSchedule
-                ? `Next: ${nextSchedule.title}`
+              : nextLabel
+                ? `Next: ${nextLabel}`
                 : 'No upcoming song scheduled'}
           </p>
           {isPlaying && (
             <p className="text-[11px] text-amber-300 truncate mt-1">
               {upcomingWhilePlaying
-                ? `Coming next: ${upcomingWhilePlaying.artist || 'Unknown'} — ${upcomingWhilePlaying.title || 'Scheduled song'}`
+                ? `Coming next: ${upcomingWhilePlaying.name || upcomingWhilePlaying.artist || 'Unknown'} — ${upcomingWhilePlaying.title || 'Scheduled song'}`
                 : 'Coming next: no upcoming schedule'}
             </p>
           )}
         </div>
+
         {isPlaying ? (
           <span className="shrink-0 rounded-full bg-red-900/40 border border-red-700/50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-red-300 animate-pulse">On Air</span>
+        ) : countingDown ? (
+          /* Large countdown badge — shown only within 60 s */
+          <div className={`shrink-0 text-right ${alerting ? 'text-red-300' : 'text-amber-300'}`}>
+            <p className={`text-[9px] uppercase font-black tracking-widest mb-0.5 ${alerting ? 'animate-pulse' : ''}`}>
+              {alerting ? '⚡ On air soon' : 'Starting in'}
+            </p>
+            <p className={`text-4xl leading-none font-black tabular-nums tracking-tighter ${alerting ? 'animate-pulse' : ''}`}>
+              {formatCountdown(remaining)}
+            </p>
+          </div>
         ) : (
-          <div className={`shrink-0 text-right ${alerting ? 'text-red-300' : 'text-amber-400'}`}>
-            <p className="text-[9px] uppercase font-bold tracking-wider">{alerting ? 'Starting soon' : 'Countdown'}</p>
-            <p className="text-lg leading-none font-black tabular-nums">
+          /* Normal idle state */
+          <div className="shrink-0 text-right text-gray-500">
+            <p className="text-[9px] uppercase font-bold tracking-wider">Next in</p>
+            <p className="text-base leading-none font-bold tabular-nums">
               {remaining === null ? '--:--' : formatCountdown(remaining)}
             </p>
           </div>
         )}
       </div>
 
+      {/* Countdown banner — full-width bar during the final 60 s */}
+      {countingDown && !isPlaying && (
+        <div className={`relative overflow-hidden px-4 py-2 flex items-center gap-3 border-b border-white/5 ${alerting ? 'bg-red-900/30' : 'bg-amber-900/20'}`}>
+          {/* Shrinking progress bar underneath */}
+          <div
+            className={`absolute inset-0 origin-left transition-[transform] duration-500 ${alerting ? 'bg-red-500/15' : 'bg-amber-500/10'}`}
+            style={{ transform: `scaleX(${remaining / 60_000})` }}
+          />
+          <span className={`relative shrink-0 w-2 h-2 rounded-full ${alerting ? 'bg-red-400 animate-ping' : 'bg-amber-400 animate-pulse'}`} />
+          <p className={`relative text-xs font-bold truncate ${alerting ? 'text-red-300' : 'text-amber-300'}`}>
+            {alerting
+              ? `AUTO-PLAY IN ${formatCountdown(remaining)} — "${nextLabel}"`
+              : `Scheduled in ${formatCountdown(remaining)} — "${nextLabel}"`}
+          </p>
+        </div>
+      )}
+
+      {/* Body */}
       <div className="px-4 py-3">
         <EncoderLevelMeter analyser={schedulerAnalyser} active={isPlaying} />
         <div className="flex items-center justify-between gap-3 mb-2">
           <div className="min-w-0">
             <p className="text-[9px] uppercase tracking-wider text-gray-600">Scheduled playback</p>
             <p className="text-xs font-semibold text-white truncate">
-              {isPlaying ? playback.schedule?.title : nextSchedule ? `Waiting for ${nextSchedule.title}` : 'Idle'}
+              {isPlaying ? playback.schedule?.title : nextLabel ? `Waiting for "${nextLabel}"` : 'Idle'}
             </p>
           </div>
           <span className="text-[11px] font-mono text-gray-400 tabular-nums shrink-0">
