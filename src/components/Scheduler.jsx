@@ -163,6 +163,8 @@ export default function Scheduler() {
   const [mode, setMode] = useState('backend')
   const [connection, setConnection] = useState('connecting')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [editingSchedule, setEditingSchedule] = useState(null)
+  const [scheduleName, setScheduleName] = useState('')
   const [sourceTab, setSourceTab] = useState('single')
   const [songID, setSongID] = useState('')
   const [multiTracks, setMultiTracks] = useState([])
@@ -171,7 +173,6 @@ export default function Scheduler() {
   const [urlArtist, setURLArtist] = useState('')
   const [scheduleDates, setScheduleDates] = useState(() => [localDateValue()])
   const [scheduleTime, setScheduleTime] = useState(localTimeValue)
-  const [recurring, setRecurring] = useState('none')
   const [logs, setLogs] = useState([])
   const [playing, setPlaying] = useState(null)
   const [now, setNow] = useState(0)
@@ -200,7 +201,7 @@ export default function Scheduler() {
         continue
       }
       const url = isURL
-        ? `/api/scheduler/url-stream?url=${encodeURIComponent(schedule.source_url || '')}`
+        ? `/api/scheduler/url-stream?token=${encodeURIComponent(token || '')}&url=${encodeURIComponent(schedule.source_url || '')}`
         : URL.createObjectURL(localTrack.blob)
       const activeSchedule = {
         ...schedule,
@@ -226,14 +227,14 @@ export default function Scheduler() {
       try {
         await audio.play()
         setPlaying(activeSchedule)
-        addLog(`Scheduler Monitor playing “${item.title}”`, 'live')
+        addLog(`Scheduler Monitor playing "${item.title}"`, 'live')
         publish()
         await new Promise((resolve) => {
           audio.addEventListener('ended', resolve, { once: true })
           audio.addEventListener('error', resolve, { once: true })
         })
       } catch (err) {
-        addLog(`Scheduler Monitor could not play “${item.title}”${err?.message ? ` (${err.message})` : ''}`, 'error')
+        addLog(`Scheduler Monitor could not play "${item.title}"${err?.message ? ` (${err.message})` : ''}`, 'error')
       } finally {
         audio.removeEventListener('timeupdate', publish)
         audio.removeEventListener('loadedmetadata', publish)
@@ -245,7 +246,7 @@ export default function Scheduler() {
     window.dispatchEvent(new CustomEvent('scheduler:playback', {
       detail: { schedule, playing: false, currentTime: 0, duration: 0 },
     }))
-  }, [addLog, audioEngine, tracks])
+  }, [addLog, audioEngine, token, tracks])
 
   const loadBackendSchedules = useCallback(async () => {
     const response = await fetch('/api/schedules', { headers: { Authorization: `Bearer ${token}` } })
@@ -320,7 +321,7 @@ export default function Scheduler() {
       window.dispatchEvent(new CustomEvent('scheduler:playback', {
         detail: { schedule: stoppedSchedule, playing: false, currentTime: 0, duration: 0 },
       }))
-      addLog(`Stopped “${stoppedSchedule?.title || 'scheduled playback'}”`)
+      addLog(`Stopped "${stoppedSchedule?.title || 'scheduled playback'}"`)
     }
     window.addEventListener('scheduler:stop', stopScheduledPlayback)
     return () => window.removeEventListener('scheduler:stop', stopScheduledPlayback)
@@ -331,21 +332,37 @@ export default function Scheduler() {
     const due = schedules.filter((item) => item.enabled && !item.triggered && new Date(item.trigger_time).getTime() <= now && new Date(item.trigger_time).getTime() >= now - 60_000)
     due.forEach((item) => {
       playSchedule(item)
-      setSchedules((prev) => prev.map((schedule) => {
-        if (schedule.id !== item.id) return schedule
-        if (schedule.recurring === 'none') return { ...schedule, triggered: true }
-        const current = new Date(schedule.trigger_time)
-        const next = schedule.recurring === 'yearly'
-          ? new Date(current.getFullYear() + 1, current.getMonth(), current.getDate(), current.getHours(), current.getMinutes(), current.getSeconds())
-          : schedule.recurring === 'monthly'
-            ? new Date(current.getFullYear(), current.getMonth() + 1, current.getDate(), current.getHours(), current.getMinutes(), current.getSeconds())
-            : new Date(current.getTime() + (schedule.recurring === 'daily' ? 86_400_000 : 604_800_000))
-        return { ...schedule, trigger_time: next.toISOString(), triggered: false }
-      }))
+      setSchedules((prev) => prev.map((s) => s.id !== item.id ? s : { ...s, triggered: true }))
     })
   }, [mode, now, playSchedule, schedules])
 
   const selectedTrack = useMemo(() => tracks.find((track) => track.name === songID), [songID, tracks])
+
+  function closeModal() {
+    setShowAddModal(false)
+    setEditingSchedule(null)
+    setScheduleName('')
+    setScheduleDates([localDateValue()])
+    setScheduleTime(localTimeValue())
+    setURLValue('')
+    setURLTitle('')
+    setURLArtist('')
+    setMultiTracks([])
+  }
+
+  function openEditModal(schedule) {
+    const date = new Date(schedule.trigger_time)
+    setEditingSchedule(schedule)
+    setScheduleName(schedule.name || schedule.title || '')
+    setScheduleDates([localDateValue(date)])
+    setScheduleTime(localTimeValue(date))
+    if (schedule.source_type === 'url') {
+      setURLValue(schedule.source_url)
+      setURLTitle(schedule.title)
+      setURLArtist(schedule.artist === 'URL Stream' ? '' : schedule.artist)
+    }
+    setShowAddModal(true)
+  }
 
   async function importTracks(event, multiple = false) {
     const audioFiles = Array.from(event.target.files || []).filter((file) => file.type.startsWith('audio/') || /\.(mp3|wav|m4a|flac|ogg|aac|opus|wma)$/i.test(file.name))
@@ -394,6 +411,41 @@ export default function Scheduler() {
   async function createSchedule(event) {
     event.preventDefault()
     if (scheduleDates.length === 0 || !scheduleTime) return
+
+    const name = scheduleName.trim()
+
+    // ── Edit mode ──────────────────────────────────────────────────────────────
+    if (editingSchedule) {
+      const updated = {
+        ...editingSchedule,
+        name,
+        recurring: 'none',
+        trigger_time: combineLocalDateTime(scheduleDates[0], scheduleTime),
+        ...(editingSchedule.source_type === 'url' && {
+          source_url: urlValue.trim(),
+          song_id: urlValue.trim(),
+          title: urlTitle.trim() || editingSchedule.title,
+          artist: urlArtist.trim() || 'URL Stream',
+        }),
+      }
+      if (mode === 'demo') {
+        setSchedules((prev) => prev.map((s) => s.id === updated.id ? updated : s).sort((a, b) => new Date(a.trigger_time) - new Date(b.trigger_time)))
+      } else {
+        const response = await fetch(`/api/schedules/${updated.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(updated),
+        })
+        if (!response.ok) { addLog(await response.text(), 'error'); return }
+        const saved = await response.json()
+        setSchedules((prev) => prev.map((s) => s.id === saved.id ? saved : s).sort((a, b) => new Date(a.trigger_time) - new Date(b.trigger_time)))
+      }
+      addLog(`Updated "${name || updated.title}"`)
+      closeModal()
+      return
+    }
+
+    // ── Add mode ───────────────────────────────────────────────────────────────
     const isURL = sourceTab === 'url'
     const isMulti = sourceTab === 'multi'
     if (!isURL && !isMulti && !selectedTrack) return
@@ -412,18 +464,20 @@ export default function Scheduler() {
       }
     }
     const scheduleBase = {
+      name,
       song_id: isURL ? urlValue.trim() : selectedTrack.name,
       title: isURL ? urlTitle.trim() : selectedTrack.title || selectedTrack.name,
       artist: isURL ? urlArtist.trim() || 'URL Stream' : selectedTrack.artist || 'Unknown',
       source_type: isURL ? 'url' : 'library',
       source_url: isURL ? urlValue.trim() : '',
       enabled: true,
-      recurring,
+      recurring: 'none',
       triggered: false,
     }
     const batch = isMulti
       ? scheduleDates.map((date) => ({
             id: mode === 'demo' ? crypto.randomUUID() : undefined,
+            name,
             song_id: `playlist-${crypto.randomUUID()}`,
             title: `${multiTracks.length} Track Playlist`,
             artist: 'Scheduled Playlist',
@@ -436,7 +490,7 @@ export default function Scheduler() {
             })),
             trigger_time: combineLocalDateTime(date, scheduleTime),
             enabled: true,
-            recurring,
+            recurring: 'none',
             triggered: false,
           }))
       : scheduleDates.map((date) => ({
@@ -450,27 +504,20 @@ export default function Scheduler() {
     } else {
       const createdBatch = []
       for (const item of batch) {
-      const response = await fetch('/api/schedules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        const response = await fetch('/api/schedules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify(item),
-      })
-      if (!response.ok) { addLog(await response.text(), 'error'); return }
+        })
+        if (!response.ok) { addLog(await response.text(), 'error'); return }
         createdBatch.push(await response.json())
       }
       setSchedules((prev) => [...prev, ...createdBatch].sort((a, b) => new Date(a.trigger_time) - new Date(b.trigger_time)))
     }
     addLog(isMulti
-      ? `Scheduled ${batch.length} songs`
-      : `Scheduled “${scheduleBase.title}” on ${batch.length} date${batch.length === 1 ? '' : 's'}`)
-    setScheduleDates([localDateValue()])
-    setScheduleTime(localTimeValue())
-    setRecurring('none')
-    setURLValue('')
-    setURLTitle('')
-    setURLArtist('')
-    setMultiTracks([])
-    setShowAddModal(false)
+      ? `Scheduled "${name}" – ${batch.length} dates`
+      : `Scheduled "${name || scheduleBase.title}" on ${batch.length} date${batch.length === 1 ? '' : 's'}`)
+    closeModal()
   }
 
   async function toggleSchedule(schedule) {
@@ -499,6 +546,8 @@ export default function Scheduler() {
     const response = await fetch(`/api/schedules/${schedule.id}/trigger`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
     if (!response.ok) addLog(await response.text(), 'error')
   }
+
+  const isEditMode = !!editingSchedule
 
   return (
     <div className="w-full space-y-5">
@@ -531,188 +580,249 @@ export default function Scheduler() {
       </div>
 
       <div className="space-y-5">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
-              <h3 className="font-semibold">Upcoming schedules</h3>
-              <span className="text-xs text-gray-500">{schedules.length} programmed</span>
-            </div>
-            <div className="divide-y divide-gray-800">
-              {schedules.length === 0 && <p className="p-8 text-center text-sm text-gray-600">No songs scheduled yet.</p>}
-              {schedules.map((schedule) => (
-                <div key={schedule.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full shrink-0 ${schedule.enabled && !schedule.triggered ? 'bg-green-400' : 'bg-gray-600'}`} />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-white truncate">{schedule.title}</p>
-                    {schedule.source_type === 'playlist' && (
-                      <p className="text-[10px] text-amber-400 truncate">
-                        {(schedule.playlist || []).map((track) => track.title).join(' → ')}
-                      </p>
-                    )}
-                    <p className="text-xs text-gray-500 truncate">
-                      {schedule.artist} · {schedule.source_type === 'url' ? 'URL' : schedule.source_type === 'playlist' ? 'Multi Playlist' : 'Computer'} · {new Date(schedule.trigger_time).toLocaleString()} · {relativeTime(schedule.trigger_time, now)}
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
+            <h3 className="font-semibold">Upcoming schedules</h3>
+            <span className="text-xs text-gray-500">{schedules.length} programmed</span>
+          </div>
+          <div className="divide-y divide-gray-800">
+            {schedules.length === 0 && <p className="p-8 text-center text-sm text-gray-600">No songs scheduled yet.</p>}
+            {schedules.map((schedule) => (
+              <div key={schedule.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className={`w-2 h-2 rounded-full shrink-0 ${schedule.enabled && !schedule.triggered ? 'bg-green-400' : 'bg-gray-600'}`} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-white truncate">{schedule.name || schedule.title}</p>
+                  {schedule.source_type === 'playlist' && (
+                    <p className="text-[10px] text-amber-400 truncate">
+                      {(schedule.playlist || []).map((track) => track.title).join(' → ')}
                     </p>
-                  </div>
-                  <span className="text-[10px] uppercase text-amber-400">{schedule.recurring === 'none' ? 'One Time' : schedule.recurring}</span>
-                  <div className="flex gap-2">
-                    <button onClick={() => triggerNow(schedule)} className="px-2.5 py-1.5 rounded bg-amber-500/15 text-amber-400 text-xs font-bold">Trigger</button>
-                    <button onClick={() => toggleSchedule(schedule)} className="px-2.5 py-1.5 rounded bg-gray-800 text-gray-400 text-xs">{schedule.enabled ? 'Disable' : 'Enable'}</button>
-                    <button onClick={() => deleteSchedule(schedule)} className="px-2.5 py-1.5 rounded bg-red-900/20 text-red-400 text-xs">Delete</button>
-                  </div>
+                  )}
+                  <p className="text-xs text-gray-500 truncate">
+                    {schedule.artist} · {schedule.source_type === 'url' ? 'URL' : schedule.source_type === 'playlist' ? 'Playlist' : 'Computer'} · {new Date(schedule.trigger_time).toLocaleString()} · {relativeTime(schedule.trigger_time, now)}
+                  </p>
                 </div>
-              ))}
-            </div>
+                <div className="flex gap-2 flex-wrap">
+                  <button onClick={() => triggerNow(schedule)} className="px-2.5 py-1.5 rounded bg-amber-500/15 text-amber-400 text-xs font-bold">Trigger</button>
+                  <button onClick={() => openEditModal(schedule)} className="px-2.5 py-1.5 rounded bg-blue-900/20 text-blue-400 text-xs font-bold">Edit</button>
+                  <button onClick={() => toggleSchedule(schedule)} className="px-2.5 py-1.5 rounded bg-gray-800 text-gray-400 text-xs">{schedule.enabled ? 'Disable' : 'Enable'}</button>
+                  <button onClick={() => deleteSchedule(schedule)} className="px-2.5 py-1.5 rounded bg-red-900/20 text-red-400 text-xs">Delete</button>
+                </div>
+              </div>
+            ))}
           </div>
+        </div>
 
-          <div className="bg-black border border-gray-800 rounded-2xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-800 text-xs font-bold uppercase tracking-widest text-gray-500">Scheduler console</div>
-            <div className="h-48 overflow-y-auto p-4 font-mono text-xs space-y-1">
-              {logs.map((entry) => <p key={entry.id} className={entry.level === 'error' ? 'text-red-400' : entry.level === 'live' ? 'text-green-400' : 'text-gray-500'}><span className="text-gray-700">[{entry.time}]</span> {entry.message}</p>)}
-            </div>
+        <div className="bg-black border border-gray-800 rounded-2xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-800 text-xs font-bold uppercase tracking-widest text-gray-500">Scheduler console</div>
+          <div className="h-48 overflow-y-auto p-4 font-mono text-xs space-y-1">
+            {logs.map((entry) => <p key={entry.id} className={entry.level === 'error' ? 'text-red-400' : entry.level === 'live' ? 'text-green-400' : 'text-gray-500'}><span className="text-gray-700">[{entry.time}]</span> {entry.message}</p>)}
           </div>
+        </div>
       </div>
 
       {showAddModal && (
-        <div className="fixed inset-0 z-[120] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4" onClick={(event) => event.target === event.currentTarget && setShowAddModal(false)}>
-          <form onSubmit={createSchedule} className="w-full max-w-lg bg-[#101218] border border-gray-700 rounded-2xl shadow-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
+        <div className="fixed inset-0 z-[120] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4" onClick={(event) => event.target === event.currentTarget && closeModal()}>
+          <form onSubmit={createSchedule} className="w-full max-w-lg bg-[#101218] border border-gray-700 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between shrink-0">
               <div>
-                <h3 className="font-bold text-white">Add Schedule</h3>
-                <p className="text-xs text-gray-500">Choose the audio source, then set its play time.</p>
+                <h3 className="font-bold text-white">{isEditMode ? 'Edit Schedule' : 'Add Schedule'}</h3>
+                <p className="text-xs text-gray-500">{isEditMode ? 'Update the name, date, or time.' : 'Choose the audio source, then set its play time.'}</p>
               </div>
-              <button type="button" onClick={() => setShowAddModal(false)} className="text-gray-500 hover:text-white text-xl">×</button>
+              <button type="button" onClick={closeModal} className="text-gray-500 hover:text-white text-xl">×</button>
             </div>
 
-            <div className="p-5 space-y-5">
-              <div className="grid grid-cols-3 gap-2 bg-black/30 rounded-xl p-1">
-                <button type="button" onClick={() => setSourceTab('single')} className={`rounded-lg py-3 flex flex-col sm:flex-row items-center justify-center gap-1.5 text-xs font-bold ${sourceTab === 'single' ? 'bg-amber-500 text-black' : 'text-gray-500 hover:text-white'}`}>
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M10 4H2v16h20V6H12l-2-2z" /></svg>
-                  Single
-                </button>
-                <button type="button" onClick={() => setSourceTab('multi')} className={`rounded-lg py-3 flex flex-col sm:flex-row items-center justify-center gap-1.5 text-xs font-bold ${sourceTab === 'multi' ? 'bg-amber-500 text-black' : 'text-gray-500 hover:text-white'}`}>
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M10 4H2v16h20V6H12l-2-2z" /></svg>
-                  Multi
-                </button>
-                <button type="button" onClick={() => setSourceTab('url')} className={`rounded-lg py-3 flex flex-col sm:flex-row items-center justify-center gap-1.5 text-xs font-bold ${sourceTab === 'url' ? 'bg-amber-500 text-black' : 'text-gray-500 hover:text-white'}`}>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H15a4.5 4.5 0 010 9h-1.5m-3 3H9a4.5 4.5 0 010-9h1.5m-3 3h9" /></svg>
-                  URL
-                </button>
-              </div>
+            <div className="p-5 space-y-5 overflow-y-auto">
+              {/* Schedule name — always shown */}
+              <label className="block text-xs text-gray-400">
+                Schedule name
+                <input
+                  value={scheduleName}
+                  onChange={(event) => setScheduleName(event.target.value)}
+                  placeholder="e.g. Morning News Open, Top-of-hour Jingle"
+                  required
+                  className="mt-1.5 w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2.5 text-white placeholder-gray-600"
+                />
+              </label>
 
-              {sourceTab === 'single' && (
-                <div className="space-y-3">
-                  <label className="flex items-center justify-center gap-3 border-2 border-dashed border-gray-700 hover:border-amber-500 rounded-xl p-5 cursor-pointer text-sm text-gray-400 hover:text-amber-400">
-                    <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M10 4H2v16h20V6H12l-2-2z" /></svg>
-                    Select one audio track
-                    <input type="file" accept="audio/*" onChange={(event) => importTracks(event, false)} className="hidden" />
-                  </label>
-                  <label className="block text-xs text-gray-400">
-                    Track
-                    <select value={songID} onChange={(event) => setSongID(event.target.value)} required className="mt-1.5 w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2.5 text-white">
-                      {tracks.length === 0 && <option value="">Select a folder containing audio</option>}
-                      {tracks.map((track) => <option key={track.name} value={track.name}>{track.artist} — {track.title}</option>)}
-                    </select>
-                  </label>
-                </div>
-              )}
+              {/* ── Edit mode: source summary + date/time ── */}
+              {isEditMode && (
+                <>
+                  {editingSchedule.source_type === 'url' ? (
+                    <div className="space-y-3">
+                      <label className="block text-xs text-gray-400">
+                        Direct audio URL
+                        <input type="url" value={urlValue} onChange={(event) => decodeAudioURL(event.target.value)} placeholder="https://example.com/stream.mp3" required className="mt-1.5 w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2.5 text-white" />
+                      </label>
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <label className="block text-xs text-gray-400">
+                          Song title
+                          <input value={urlTitle} onChange={(event) => setURLTitle(event.target.value)} placeholder="Song title" required className="mt-1.5 w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2.5 text-white" />
+                        </label>
+                        <label className="block text-xs text-gray-400">
+                          Artist
+                          <input value={urlArtist} onChange={(event) => setURLArtist(event.target.value)} placeholder="Optional" className="mt-1.5 w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2.5 text-white" />
+                        </label>
+                      </div>
+                    </div>
+                  ) : editingSchedule.source_type === 'playlist' ? (
+                    <div className="bg-gray-950 border border-gray-800 rounded-xl p-3 space-y-1.5">
+                      <p className="text-[10px] uppercase font-bold text-gray-600 tracking-widest mb-2">Playlist tracks</p>
+                      {(editingSchedule.playlist || []).map((track, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <span className="text-[10px] text-amber-400 font-bold w-4 shrink-0">{index + 1}</span>
+                          <p className="text-xs text-gray-300 truncate">{track.title} <span className="text-gray-600">– {track.artist}</span></p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-gray-950 border border-gray-800 rounded-xl p-3">
+                      <p className="text-[10px] uppercase font-bold text-gray-600 tracking-widest mb-1">Track</p>
+                      <p className="text-sm text-white">{editingSchedule.title}</p>
+                      <p className="text-xs text-gray-500">{editingSchedule.artist}</p>
+                    </div>
+                  )}
 
-              {sourceTab === 'multi' && (
-                <div className="space-y-3">
-                  <div className="grid sm:grid-cols-3 gap-3 bg-gray-950 border border-gray-800 rounded-xl p-3">
+                  <div className="grid sm:grid-cols-2 gap-3">
                     <label className="block text-xs text-gray-400">
-                      Calendar dates
-                      <div className="mt-1.5"><CalendarPopup dates={scheduleDates} onChange={setScheduleDates} /></div>
+                      Date
+                      <input
+                        type="date"
+                        value={scheduleDates[0] || ''}
+                        onChange={(event) => setScheduleDates([event.target.value])}
+                        required
+                        className="mt-1.5 w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2.5 text-white"
+                      />
                     </label>
                     <label className="block text-xs text-gray-400">
                       Play time
                       <div className="mt-1.5"><TimePopup value={scheduleTime} onChange={setScheduleTime} /></div>
                     </label>
-                    <label className="block text-xs text-gray-400">
-                      Repeat
-                      <select value={recurring} onChange={(event) => setRecurring(event.target.value)} className="mt-1.5 w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2.5 text-white">
-                        <option value="none">One Time</option>
-                        <option value="daily">Daily</option>
-                        <option value="weekly">Weekly</option>
-                        <option value="monthly">Monthly</option>
-                      </select>
-                    </label>
                   </div>
-                  <label className="flex items-center justify-center gap-3 border-2 border-dashed border-gray-700 hover:border-amber-500 rounded-xl p-5 cursor-pointer text-sm text-gray-400 hover:text-amber-400">
-                    <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M10 4H2v16h20V6H12l-2-2z" /></svg>
-                    Select multiple audio tracks
-                    <input type="file" accept="audio/*" multiple onChange={(event) => importTracks(event, true)} className="hidden" />
-                  </label>
-                  <div className="max-h-52 overflow-y-auto space-y-2">
-                    {multiTracks.length === 0 && <p className="text-xs text-center text-gray-600 py-3">Select multiple tracks to batch schedule.</p>}
-                    {multiTracks.map((track, index) => (
-                      <div key={track.name} className="bg-gray-950 border border-gray-800 rounded-lg p-3 flex items-center gap-3">
-                        <span className="w-6 h-6 rounded-full bg-amber-500/15 text-amber-400 flex items-center justify-center text-[10px] font-bold shrink-0">{index + 1}</span>
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold text-white truncate">{track.title}</p>
-                          <p className="text-[10px] text-gray-600 truncate">{track.artist}</p>
-                        </div>
+                </>
+              )}
+
+              {/* ── Add mode: source tabs + fields ── */}
+              {!isEditMode && (
+                <>
+                  <div className="grid grid-cols-3 gap-2 bg-black/30 rounded-xl p-1">
+                    <button type="button" onClick={() => setSourceTab('single')} className={`rounded-lg py-3 flex flex-col sm:flex-row items-center justify-center gap-1.5 text-xs font-bold ${sourceTab === 'single' ? 'bg-amber-500 text-black' : 'text-gray-500 hover:text-white'}`}>
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M10 4H2v16h20V6H12l-2-2z" /></svg>
+                      Single
+                    </button>
+                    <button type="button" onClick={() => setSourceTab('multi')} className={`rounded-lg py-3 flex flex-col sm:flex-row items-center justify-center gap-1.5 text-xs font-bold ${sourceTab === 'multi' ? 'bg-amber-500 text-black' : 'text-gray-500 hover:text-white'}`}>
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M10 4H2v16h20V6H12l-2-2z" /></svg>
+                      Multi
+                    </button>
+                    <button type="button" onClick={() => setSourceTab('url')} className={`rounded-lg py-3 flex flex-col sm:flex-row items-center justify-center gap-1.5 text-xs font-bold ${sourceTab === 'url' ? 'bg-amber-500 text-black' : 'text-gray-500 hover:text-white'}`}>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H15a4.5 4.5 0 010 9h-1.5m-3 3H9a4.5 4.5 0 010-9h1.5m-3 3h9" /></svg>
+                      URL
+                    </button>
+                  </div>
+
+                  {sourceTab === 'single' && (
+                    <div className="space-y-3">
+                      <label className="flex items-center justify-center gap-3 border-2 border-dashed border-gray-700 hover:border-amber-500 rounded-xl p-5 cursor-pointer text-sm text-gray-400 hover:text-amber-400">
+                        <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M10 4H2v16h20V6H12l-2-2z" /></svg>
+                        Select one audio track
+                        <input type="file" accept="audio/*" onChange={(event) => importTracks(event, false)} className="hidden" />
+                      </label>
+                      <label className="block text-xs text-gray-400">
+                        Track
+                        <select value={songID} onChange={(event) => setSongID(event.target.value)} required className="mt-1.5 w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2.5 text-white">
+                          {tracks.length === 0 && <option value="">Select a folder containing audio</option>}
+                          {tracks.map((track) => <option key={track.name} value={track.name}>{track.artist} — {track.title}</option>)}
+                        </select>
+                      </label>
+                    </div>
+                  )}
+
+                  {sourceTab === 'multi' && (
+                    <div className="space-y-3">
+                      <div className="grid sm:grid-cols-2 gap-3 bg-gray-950 border border-gray-800 rounded-xl p-3">
+                        <label className="block text-xs text-gray-400">
+                          Calendar dates
+                          <div className="mt-1.5"><CalendarPopup dates={scheduleDates} onChange={setScheduleDates} /></div>
+                        </label>
+                        <label className="block text-xs text-gray-400">
+                          Play time
+                          <div className="mt-1.5"><TimePopup value={scheduleTime} onChange={setScheduleTime} /></div>
+                        </label>
                       </div>
-                    ))}
-                  </div>
-                  <p className="text-[10px] text-amber-400/80">All tracks play sequentially as one playlist using the date, time, and repeat settings above.</p>
-                </div>
-              )}
+                      <label className="flex items-center justify-center gap-3 border-2 border-dashed border-gray-700 hover:border-amber-500 rounded-xl p-5 cursor-pointer text-sm text-gray-400 hover:text-amber-400">
+                        <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M10 4H2v16h20V6H12l-2-2z" /></svg>
+                        Select multiple audio tracks
+                        <input type="file" accept="audio/*" multiple onChange={(event) => importTracks(event, true)} className="hidden" />
+                      </label>
+                      <div className="max-h-52 overflow-y-auto space-y-2">
+                        {multiTracks.length === 0 && <p className="text-xs text-center text-gray-600 py-3">Select multiple tracks to batch schedule.</p>}
+                        {multiTracks.map((track, index) => (
+                          <div key={track.name} className="bg-gray-950 border border-gray-800 rounded-lg p-3 flex items-center gap-3">
+                            <span className="w-6 h-6 rounded-full bg-amber-500/15 text-amber-400 flex items-center justify-center text-[10px] font-bold shrink-0">{index + 1}</span>
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-white truncate">{track.title}</p>
+                              <p className="text-[10px] text-gray-600 truncate">{track.artist}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-amber-400/80">All tracks play sequentially as one playlist.</p>
+                    </div>
+                  )}
 
-              {sourceTab === 'url' && (
-                <div className="space-y-3">
-                  <label className="block text-xs text-gray-400">
-                    Direct audio URL
-                    <input type="url" value={urlValue} onChange={(event) => decodeAudioURL(event.target.value)} placeholder="https://example.com/Artist%20-%20Song.mp3" required className="mt-1.5 w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2.5 text-white" />
-                    <span className="block mt-1 text-[10px] text-gray-600">Encoded filenames are decoded automatically into artist and title.</span>
-                  </label>
-                  <div className="grid sm:grid-cols-2 gap-3">
-                    <label className="block text-xs text-gray-400">
-                      Song title
-                      <input value={urlTitle} onChange={(event) => setURLTitle(event.target.value)} placeholder="Song title" required className="mt-1.5 w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2.5 text-white" />
-                    </label>
-                    <label className="block text-xs text-gray-400">
-                      Artist
-                      <input value={urlArtist} onChange={(event) => setURLArtist(event.target.value)} placeholder="Optional" className="mt-1.5 w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2.5 text-white" />
-                    </label>
-                  </div>
-                </div>
-              )}
+                  {sourceTab === 'url' && (
+                    <div className="space-y-3">
+                      <label className="block text-xs text-gray-400">
+                        Direct audio URL
+                        <input type="url" value={urlValue} onChange={(event) => decodeAudioURL(event.target.value)} placeholder="https://example.com/Artist%20-%20Song.mp3" required className="mt-1.5 w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2.5 text-white" />
+                        <span className="block mt-1 text-[10px] text-gray-600">Encoded filenames are decoded automatically into artist and title.</span>
+                      </label>
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <label className="block text-xs text-gray-400">
+                          Song title
+                          <input value={urlTitle} onChange={(event) => setURLTitle(event.target.value)} placeholder="Song title" required className="mt-1.5 w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2.5 text-white" />
+                        </label>
+                        <label className="block text-xs text-gray-400">
+                          Artist
+                          <input value={urlArtist} onChange={(event) => setURLArtist(event.target.value)} placeholder="Optional" className="mt-1.5 w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2.5 text-white" />
+                        </label>
+                      </div>
+                    </div>
+                  )}
 
-              {sourceTab !== 'multi' && <div className="grid sm:grid-cols-3 gap-3">
-                <label className="block text-xs text-gray-400">
-                  Calendar dates
-                  <div className="mt-1.5"><CalendarPopup dates={scheduleDates} onChange={setScheduleDates} /></div>
-                </label>
-                <label className="block text-xs text-gray-400">
-                  Play time
-                  <div className="mt-1.5"><TimePopup value={scheduleTime} onChange={setScheduleTime} /></div>
-                </label>
-                <label className="block text-xs text-gray-400">
-                  Repeat
-                  <select value={recurring} onChange={(event) => setRecurring(event.target.value)} className="mt-1.5 w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2.5 text-white">
-                    <option value="none">One Time</option>
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
-                </label>
-                <p className="sm:col-span-3 text-[10px] text-amber-400/80">Select one or more start dates, a time, and how often the schedule repeats.</p>
-              </div>}
+                  {sourceTab !== 'multi' && (
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      <label className="block text-xs text-gray-400">
+                        Calendar dates
+                        <div className="mt-1.5"><CalendarPopup dates={scheduleDates} onChange={setScheduleDates} /></div>
+                      </label>
+                      <label className="block text-xs text-gray-400">
+                        Play time
+                        <div className="mt-1.5"><TimePopup value={scheduleTime} onChange={setScheduleTime} /></div>
+                      </label>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
-            <div className="px-5 py-4 border-t border-gray-800 flex justify-end gap-3">
-              <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 text-sm text-gray-400 hover:text-white">Cancel</button>
+            <div className="px-5 py-4 border-t border-gray-800 flex justify-end gap-3 shrink-0">
+              <button type="button" onClick={closeModal} className="px-4 py-2 text-sm text-gray-400 hover:text-white">Cancel</button>
               <button
                 type="submit"
                 disabled={
-                  sourceTab === 'single'
-                    ? !selectedTrack || scheduleDates.length === 0
-                    : sourceTab === 'multi'
-                      ? multiTracks.length === 0 || scheduleDates.length === 0 || !scheduleTime
-                      : !urlValue || !urlTitle || scheduleDates.length === 0
+                  !scheduleName.trim() || scheduleDates.length === 0 || !scheduleTime
+                    ? true
+                    : isEditMode
+                      ? (editingSchedule.source_type === 'url' && (!urlValue || !urlTitle))
+                      : sourceTab === 'single'
+                        ? !selectedTrack
+                        : sourceTab === 'multi'
+                          ? multiTracks.length === 0
+                          : !urlValue || !urlTitle
                 }
                 className="px-5 py-2.5 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-40 text-sm font-bold"
               >
-                {sourceTab === 'multi' ? `Save Playlist (${multiTracks.length || 0} tracks)` : 'Save Schedule'}
+                {isEditMode ? 'Save Changes' : sourceTab === 'multi' ? `Save Playlist (${multiTracks.length || 0} tracks)` : 'Save Schedule'}
               </button>
             </div>
           </form>
