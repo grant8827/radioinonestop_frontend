@@ -74,6 +74,11 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
   const [description, setDescription] = useState('')
   const [logoPreview, setLogoPreview] = useState('')
 
+  // OTP verification
+  const [otp, setOtp] = useState('')
+  const [pendingEmail, setPendingEmail] = useState('')
+  const [resendCooldown, setResendCooldown] = useState(0)
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const firstInputRef = useRef(null)
@@ -142,6 +147,11 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
       const text = await resp.text()
       if (!resp.ok) { setError(text.trim() || 'Registration failed'); return }
       const data = JSON.parse(text)
+      if (data.status === 'verify_email') {
+        setPendingEmail(data.email || email.trim().toLowerCase())
+        setStep(3)
+        return
+      }
       login(data.token)
       onSuccess()
     } catch {
@@ -149,6 +159,47 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
     } finally {
       setLoading(false)
     }
+  }
+
+  async function handleVerifyOTP(e) {
+    e.preventDefault()
+    setError('')
+    if (otp.trim().length !== 6) { setError('Enter the 6-digit code'); return }
+    setLoading(true)
+    try {
+      const resp = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: pendingEmail, otp: otp.trim() }),
+      })
+      const text = await resp.text()
+      if (!resp.ok) { setError(text.trim() || 'Invalid or expired code'); return }
+      const data = JSON.parse(text)
+      login(data.token)
+      onSuccess()
+    } catch {
+      setError('Network error — is the server running?')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleResendOTP() {
+    if (resendCooldown > 0) return
+    try {
+      await fetch('/api/auth/resend-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: pendingEmail }),
+      })
+      setResendCooldown(60)
+      const interval = setInterval(() => {
+        setResendCooldown(v => {
+          if (v <= 1) { clearInterval(interval); return 0 }
+          return v - 1
+        })
+      }, 1000)
+    } catch { /* silent */ }
   }
 
   return (
@@ -180,10 +231,10 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
             </div>
             <div className="flex-1">
               <h2 className="text-lg font-bold text-white">
-                {step === 1 ? 'Create your account' : 'Set up your radio station'}
+                {step === 1 ? 'Create your account' : step === 2 ? 'Set up your radio station' : 'Verify your email'}
               </h2>
               <p className="text-xs text-gray-400 mt-0.5">
-                {step === 1 ? 'Step 1 of 2 — Personal info' : 'Step 2 of 2 — Radio info'}
+                {step === 1 ? 'Step 1 of 3 — Personal info' : step === 2 ? 'Step 2 of 3 — Radio info' : 'Step 3 of 3 — Email verification'}
               </p>
             </div>
             {selectedPlan && (
@@ -199,7 +250,7 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
           <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
             <div
               className="h-full rio-logo-gradient rounded-full transition-all duration-500"
-              style={{ width: step === 1 ? '50%' : '100%' }}
+              style={{ width: step === 1 ? '33%' : step === 2 ? '66%' : '100%' }}
             />
           </div>
         </div>
@@ -323,6 +374,60 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
                 {loading ? 'Creating station…' : '🎙️ Launch My Station'}
               </button>
             </div>
+          </form>
+        )}
+
+        {/* ══ STEP 3 — Email Verification ══ */}
+        {step === 3 && (
+          <form onSubmit={handleVerifyOTP} className="px-7 py-6 space-y-5">
+            <div className="text-center">
+              <div className="w-14 h-14 rounded-2xl bg-purple-900/30 border border-purple-700/30 flex items-center justify-center mx-auto mb-4">
+                <svg className="w-7 h-7 text-purple-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                </svg>
+              </div>
+              <p className="text-sm text-gray-400 leading-relaxed">
+                We sent a 6-digit code to<br />
+                <span className="text-white font-semibold">{pendingEmail}</span>
+              </p>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1.5">Verification Code</label>
+              <input
+                ref={firstInputRef}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                placeholder="000000"
+                className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-2xl font-mono text-white text-center tracking-[0.5em] placeholder-gray-700 focus:outline-none focus:border-amber-500 transition-colors"
+              />
+            </div>
+
+            <ErrorBox message={error} />
+
+            <button
+              type="submit"
+              disabled={loading || otp.length !== 6}
+              className="w-full py-2.5 rounded-xl rio-logo-gradient disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm transition-all shadow-lg shadow-red-900/30"
+            >
+              {loading ? 'Verifying…' : 'Verify & Create Account'}
+            </button>
+
+            <p className="text-center text-xs text-gray-600">
+              Didn't receive it?{' '}
+              <button
+                type="button"
+                onClick={handleResendOTP}
+                disabled={resendCooldown > 0}
+                className="text-amber-400 hover:text-amber-300 font-semibold disabled:text-gray-600 disabled:cursor-not-allowed"
+              >
+                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
+              </button>
+            </p>
           </form>
         )}
       </div>

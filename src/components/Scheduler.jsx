@@ -154,6 +154,7 @@ export default function Scheduler() {
   const audioRef = useRef(null)
   const playbackRunRef = useRef(0)
   const tracksRef = useRef([])
+  const pausedDecksRef = useRef([])
   const [tracks, setTracks] = useState([])
   const [schedules, setSchedules] = useState([])
   const [mode, setMode] = useState('backend')
@@ -195,6 +196,9 @@ export default function Scheduler() {
       : [{ song_id: schedule.song_id, title: schedule.title, artist: schedule.artist, source_url: schedule.source_url }]
 
     await audioEngine?.resume?.()
+
+    // Pause any DJ deck that is currently playing and remember it for later
+    pausedDecksRef.current = audioEngine?.pauseDecks?.() ?? []
 
     for (let index = 0; index < scheduledTracks.length; index += 1) {
       if (playbackRunRef.current !== runID) return
@@ -244,6 +248,9 @@ export default function Scheduler() {
     if (playbackRunRef.current !== runID) return
     setPlaying(null)
     window.dispatchEvent(new CustomEvent('scheduler:playback', { detail: { schedule, playing: false, currentTime: 0, duration: 0 } }))
+    // Resume whichever decks were paused when this schedule started
+    audioEngine?.resumeDecks?.(pausedDecksRef.current)
+    pausedDecksRef.current = []
   }, [addLog, audioEngine, token])
 
   const loadBackendSchedules = useCallback(async () => {
@@ -317,6 +324,9 @@ export default function Scheduler() {
       setPlaying(null)
       window.dispatchEvent(new CustomEvent('scheduler:playback', { detail: { schedule: stoppedSchedule, playing: false, currentTime: 0, duration: 0 } }))
       addLog(`Stopped "${stoppedSchedule?.title || 'scheduled playback'}"`)
+      // Resume any deck that was paused when the schedule started
+      audioEngine?.resumeDecks?.(pausedDecksRef.current)
+      pausedDecksRef.current = []
     }
     window.addEventListener('scheduler:stop', stopScheduledPlayback)
     return () => window.removeEventListener('scheduler:stop', stopScheduledPlayback)

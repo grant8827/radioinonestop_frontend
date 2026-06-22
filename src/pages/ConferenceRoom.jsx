@@ -1042,6 +1042,7 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
   const [token, setToken] = useState(null)
   const [livekitUrl, setLivekitUrl] = useState(null)
   const [error, setError] = useState(null)
+  const [disconnected, setDisconnected] = useState(false)
   const [microphoneError, setMicrophoneError] = useState('')
 
   // Observe visibility so we don't auto-connect to LiveKit in the background on page load
@@ -1110,6 +1111,28 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
     )
   }
 
+  if (disconnected) {
+    return (
+      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center p-4">
+        <div className="w-full max-w-sm bg-gray-900 border border-gray-800 rounded-2xl p-6 text-center">
+          <p className="text-base font-semibold text-white mb-1">Disconnected</p>
+          <p className="text-sm text-gray-500 mb-5">You were disconnected from the room.</p>
+          <button
+            onClick={() => {
+              setDisconnected(false)
+              setToken(null)
+              setLivekitUrl(null)
+              if (isGuest) setGuestNameSubmitted(false)
+            }}
+            className="w-full py-2.5 bg-gray-800 hover:bg-gray-700 text-white text-sm font-semibold rounded-lg transition-colors"
+          >
+            Rejoin
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   if (error) {
     return (
       <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center p-4">
@@ -1148,7 +1171,7 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
       onMediaDeviceFailure={(failure, kind) => {
         if (!kind || kind === 'audioinput') setMicrophoneError(microphoneErrorMessage(failure))
       }}
-      onDisconnected={() => { if (onLeave) onLeave(); else window.location.href = '/' }}
+      onDisconnected={() => { if (onLeave) onLeave(); else setDisconnected(true) }}
     >
       <RoomView
         onLeave={onLeave}

@@ -19,6 +19,7 @@ import StationsPage from './pages/StationsPage'
 import PricingPage from './pages/PricingPage'
 import RegisterPage from './pages/RegisterPage'
 import PaymentPage from './pages/PaymentPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import ListenerLimitModal from './components/ListenerLimitModal'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AudioEngineProvider } from './context/AudioEngine'
@@ -229,7 +230,7 @@ function MainApp() {
           {mode === 'mixer' && <Mixer config={config} onOpenConference={() => handleModeChange('conference')} />}
           {/* Keep the live-chat Conference room mounted across tab changes. */}
           <div className={mode !== 'conference' ? 'hidden' : 'contents'}>
-            <ConferenceRoom roomId="studio" username={user?.stationName} onLeave={() => handleModeChange('radio')} onGoToMixer={() => handleModeChange('mixer')} />
+            <ConferenceRoom roomId="studio" username={stationName || user?.stationName} onLeave={() => handleModeChange('radio')} onGoToMixer={() => handleModeChange('mixer')} />
           </div>
           {mode === 'admin' && user?.role === 'admin' && <SuperAdmin />}
           {mode === 'profile' && <ProfileSettings />}
@@ -273,6 +274,7 @@ export default function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/payment" element={<PaymentPage />} />
           <Route path="/conference/:roomId" element={<ConferenceRoom />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route
             path="/app"
             element={

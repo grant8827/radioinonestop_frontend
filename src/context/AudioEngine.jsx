@@ -843,6 +843,29 @@ export function AudioEngineProvider({ children }) {
     return deckAnalysers.current[key] ?? null
   }, [])
 
+  // Pause any playing DJ decks and return the keys that were paused.
+  // Call resumeDecks(keys) with the returned value to restore them.
+  const pauseDecks = useCallback(() => {
+    const paused = []
+    for (const key of ['dj-a', 'dj-b']) {
+      const el = mediaElements.current[key]
+      if (el && !el.paused && el.readyState >= 2) {
+        el.pause()
+        paused.push(key)
+      }
+    }
+    return paused
+  }, [])
+
+  const resumeDecks = useCallback((keys) => {
+    for (const key of keys) {
+      const el = mediaElements.current[key]
+      if (el && el.paused && el.src && el.readyState >= 2) {
+        el.play().catch(() => {})
+      }
+    }
+  }, [])
+
   // ── Get the stream output track (for WebRTC/recording) ───────────────────
   const getStreamTrack = useCallback(() => {
     getAC()
@@ -1093,6 +1116,8 @@ export function AudioEngineProvider({ children }) {
       updateSchedulerEq,
       updateDeckMix,
       updateDeckEq,
+      pauseDecks,
+      resumeDecks,
       setDjActive,
       micOnAirMap,
       setMicOnAir,
