@@ -1066,6 +1066,7 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
     if (authToken) headers['Authorization'] = `Bearer ${authToken}`
     fetch(`/api/conference/token?room=${encodeURIComponent(roomId)}&username=${encodeURIComponent(username)}`, { headers })
       .then((r) => {
+        if (r.status === 403) return r.text().then(() => { throw new Error('This room is full. The host’s plan guest limit has been reached.') })
         if (!r.ok) return r.text().then((t) => { throw new Error(t) })
         return r.json()
       })
