@@ -634,6 +634,11 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
                     </svg>
                     Stop Stream
                   </>
+                ) : connecting ? (
+                  <>
+                    {/* Optional: you can add a spinner icon here */}
+                    Connecting...
+                  </>
                 ) : (
                   <>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
