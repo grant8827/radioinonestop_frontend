@@ -237,18 +237,18 @@ function MainApp() {
           {mode === 'settings' && <SettingsPage />}
 
           {/* Radio player stays mounted so audio elements survive mode switches. */}
-          <div className={`flex flex-col lg:flex-row gap-4 w-full${
-            mode !== 'radio' ? ' hidden' : ''
-          }`}>
-            <div className="flex-1 flex flex-col gap-4 min-w-0">
-              <Player mode="radio" config={config} trackA={trackA} trackB={trackB} queue={queue} onQueuePop={repeatPlaylist ? () => setQueue((q) => q.length > 0 ? [...q.slice(1), q[0]] : [...repeatBackupRef.current]) : () => setQueue((q) => q.slice(1))} onLoadTrackA={setTrackA} onLoadTrackB={setTrackB} onDeckPlaybackChange={handleDeckPlaybackChange} repeatPlaylist={repeatPlaylist} onRepeatReload={onRepeatReload} isSuspended={listenerStatus?.status === 'suspended'} />
-              <NowPlaying config={config} mode={mode} />
-            </div>
-            <div className="lg:w-80 xl:w-96 shrink-0 flex flex-col gap-3 min-h-0">
-              {/* VIDEO DISABLED: SocialLive camera preview removed. */}
-              <SchedulerRadioMonitor />
-              <div className="min-h-0 overflow-hidden" style={{ height: 530 }}>
-                <TrackLibrary onTrackLoadA={loadTrackAFromLibrary} onTrackLoadB={loadTrackBFromLibrary} queue={queue} onQueueChange={setQueue} repeatPlaylist={repeatPlaylist} onRepeatChange={setRepeatPlaylist} nowPlayingA={trackA} nowPlayingB={trackB} />
+          <div className={mode !== 'radio' ? 'hidden' : 'overflow-x-auto'}>
+            <div className="flex flex-row gap-4 min-w-240">
+              <div className="flex-1 flex flex-col gap-4 min-w-0">
+                <Player mode="radio" config={config} trackA={trackA} trackB={trackB} queue={queue} onQueuePop={repeatPlaylist ? () => setQueue((q) => q.length > 0 ? [...q.slice(1), q[0]] : [...repeatBackupRef.current]) : () => setQueue((q) => q.slice(1))} onLoadTrackA={setTrackA} onLoadTrackB={setTrackB} onDeckPlaybackChange={handleDeckPlaybackChange} repeatPlaylist={repeatPlaylist} onRepeatReload={onRepeatReload} isSuspended={listenerStatus?.status === 'suspended'} />
+                <NowPlaying config={config} mode={mode} />
+              </div>
+              <div className="w-80 shrink-0 flex flex-col gap-3 min-h-0">
+                {/* VIDEO DISABLED: SocialLive camera preview removed. */}
+                <SchedulerRadioMonitor />
+                <div className="min-h-0 overflow-hidden" style={{ height: 530 }}>
+                  <TrackLibrary onTrackLoadA={loadTrackAFromLibrary} onTrackLoadB={loadTrackBFromLibrary} queue={queue} onQueueChange={setQueue} repeatPlaylist={repeatPlaylist} onRepeatChange={setRepeatPlaylist} nowPlayingA={trackA} nowPlayingB={trackB} />
+                </div>
               </div>
             </div>
           </div>

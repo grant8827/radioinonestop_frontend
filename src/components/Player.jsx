@@ -2039,7 +2039,7 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
               </span>
             </div>
           )}
-          <div className="flex flex-col lg:flex-row">
+          <div className="flex flex-row">
             <DeckUnit
               side="A" color={LOGO.redHot}
               active={true} playing={playing} onTogglePlay={togglePlay}

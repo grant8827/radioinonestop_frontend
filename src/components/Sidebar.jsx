@@ -4,7 +4,7 @@ import UpgradeModal from './UpgradeModal'
 
 // Define which features are available in each plan
 const PLAN_FEATURES = {
-  starter: ['radio', 'mixer', 'stream'],
+  starter: ['radio', 'mixer', 'stream', 'scheduler'],
   professional: ['radio', 'mixer', 'stream', 'scheduler', 'conference'],
   enterprise: ['radio', 'mixer', 'stream', 'scheduler', 'conference'],
   ultimate: ['radio', 'mixer', 'stream', 'scheduler', 'conference'],
@@ -12,7 +12,6 @@ const PLAN_FEATURES = {
 
 // Define required plans for locked features
 const FEATURE_REQUIRED_PLAN = {
-  scheduler: 'professional',
   conference: 'professional',
 }
 
@@ -221,7 +220,7 @@ export default function Sidebar({ stationName, logoUrl, mode, onModeChange, onSe
         {/* Upgrade Plan */}
         <a
           href="/pricing"
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all rio-logo-gradient text-white shadow-lg shadow-red-900/30"
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all text-gray-400 "
         >
           <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />

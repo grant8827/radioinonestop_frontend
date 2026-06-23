@@ -1111,7 +1111,7 @@ export default function Mixer({ config, onOpenConference }) {
   }, [audioEngine])
 
   return (
-    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div style={{ width: '100%', overflowX: 'auto' }}><div style={{ width: '100%', minWidth: 1000, display: 'flex', flexDirection: 'column', gap: 14 }}>
 
       {/* ── Header ── */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
@@ -1212,22 +1212,25 @@ export default function Mixer({ config, onOpenConference }) {
               </div>
             </div>
 
-            {/* Group divider */}
-            <div style={{
-              flexShrink: 0, width: 1, alignSelf: 'stretch', margin: '0 16px',
-              background: `linear-gradient(to bottom, transparent, ${T.border} 15%, ${T.border} 85%, transparent)`,
-            }} />
+          </div>
 
-            {/* Dedicated conference return */}
-            <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-              <GroupHeader label="Conference" color={LOGO.cream} count={1} />
-              <ConferenceStrip
-                conf={confState}
-                onUpdate={updateConf}
-                onOpenConference={onOpenConference}
-                level={levels.conference ?? 0}
-              />
-            </div>
+          {/* Conference strip — pinned right, never inside the scroll area */}
+          <div style={{
+            flexShrink: 0,
+            borderLeft: `1px solid ${T.border}`,
+            padding: '20px 12px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            background: T.surface,
+          }}>
+            <GroupHeader label="Conference" color={LOGO.cream} count={1} />
+            <ConferenceStrip
+              conf={confState}
+              onUpdate={updateConf}
+              onOpenConference={onOpenConference}
+              level={levels.conference ?? 0}
+            />
           </div>
 
           {/* Master — pinned right */}
@@ -1282,6 +1285,6 @@ export default function Mixer({ config, onOpenConference }) {
           </div>
         </div>
       </div>
-    </div>
+    </div></div>
   )
 }
