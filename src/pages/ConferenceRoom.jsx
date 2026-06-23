@@ -453,9 +453,35 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
     return () => clearInterval(id)
   }, [audioEngine])
 
-  // WebRTC signaling lifecycle
+  // For guests: acquire mic BEFORE opening the WebSocket so it's guaranteed
+  // available when the host's offer arrives. micReady gates the signaling effect.
+  const [micReady, setMicReady] = useState(!!audioEngine)
   useEffect(() => {
-    if (!readyToJoin || !roomId) return
+    if (!readyToJoin) return
+    if (audioEngine) { setMicReady(true); return }
+    let cancelled = false
+    navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+      .then((stream) => {
+        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return }
+        micStreamRef.current = stream
+        setMicReady(true)
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setMicrophoneError(microphoneErrorMessage(err))
+          setMicReady(true) // proceed without mic so the WS still opens
+        }
+      })
+    return () => {
+      cancelled = true
+      micStreamRef.current?.getTracks().forEach((t) => t.stop())
+      micStreamRef.current = null
+    }
+  }, [readyToJoin, audioEngine])
+
+  // WebRTC signaling lifecycle — runs only after mic is ready
+  useEffect(() => {
+    if (!micReady || !roomId) return
 
     isMountedRef.current = true
     leavingRef.current = false
@@ -533,19 +559,8 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
       }
     }
 
-    ws.onopen = async () => {
-      // Get mic for guests before any signaling can complete
-      if (!audioEngine) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-          if (!isMountedRef.current) { stream.getTracks().forEach((t) => t.stop()); return }
-          micStreamRef.current = stream
-        } catch (err) {
-          if (isMountedRef.current) setMicrophoneError(microphoneErrorMessage(err))
-        }
-      } else {
-        setOutboundStatus({ status: 'connecting', message: 'Connecting mixer send...' })
-      }
+    ws.onopen = () => {
+      if (audioEngine) setOutboundStatus({ status: 'connecting', message: 'Connecting mixer send...' })
     }
 
     ws.onmessage = async (e) => {
@@ -639,14 +654,10 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
       ws.close()
       Object.values(pcsRef.current).forEach((pc) => { try { pc.close() } catch {} })
       pcsRef.current = {}
-      if (!isHostRef.current) {
-        micStreamRef.current?.getTracks().forEach((t) => t.stop())
-        micStreamRef.current = null
-      }
       audioEngine?.disconnectAllConferenceStreams?.()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readyToJoin, roomId])
+  }, [micReady, roomId])
 
   const handleLeave = useCallback(() => {
     leavingRef.current = true
