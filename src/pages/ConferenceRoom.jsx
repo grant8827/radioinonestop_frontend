@@ -1021,14 +1021,22 @@ function RoomView({ onLeave, inviteUrl, microphoneError, onMicrophoneError, onGo
 // ── Page entry point ───────────────────────────────────────────────────────────
 // roomId + onLeave props are used when rendered inline inside the app.
 // When loaded via the /conference/:roomId route (guest link), useParams() provides the roomId.
-export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: propUsername, onGoToMixer }) {
+export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: propUsername, isActive, onGoToMixer }) {
   const { roomId: routeRoomId } = useParams()
   const roomId = propRoomId ?? routeRoomId
   const inviteUrl = `${window.location.origin}/conference/${roomId}`
   const { user, token: authToken } = useAuth()
 
-  const containerRef = useRef(null)
+  // hasBecomeVisible is set once when the tab first becomes active — never resets.
+  // This prevents re-fetching the token when the user switches away and back.
   const [hasBecomeVisible, setHasBecomeVisible] = useState(false)
+
+  // For the inline host: trigger on isActive. For guest routes: already active.
+  useEffect(() => {
+    if (!hasBecomeVisible && (isActive || !propRoomId)) {
+      setHasBecomeVisible(true)
+    }
+  }, [isActive, propRoomId, hasBecomeVisible])
 
   // Guests (no auth, no propUsername) must enter a display name before joining
   const isGuest = !authToken && !propUsername
@@ -1044,19 +1052,6 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
   const [error, setError] = useState(null)
   const [disconnected, setDisconnected] = useState(false)
   const [microphoneError, setMicrophoneError] = useState('')
-
-  // Observe visibility so we don't auto-connect to LiveKit in the background on page load
-  useEffect(() => {
-    if (isGuest || hasBecomeVisible || !containerRef.current) return
-    const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting) {
-        setHasBecomeVisible(true)
-        observer.disconnect()
-      }
-    })
-    observer.observe(containerRef.current)
-    return () => observer.disconnect()
-  }, [isGuest, hasBecomeVisible])
 
   const readyToJoin = isGuest ? guestNameSubmitted : hasBecomeVisible
 
@@ -1150,7 +1145,7 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
 
   if (!token) {
     return (
-      <div ref={containerRef} className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
+      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
         <div className="flex items-center gap-3 text-gray-400">
           <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />

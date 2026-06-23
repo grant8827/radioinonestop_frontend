@@ -230,7 +230,7 @@ function MainApp() {
           {mode === 'mixer' && <Mixer config={config} onOpenConference={() => handleModeChange('conference')} />}
           {/* Keep the live-chat Conference room mounted across tab changes. */}
           <div className={mode !== 'conference' ? 'hidden' : 'contents'}>
-            <ConferenceRoom roomId={user?.id || 'studio'} username={stationName || user?.stationName} onLeave={() => handleModeChange('radio')} onGoToMixer={() => handleModeChange('mixer')} />
+            <ConferenceRoom roomId={user?.id || 'studio'} username={stationName || user?.stationName} isActive={mode === 'conference'} onLeave={() => handleModeChange('radio')} onGoToMixer={() => handleModeChange('mixer')} />
           </div>
           {mode === 'admin' && user?.role === 'admin' && <SuperAdmin />}
           {mode === 'profile' && <ProfileSettings />}
