@@ -753,12 +753,20 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
         <div className="w-full max-w-sm bg-gray-900 border border-gray-800 rounded-2xl p-6 text-center">
           <p className="text-base font-semibold text-white mb-1">Disconnected</p>
           <p className="text-sm text-gray-500 mb-5">You were disconnected from the room.</p>
-          <button
-            onClick={() => { setDisconnected(false); setConnected(false); setMyPeerId(null); setPeers({}); setRemoteStreams({}); setParticipantControls({}); if (isGuest) setGuestNameSubmitted(false) }}
-            className="w-full py-2.5 bg-gray-800 hover:bg-gray-700 text-white text-sm font-semibold rounded-lg transition-colors"
-          >
-            Rejoin
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => { if (onLeave) onLeave(); else window.location.href = '/' }}
+              className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 text-white text-sm font-semibold rounded-lg transition-colors"
+            >
+              Close
+            </button>
+            <button
+              onClick={() => { setDisconnected(false); setConnected(false); setMyPeerId(null); setPeers({}); setRemoteStreams({}); setParticipantControls({}); if (isGuest) setGuestNameSubmitted(false) }}
+              className="flex-1 py-2.5 bg-red-700 hover:bg-red-600 text-white text-sm font-semibold rounded-lg transition-colors"
+            >
+              Rejoin
+            </button>
+          </div>
         </div>
       </div>
     )
