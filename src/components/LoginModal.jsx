@@ -179,7 +179,7 @@ export default function LoginModal({ onSuccess, onClose, onSwitchToRegister }) {
                 <p className="text-xs text-gray-500">
                   Don't have an account?{' '}
                   <button type="button" onClick={onSwitchToRegister} className="text-amber-400 hover:text-amber-300 font-semibold">
-                    Create one free →
+                    Create one →
                   </button>
                 </p>
               </div>

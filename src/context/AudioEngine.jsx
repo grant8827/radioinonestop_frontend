@@ -40,8 +40,11 @@ export function AudioEngineProvider({ children }) {
   // 3-band EQ on the master bus (between master gain and master analyser)
   const masterEqRef = useRef(null)  // { hi, mid, lo } BiquadFilterNodes
 
-  // Headphone phones gain — sits between masterAnalyser and ac.destination (local only, stream unaffected)
+  // Headphone phones gain — local only, stream unaffected
   const phonesGainRef = useRef(null)
+  const monitorDestRef = useRef(null)
+  const monitorElRef = useRef(null)
+  const monitorFallbackConnectedRef = useRef(false)
 
   // Gain node between masterAnalyser and phonesGain — set to 0 when CUE is held (switches phones to cue)
   const mainToPhonesGainRef = useRef(null)
@@ -172,7 +175,28 @@ export function AudioEngineProvider({ children }) {
       const phonesGain = ac.createGain()
       phonesGain.gain.value = 0.8   // default headphone level
       phonesGainRef.current = phonesGain
-      phonesGain.connect(ac.destination)
+
+      const monitorDest = ac.createMediaStreamDestination()
+      monitorDestRef.current = monitorDest
+      phonesGain.connect(monitorDest)
+
+      const monitorEl = new Audio()
+      monitorEl.autoplay = true
+      monitorEl.playsInline = true
+      monitorEl.srcObject = monitorDest.stream
+      monitorElRef.current = monitorEl
+      const savedMonitorDevice = localStorage.getItem('headphoneMonitorDeviceId') || ''
+      if (savedMonitorDevice && typeof monitorEl.setSinkId === 'function') {
+        monitorEl.setSinkId(savedMonitorDevice).catch(() => {
+          localStorage.removeItem('headphoneMonitorDeviceId')
+        })
+      }
+      monitorEl.play().catch(() => {
+        if (!monitorFallbackConnectedRef.current) {
+          phonesGain.connect(ac.destination)
+          monitorFallbackConnectedRef.current = true
+        }
+      })
 
       // mainToPhonesGain: switched OFF (gain=0) when CUE is held so only cue signal heard
       const mainToPhonesGain = ac.createGain()
@@ -205,7 +229,46 @@ export function AudioEngineProvider({ children }) {
     if (acRef.current?.state === 'suspended') {
       await acRef.current.resume()
     }
+    try {
+      await monitorElRef.current?.play()
+      if (monitorFallbackConnectedRef.current && phonesGainRef.current && acRef.current) {
+        phonesGainRef.current.disconnect(acRef.current.destination)
+        monitorFallbackConnectedRef.current = false
+      }
+    } catch {}
   }, [])
+
+  const getHeadphoneOutputSupport = useCallback(() => (
+    typeof HTMLMediaElement !== 'undefined' &&
+    typeof HTMLMediaElement.prototype.setSinkId === 'function'
+  ), [])
+
+  const setHeadphoneOutputDevice = useCallback(async (deviceId = '') => {
+    const ac = getAC()
+    const el = monitorElRef.current
+    if (!el) return { ok: false, reason: 'missing-output' }
+    if (typeof el.setSinkId !== 'function') return { ok: false, reason: 'unsupported' }
+    try {
+      await el.setSinkId(deviceId)
+      if (deviceId) localStorage.setItem('headphoneMonitorDeviceId', deviceId)
+      else localStorage.removeItem('headphoneMonitorDeviceId')
+      if (ac.state === 'suspended') await ac.resume()
+      await el.play()
+      if (monitorFallbackConnectedRef.current && phonesGainRef.current) {
+        try {
+          phonesGainRef.current.disconnect(ac.destination)
+          monitorFallbackConnectedRef.current = false
+        } catch {}
+      }
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, reason: error?.name || 'output-error' }
+    }
+  }, [getAC])
+
+  const getHeadphoneOutputDevice = useCallback(() => (
+    localStorage.getItem('headphoneMonitorDeviceId') || ''
+  ), [])
 
   // ── Auto-resume after sleep / tab-hidden / OS audio power events ─────────
   useEffect(() => {
@@ -1107,6 +1170,9 @@ export function AudioEngineProvider({ children }) {
       getConferenceSendMuted,
       getConferenceChannelId,
       resume,
+      getHeadphoneOutputSupport,
+      setHeadphoneOutputDevice,
+      getHeadphoneOutputDevice,
       djConnected,
       getAnalyser,
       getMasterAnalyser,

@@ -3,6 +3,7 @@ import { useAudioEngine } from '../context/AudioEngine'
 
 const TABS = [
   { id: 'record', label: 'Record' },
+  { id: 'monitor', label: 'Headphone / Monitor Out' },
 ]
 
 const hasDirPicker = typeof window !== 'undefined' && 'showDirectoryPicker' in window
@@ -16,11 +17,27 @@ function formatTime(secs) {
 export default function SettingsPage() {
   const [tab, setTab] = useState('record')
   const audioEngine = useAudioEngine()
-  const { recording, recTime, recDirName, setRecDirHandle, clearRecDirHandle, startRec, stopRec } = audioEngine ?? {}
+  const {
+    recording,
+    recTime,
+    recDirName,
+    setRecDirHandle,
+    clearRecDirHandle,
+    startRec,
+    stopRec,
+    getHeadphoneOutputSupport,
+    setHeadphoneOutputDevice,
+    getHeadphoneOutputDevice,
+  } = audioEngine ?? {}
 
   // Format (local pref only)
   const [format, setFormat] = useState(() => localStorage.getItem('recFormat') || 'webm')
   const [recError, setRecError] = useState('')
+  const [monitorDevices, setMonitorDevices] = useState([])
+  const [monitorDeviceId, setMonitorDeviceId] = useState(() => localStorage.getItem('headphoneMonitorDeviceId') || '')
+  const [monitorError, setMonitorError] = useState('')
+  const [monitorLoading, setMonitorLoading] = useState(false)
+  const monitorSupported = getHeadphoneOutputSupport?.() ?? false
 
   // Listen for open-settings-record event dispatched by the Mixer nudge
   useEffect(() => {
@@ -35,6 +52,20 @@ export default function SettingsPage() {
     document.addEventListener('rec-error', handler)
     return () => document.removeEventListener('rec-error', handler)
   }, [])
+
+  const refreshMonitorDevices = async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) return
+    const devices = await navigator.mediaDevices.enumerateDevices()
+    setMonitorDevices(devices.filter((d) => d.kind === 'audiooutput'))
+    setMonitorDeviceId(getHeadphoneOutputDevice?.() || '')
+  }
+
+  useEffect(() => {
+    refreshMonitorDevices().catch(() => {})
+    const handler = () => refreshMonitorDevices().catch(() => {})
+    navigator.mediaDevices?.addEventListener?.('devicechange', handler)
+    return () => navigator.mediaDevices?.removeEventListener?.('devicechange', handler)
+  }, [getHeadphoneOutputDevice])
 
   const pickFolder = async () => {
     try {
@@ -55,6 +86,34 @@ export default function SettingsPage() {
     const result = startRec?.(format)
     if (result === 'no-stream') setRecError('No audio stream yet — load a track and start the mixer first.')
     else if (result === 'unsupported') setRecError('MediaRecorder not supported in this browser.')
+  }
+
+  const handleMonitorDeviceChange = async (deviceId) => {
+    setMonitorError('')
+    setMonitorDeviceId(deviceId)
+    const result = await setHeadphoneOutputDevice?.(deviceId)
+    if (!result?.ok) {
+      setMonitorError(
+        result?.reason === 'unsupported'
+          ? 'This browser cannot choose a separate headphone output.'
+          : 'Could not switch headphone output. Check browser permissions and device availability.'
+      )
+      setMonitorDeviceId(getHeadphoneOutputDevice?.() || '')
+    }
+  }
+
+  const unlockMonitorLabels = async () => {
+    setMonitorError('')
+    setMonitorLoading(true)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      stream.getTracks().forEach((track) => track.stop())
+      await refreshMonitorDevices()
+    } catch {
+      setMonitorError('Microphone permission is needed before the browser will show full device names.')
+    } finally {
+      setMonitorLoading(false)
+    }
   }
 
   return (
@@ -215,6 +274,66 @@ export default function SettingsPage() {
             )}
           </div>
 
+        </div>
+      )}
+
+      {tab === 'monitor' && (
+        <div className="max-w-lg space-y-5">
+          <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-800">
+              <h2 className="text-sm font-semibold text-gray-200">Headphone Output</h2>
+            </div>
+            <div className="px-5 py-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                  Monitor Device
+                </label>
+                <select
+                  value={monitorDeviceId}
+                  disabled={!monitorSupported}
+                  onChange={(e) => handleMonitorDeviceChange(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-sm text-gray-200 disabled:opacity-50 focus:outline-none focus:border-red-500"
+                >
+                  <option value="">System default output</option>
+                  {monitorDevices
+                    .filter((device) => device.deviceId && device.deviceId !== 'default')
+                    .map((device, idx) => (
+                      <option key={device.deviceId} value={device.deviceId}>
+                        {device.label || `Output ${idx + 1}`}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => refreshMonitorDevices().catch(() => setMonitorError('Could not refresh output devices.'))}
+                  className="px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm text-gray-300 rounded-lg transition-colors"
+                >
+                  Refresh Devices
+                </button>
+                <button
+                  onClick={unlockMonitorLabels}
+                  disabled={monitorLoading || !navigator.mediaDevices?.getUserMedia}
+                  className="px-3 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 border border-gray-700 text-sm text-gray-300 rounded-lg transition-colors"
+                >
+                  {monitorLoading ? 'Checking...' : 'Show Device Names'}
+                </button>
+              </div>
+
+              {!monitorSupported && (
+                <p className="text-xs text-amber-400">
+                  Your browser does not support selecting a separate headphone output. Chrome or Edge is recommended for this feature.
+                </p>
+              )}
+              {monitorSupported && (
+                <p className="text-xs text-gray-500">
+                  This changes only the local headphone/cue monitor path. The stream, recording, mixer channels, and Auto DJ output stay on the main mix.
+                </p>
+              )}
+              {monitorError && <p className="text-xs text-red-400">{monitorError}</p>}
+            </div>
+          </div>
         </div>
       )}
 

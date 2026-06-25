@@ -71,12 +71,12 @@ function MainApp() {
 
   const loadTrackAFromLibrary = useCallback((track) => {
     if (deckPlaying.A) return
-    setTrackA(track)
+    setTrackA({ ...track })
   }, [deckPlaying.A])
 
   const loadTrackBFromLibrary = useCallback((track) => {
     if (deckPlaying.B) return
-    setTrackB(track)
+    setTrackB({ ...track })
   }, [deckPlaying.B])
   
   useEffect(() => {

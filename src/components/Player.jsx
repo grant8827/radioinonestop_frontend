@@ -1067,8 +1067,6 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
   const hlsRef   = useRef(null)
   const retryTimer = useRef(null)
   const retryCount = useRef(0)
-  const prevLocalUrlRef = useRef(null)
-  const prevLocalUrlRefB = useRef(null)
 
   const audioEngine = useAudioEngine()
   const djConnected = audioEngine?.djConnected ?? false
@@ -1693,17 +1691,9 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
     // Tear down HLS
     clearTimeout(retryTimer.current)
     if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
-    // Revoke previous object URL to free memory — but only if the URL is no longer
-    // referenced anywhere (queue still holds it in repeat mode, or it may be on Deck B)
-    const oldUrl = prevLocalUrlRef.current
-    if (oldUrl && oldUrl !== trackA.url) {
-      const stillNeeded = oldUrl === trackB?.url ||
-        queueRef.current.some((t) => t.url === oldUrl)
-      if (!stillNeeded) URL.revokeObjectURL(oldUrl)
-    }
-    prevLocalUrlRef.current = trackA.url
     media.pause()
     media.src = trackA.url
+    media.currentTime = 0
     media.load()
     setPlaying(false)
     setError(null)
@@ -1715,15 +1705,9 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
     if (!trackB) return
     const media = mediaRefB.current
     if (!media) return
-    const oldUrl = prevLocalUrlRefB.current
-    if (oldUrl && oldUrl !== trackB.url) {
-      const stillNeeded = oldUrl === trackA?.url ||
-        queueRef.current.some((t) => t.url === oldUrl)
-      if (!stillNeeded) URL.revokeObjectURL(oldUrl)
-    }
-    prevLocalUrlRefB.current = trackB.url
     media.pause()
     media.src = trackB.url
+    media.currentTime = 0
     media.load()
     setPlayingB(false)
   }, [trackB])
