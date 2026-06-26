@@ -238,16 +238,24 @@ export default function RegisterPage() {
   // Resend OTP
   async function handleResend() {
     if (resendCooldown > 0) return
+    setError('')
     try {
-      await fetch('/api/auth/resend-otp', {
+      const resp = await fetch('/api/auth/resend-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim().toLowerCase() }),
       })
+      const text = await resp.text()
+      if (!resp.ok) {
+        setError(text.trim() || 'Could not resend verification code')
+        return
+      }
       setResendCooldown(60)
       setOtp(['', '', '', '', '', ''])
       otpRefs.current[0]?.focus()
-    } catch {}
+    } catch {
+      setError('Network error — could not resend verification code')
+    }
   }
 
   // Step 3 — save radio info and complete

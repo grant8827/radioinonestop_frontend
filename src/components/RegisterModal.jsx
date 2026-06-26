@@ -186,12 +186,18 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
 
   async function handleResendOTP() {
     if (resendCooldown > 0) return
+    setError('')
     try {
-      await fetch('/api/auth/resend-otp', {
+      const resp = await fetch('/api/auth/resend-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: pendingEmail }),
       })
+      const text = await resp.text()
+      if (!resp.ok) {
+        setError(text.trim() || 'Could not resend verification code')
+        return
+      }
       setResendCooldown(60)
       const interval = setInterval(() => {
         setResendCooldown(v => {
@@ -199,7 +205,9 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
           return v - 1
         })
       }, 1000)
-    } catch { /* silent */ }
+    } catch {
+      setError('Network error — could not resend verification code')
+    }
   }
 
   return (
