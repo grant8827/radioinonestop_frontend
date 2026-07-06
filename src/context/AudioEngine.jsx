@@ -46,12 +46,16 @@ export function AudioEngineProvider({ children }) {
 
   // Headphone phones gain — local only, stream unaffected
   const phonesGainRef = useRef(null)
+  const monitorModeGainRef = useRef(null)
   const monitorDestRef = useRef(null)
   const monitorElRef = useRef(null)
   const monitorFallbackConnectedRef = useRef(false)
   const lineOutDestRef = useRef(null)
   const lineOutElRef = useRef(null)
   const lineOutGainRef = useRef(null)
+  const cueOutDestRef = useRef(null)
+  const cueOutElRef = useRef(null)
+  const cueOutGainRef = useRef(null)
   const externalLineInRef = useRef(null)
 
   // Gain node between masterAnalyser and phonesGain — set to 0 when CUE is held (switches phones to cue)
@@ -227,9 +231,14 @@ export function AudioEngineProvider({ children }) {
       phonesGain.gain.value = 0.8   // default headphone level
       phonesGainRef.current = phonesGain
 
+      const monitorModeGain = ac.createGain()
+      monitorModeGain.gain.value = savedMixerMode === 'external' ? 0 : 1
+      monitorModeGainRef.current = monitorModeGain
+
       const monitorDest = ac.createMediaStreamDestination()
       monitorDestRef.current = monitorDest
-      phonesGain.connect(monitorDest)
+      phonesGain.connect(monitorModeGain)
+      monitorModeGain.connect(monitorDest)
 
       const monitorEl = new Audio()
       monitorEl.autoplay = true
@@ -244,7 +253,7 @@ export function AudioEngineProvider({ children }) {
       }
       monitorEl.play().catch(() => {
         if (!monitorFallbackConnectedRef.current) {
-          phonesGain.connect(ac.destination)
+          monitorModeGain.connect(ac.destination)
           monitorFallbackConnectedRef.current = true
         }
       })
@@ -261,11 +270,6 @@ export function AudioEngineProvider({ children }) {
       cueBus.gain.value = 0.8   // cue level knob initial value
       cueBusRef.current = cueBus
       cueBus.connect(phonesGain)
-
-      // Stream path — switchable between app mixer and external mixer line-in.
-      masterAnalyser.connect(appStreamGain)
-      appStreamGain.connect(streamDest)
-      externalStreamGain.connect(streamDest)
 
       // External line out: sends the app mix to a selected hardware output.
       const lineOutGain = ac.createGain()
@@ -292,6 +296,37 @@ export function AudioEngineProvider({ children }) {
         // User gesture may be required before the browser starts this output.
       })
 
+      // External cue out: sends cue/PFL audio to a selected hardware output
+      // while external mixer mode is active.
+      const cueOutGain = ac.createGain()
+      cueOutGain.gain.value = savedMixerMode === 'external' ? 1 : 0
+      cueOutGainRef.current = cueOutGain
+      cueBus.connect(cueOutGain)
+
+      const cueOutDest = ac.createMediaStreamDestination()
+      cueOutDestRef.current = cueOutDest
+      cueOutGain.connect(cueOutDest)
+
+      const cueOutEl = new Audio()
+      cueOutEl.autoplay = true
+      cueOutEl.playsInline = true
+      cueOutEl.srcObject = cueOutDest.stream
+      cueOutElRef.current = cueOutEl
+      const savedCueOutDevice = localStorage.getItem('externalMixerCueOutDeviceId') || ''
+      if (savedCueOutDevice && typeof cueOutEl.setSinkId === 'function') {
+        cueOutEl.setSinkId(savedCueOutDevice).catch(() => {
+          localStorage.removeItem('externalMixerCueOutDeviceId')
+        })
+      }
+      cueOutEl.play().catch(() => {
+        // User gesture may be required before the browser starts this output.
+      })
+
+      // Stream path — switchable between app mixer and external mixer line-in.
+      masterAnalyser.connect(appStreamGain)
+      appStreamGain.connect(streamDest)
+      externalStreamGain.connect(streamDest)
+
       // Auto-resume if the OS suspends the context mid-playback
       ac.addEventListener('statechange', () => {
         if (ac.state === 'suspended') {
@@ -312,7 +347,7 @@ export function AudioEngineProvider({ children }) {
     try {
       await monitorElRef.current?.play()
       if (monitorFallbackConnectedRef.current && phonesGainRef.current && acRef.current) {
-        phonesGainRef.current.disconnect(acRef.current.destination)
+        monitorModeGainRef.current?.disconnect(acRef.current.destination)
         monitorFallbackConnectedRef.current = false
       }
     } catch {}
@@ -336,7 +371,7 @@ export function AudioEngineProvider({ children }) {
       await el.play()
       if (monitorFallbackConnectedRef.current && phonesGainRef.current) {
         try {
-          phonesGainRef.current.disconnect(ac.destination)
+          monitorModeGainRef.current?.disconnect(ac.destination)
           monitorFallbackConnectedRef.current = false
         } catch {}
       }
@@ -359,7 +394,12 @@ export function AudioEngineProvider({ children }) {
     appStreamGainRef.current?.gain.setTargetAtTime(nextMode === 'external' ? 0 : 1, t, 0.03)
     externalStreamGainRef.current?.gain.setTargetAtTime(nextMode === 'external' ? 1 : 0, t, 0.03)
     lineOutGainRef.current?.gain.setTargetAtTime(nextMode === 'external' ? 1 : 0, t, 0.03)
+    cueOutGainRef.current?.gain.setTargetAtTime(nextMode === 'external' ? 1 : 0, t, 0.03)
+    monitorModeGainRef.current?.gain.setTargetAtTime(nextMode === 'external' ? 0 : 1, t, 0.03)
     lineOutElRef.current?.play().catch(() => {
+      // User gesture may be required before the browser starts this output.
+    })
+    cueOutElRef.current?.play().catch(() => {
       // User gesture may be required before the browser starts this output.
     })
   }, [getAC])
@@ -424,6 +464,27 @@ export function AudioEngineProvider({ children }) {
 
   const getExternalLineOutDevice = useCallback(() => (
     localStorage.getItem('externalMixerLineOutDeviceId') || ''
+  ), [])
+
+  const setExternalCueOutDevice = useCallback(async (deviceId = '') => {
+    const ac = getAC()
+    const el = cueOutElRef.current
+    if (!el) return { ok: false, reason: 'missing-output' }
+    if (typeof el.setSinkId !== 'function') return { ok: false, reason: 'unsupported' }
+    try {
+      await el.setSinkId(deviceId)
+      if (deviceId) localStorage.setItem('externalMixerCueOutDeviceId', deviceId)
+      else localStorage.removeItem('externalMixerCueOutDeviceId')
+      if (ac.state === 'suspended') await ac.resume()
+      await el.play()
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, reason: error?.name || 'output-error' }
+    }
+  }, [getAC])
+
+  const getExternalCueOutDevice = useCallback(() => (
+    localStorage.getItem('externalMixerCueOutDeviceId') || ''
   ), [])
 
   // ── Auto-resume after sleep / tab-hidden / OS audio power events ─────────
@@ -1351,6 +1412,8 @@ export function AudioEngineProvider({ children }) {
       connectExternalLineIn,
       setExternalLineOutDevice,
       getExternalLineOutDevice,
+      setExternalCueOutDevice,
+      getExternalCueOutDevice,
       djConnected,
       getAnalyser,
       getMasterAnalyser,

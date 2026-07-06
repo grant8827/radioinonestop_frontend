@@ -129,6 +129,8 @@ export default function SettingsPage() {
     connectExternalLineIn,
     setExternalLineOutDevice,
     getExternalLineOutDevice,
+    setExternalCueOutDevice,
+    getExternalCueOutDevice,
     updateMasterFader,
     updateMasterEq,
     updateMasterGraphicEq,
@@ -165,6 +167,7 @@ export default function SettingsPage() {
   const [mixerOutputDevices, setMixerOutputDevices] = useState([])
   const [lineInDeviceId, setLineInDeviceId] = useState(() => localStorage.getItem('externalMixerLineInDeviceId') || '')
   const [lineOutDeviceId, setLineOutDeviceId] = useState(() => localStorage.getItem('externalMixerLineOutDeviceId') || '')
+  const [cueOutDeviceId, setCueOutDeviceId] = useState(() => localStorage.getItem('externalMixerCueOutDeviceId') || '')
   const [mixerError, setMixerError] = useState('')
   const [mixerLoading, setMixerLoading] = useState(false)
   const connectedLineInRef = useRef('')
@@ -196,6 +199,7 @@ export default function SettingsPage() {
     setMixerInputDevices(devices.filter((d) => d.kind === 'audioinput' && d.deviceId))
     setMixerOutputDevices(devices.filter((d) => d.kind === 'audiooutput' && d.deviceId))
     setLineOutDeviceId(getExternalLineOutDevice?.() || localStorage.getItem('externalMixerLineOutDeviceId') || '')
+    setCueOutDeviceId(getExternalCueOutDevice?.() || localStorage.getItem('externalMixerCueOutDeviceId') || '')
   }
 
   useEffect(() => {
@@ -209,7 +213,7 @@ export default function SettingsPage() {
       navigator.mediaDevices?.removeEventListener?.('devicechange', handler)
       navigator.mediaDevices?.removeEventListener?.('devicechange', mixerHandler)
     }
-  }, [getHeadphoneOutputDevice, getExternalLineOutDevice])
+  }, [getHeadphoneOutputDevice, getExternalLineOutDevice, getExternalCueOutDevice])
 
   useEffect(() => {
     setMixerSettingsMode?.(mixerMode)
@@ -359,6 +363,20 @@ export default function SettingsPage() {
           : 'Could not switch line-out. Check browser permissions and device availability.'
       )
       setLineOutDeviceId(getExternalLineOutDevice?.() || '')
+    }
+  }
+
+  const handleCueOutChange = async (deviceId) => {
+    setMixerError('')
+    setCueOutDeviceId(deviceId)
+    const result = await setExternalCueOutDevice?.(deviceId)
+    if (!result?.ok) {
+      setMixerError(
+        result?.reason === 'unsupported'
+          ? 'This browser cannot choose a separate cue-out device.'
+          : 'Could not switch cue-out. Check browser permissions and device availability.'
+      )
+      setCueOutDeviceId(getExternalCueOutDevice?.() || '')
     }
   }
 
@@ -536,7 +554,7 @@ export default function SettingsPage() {
                 </label>
                 <select
                   value={monitorDeviceId}
-                  disabled={!monitorSupported}
+                  disabled={!monitorSupported || mixerMode === 'external'}
                   onChange={(e) => handleMonitorDeviceChange(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-sm text-gray-200 disabled:opacity-50 focus:outline-none focus:border-red-500"
                 >
@@ -554,13 +572,14 @@ export default function SettingsPage() {
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => refreshMonitorDevices().catch(() => setMonitorError('Could not refresh output devices.'))}
-                  className="px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm text-gray-300 rounded-lg transition-colors"
+                  disabled={mixerMode === 'external'}
+                  className="px-3 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 border border-gray-700 text-sm text-gray-300 rounded-lg transition-colors"
                 >
                   Refresh Devices
                 </button>
                 <button
                   onClick={unlockMonitorLabels}
-                  disabled={monitorLoading || !navigator.mediaDevices?.getUserMedia}
+                  disabled={monitorLoading || mixerMode === 'external' || !navigator.mediaDevices?.getUserMedia}
                   className="px-3 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 border border-gray-700 text-sm text-gray-300 rounded-lg transition-colors"
                 >
                   {monitorLoading ? 'Checking...' : 'Show Device Names'}
@@ -575,6 +594,11 @@ export default function SettingsPage() {
               {monitorSupported && (
                 <p className="text-xs text-gray-500">
                   This changes only the local headphone/cue monitor path. The stream, recording, mixer channels, and Auto DJ output stay on the main mix.
+                </p>
+              )}
+              {mixerMode === 'external' && (
+                <p className="text-xs text-amber-400">
+                  Headphone output is inactive while External Mixer mode is on. Use Mixer Settings → External Mixer → Cue Out Destination instead.
                 </p>
               )}
               {monitorError && <p className="text-xs text-red-400">{monitorError}</p>}
@@ -712,6 +736,30 @@ export default function SettingsPage() {
                   </select>
                   <p className="text-xs text-gray-500 mt-2">
                     This is where the app mixer audio is sent out, for example into a USB mixer or audio interface.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                    Cue Out Destination
+                  </label>
+                  <select
+                    value={cueOutDeviceId}
+                    disabled={!monitorSupported}
+                    onChange={(e) => handleCueOutChange(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-sm text-gray-200 disabled:opacity-50 focus:outline-none focus:border-red-500"
+                  >
+                    <option value="">System default output</option>
+                    {mixerOutputDevices
+                      .filter((device) => device.deviceId && device.deviceId !== 'default')
+                      .map((device, idx) => (
+                        <option key={device.deviceId} value={device.deviceId}>
+                          {device.label || `Output ${idx + 1}`}
+                        </option>
+                      ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-2">
+                    This sends cue/PFL audio to a separate external mixer channel while External Mixer mode is on.
                   </p>
                 </div>
 
