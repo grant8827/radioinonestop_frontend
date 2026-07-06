@@ -36,15 +36,23 @@ export function AudioEngineProvider({ children }) {
 
   // Master output AnalyserNode
   const masterAnalyserRef = useRef(null)
+  const appStreamGainRef = useRef(null)
+  const externalStreamGainRef = useRef(null)
 
   // 3-band EQ on the master bus (between master gain and master analyser)
   const masterEqRef = useRef(null)  // { hi, mid, lo } BiquadFilterNodes
+  const masterGraphicEqRef = useRef(null)
+  const masterOutputGainRef = useRef(null)
 
   // Headphone phones gain — local only, stream unaffected
   const phonesGainRef = useRef(null)
   const monitorDestRef = useRef(null)
   const monitorElRef = useRef(null)
   const monitorFallbackConnectedRef = useRef(false)
+  const lineOutDestRef = useRef(null)
+  const lineOutElRef = useRef(null)
+  const lineOutGainRef = useRef(null)
+  const externalLineInRef = useRef(null)
 
   // Gain node between masterAnalyser and phonesGain — set to 0 when CUE is held (switches phones to cue)
   const mainToPhonesGainRef = useRef(null)
@@ -164,12 +172,55 @@ export function AudioEngineProvider({ children }) {
       master.connect(masterHi); masterHi.connect(masterMid); masterMid.connect(masterLo)
       masterEqRef.current = { hi: masterHi, mid: masterMid, lo: masterLo }
 
+      const savedGraphicEq = (() => {
+        try { return JSON.parse(localStorage.getItem('mixer_graphic_eq') || 'null') || {} } catch { return {} }
+      })()
+      const graphicBands = [
+        ['31_25', 31.25],
+        ['62_5', 62.5],
+        ['125', 125],
+        ['250', 250],
+        ['500', 500],
+        ['1k', 1000],
+        ['2k', 2000],
+        ['4k', 4000],
+        ['8k', 8000],
+        ['16k', 16000],
+      ]
+      let graphicTail = masterLo
+      const graphicNodes = {}
+      graphicBands.forEach(([key, frequency]) => {
+        const band = ac.createBiquadFilter()
+        band.type = 'peaking'
+        band.frequency.value = frequency
+        band.Q.value = 1.2
+        band.gain.value = ((savedGraphicEq[key] ?? 0.5) - 0.5) * 24
+        graphicTail.connect(band)
+        graphicTail = band
+        graphicNodes[key] = band
+      })
+      masterGraphicEqRef.current = graphicNodes
+
+      const savedOutputGain = Number(localStorage.getItem('mixer_output_gain') || '0.5')
+      const masterOutputGain = ac.createGain()
+      masterOutputGain.gain.value = Math.pow(10, ((savedOutputGain - 0.5) * 24) / 20)
+      masterOutputGainRef.current = masterOutputGain
+      graphicTail.connect(masterOutputGain)
+
       // Master analyser — tap after the master EQ, before destination
       const masterAnalyser = ac.createAnalyser()
       masterAnalyser.fftSize = 256
       masterAnalyser.smoothingTimeConstant = 0.85
       masterAnalyserRef.current = masterAnalyser
-      masterLo.connect(masterAnalyser)
+      masterOutputGain.connect(masterAnalyser)
+
+      const appStreamGain = ac.createGain()
+      const externalStreamGain = ac.createGain()
+      const savedMixerMode = localStorage.getItem('mixerSettingsMode') || 'app'
+      appStreamGain.gain.value = savedMixerMode === 'external' ? 0 : 1
+      externalStreamGain.gain.value = savedMixerMode === 'external' ? 1 : 0
+      appStreamGainRef.current = appStreamGain
+      externalStreamGainRef.current = externalStreamGain
 
       // Phones gain: local headphone/speaker path only — stream is NOT affected
       const phonesGain = ac.createGain()
@@ -211,13 +262,42 @@ export function AudioEngineProvider({ children }) {
       cueBusRef.current = cueBus
       cueBus.connect(phonesGain)
 
-      // Stream path — completely separate, never touched by phones/cue changes
-      masterAnalyser.connect(streamDest)
+      // Stream path — switchable between app mixer and external mixer line-in.
+      masterAnalyser.connect(appStreamGain)
+      appStreamGain.connect(streamDest)
+      externalStreamGain.connect(streamDest)
+
+      // External line out: sends the app mix to a selected hardware output.
+      const lineOutGain = ac.createGain()
+      lineOutGain.gain.value = savedMixerMode === 'external' ? 1 : 0
+      lineOutGainRef.current = lineOutGain
+      masterAnalyser.connect(lineOutGain)
+
+      const lineOutDest = ac.createMediaStreamDestination()
+      lineOutDestRef.current = lineOutDest
+      lineOutGain.connect(lineOutDest)
+
+      const lineOutEl = new Audio()
+      lineOutEl.autoplay = true
+      lineOutEl.playsInline = true
+      lineOutEl.srcObject = lineOutDest.stream
+      lineOutElRef.current = lineOutEl
+      const savedLineOutDevice = localStorage.getItem('externalMixerLineOutDeviceId') || ''
+      if (savedLineOutDevice && typeof lineOutEl.setSinkId === 'function') {
+        lineOutEl.setSinkId(savedLineOutDevice).catch(() => {
+          localStorage.removeItem('externalMixerLineOutDeviceId')
+        })
+      }
+      lineOutEl.play().catch(() => {
+        // User gesture may be required before the browser starts this output.
+      })
 
       // Auto-resume if the OS suspends the context mid-playback
       ac.addEventListener('statechange', () => {
         if (ac.state === 'suspended') {
-          ac.resume().catch(() => {})
+          ac.resume().catch(() => {
+            // The next user gesture will resume the context if the OS keeps it suspended.
+          })
         }
       })
     }
@@ -268,6 +348,82 @@ export function AudioEngineProvider({ children }) {
 
   const getHeadphoneOutputDevice = useCallback(() => (
     localStorage.getItem('headphoneMonitorDeviceId') || ''
+  ), [])
+
+  const setMixerSettingsMode = useCallback((mode = 'app') => {
+    const nextMode = mode === 'external' ? 'external' : 'app'
+    localStorage.setItem('mixerSettingsMode', nextMode)
+    getAC()
+    if (!acRef.current) return
+    const t = acRef.current.currentTime
+    appStreamGainRef.current?.gain.setTargetAtTime(nextMode === 'external' ? 0 : 1, t, 0.03)
+    externalStreamGainRef.current?.gain.setTargetAtTime(nextMode === 'external' ? 1 : 0, t, 0.03)
+    lineOutGainRef.current?.gain.setTargetAtTime(nextMode === 'external' ? 1 : 0, t, 0.03)
+    lineOutElRef.current?.play().catch(() => {
+      // User gesture may be required before the browser starts this output.
+    })
+  }, [getAC])
+
+  const getMixerSettingsMode = useCallback(() => (
+    localStorage.getItem('mixerSettingsMode') || 'app'
+  ), [])
+
+  const connectExternalLineIn = useCallback(async (deviceId = '') => {
+    const ac = getAC()
+    const prev = externalLineInRef.current
+    if (prev) {
+      try { prev.sourceNode.disconnect() } catch {
+        // Source may already be disconnected after a device change.
+      }
+      prev.stream.getTracks().forEach((track) => track.stop())
+      externalLineInRef.current = null
+    }
+
+    if (!deviceId) {
+      localStorage.removeItem('externalMixerLineInDeviceId')
+      localStorage.removeItem('externalMixerLineInDeviceLabel')
+      return { ok: true }
+    }
+
+    try {
+      if (ac.state === 'suspended') await ac.resume()
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          deviceId: { exact: deviceId },
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+      })
+      const sourceNode = ac.createMediaStreamSource(stream)
+      sourceNode.connect(externalStreamGainRef.current)
+      externalLineInRef.current = { stream, sourceNode }
+      localStorage.setItem('externalMixerLineInDeviceId', deviceId)
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, reason: error?.name || 'input-error' }
+    }
+  }, [getAC])
+
+  const setExternalLineOutDevice = useCallback(async (deviceId = '') => {
+    const ac = getAC()
+    const el = lineOutElRef.current
+    if (!el) return { ok: false, reason: 'missing-output' }
+    if (typeof el.setSinkId !== 'function') return { ok: false, reason: 'unsupported' }
+    try {
+      await el.setSinkId(deviceId)
+      if (deviceId) localStorage.setItem('externalMixerLineOutDeviceId', deviceId)
+      else localStorage.removeItem('externalMixerLineOutDeviceId')
+      if (ac.state === 'suspended') await ac.resume()
+      await el.play()
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, reason: error?.name || 'output-error' }
+    }
+  }, [getAC])
+
+  const getExternalLineOutDevice = useCallback(() => (
+    localStorage.getItem('externalMixerLineOutDeviceId') || ''
   ), [])
 
   // ── Auto-resume after sleep / tab-hidden / OS audio power events ─────────
@@ -450,6 +606,21 @@ export function AudioEngineProvider({ children }) {
       case 'lo':  eq.lo.gain.setTargetAtTime(dB,  t, 0.01); break
     }
   }, [])
+
+  const updateMasterGraphicEq = useCallback((band, value) => {
+    getAC()
+    const node = masterGraphicEqRef.current?.[band]
+    if (!node || !acRef.current) return
+    const dB = (Math.max(0, Math.min(1, value)) - 0.5) * 24
+    node.gain.setTargetAtTime(dB, acRef.current.currentTime, 0.02)
+  }, [getAC])
+
+  const updateMasterOutputGain = useCallback((value) => {
+    getAC()
+    if (!masterOutputGainRef.current || !acRef.current) return
+    const dB = (Math.max(0, Math.min(1, value)) - 0.5) * 24
+    masterOutputGainRef.current.gain.setTargetAtTime(Math.pow(10, dB / 20), acRef.current.currentTime, 0.02)
+  }, [getAC])
 
   // ── Headphone / phones output level (local only — stream is never touched) ─
   const updatePhonesVol = useCallback((value) => {
@@ -1148,6 +1319,8 @@ export function AudioEngineProvider({ children }) {
       connectPadAudio,
       registerSchedulerMediaElement,
       updateMasterEq,
+      updateMasterGraphicEq,
+      updateMasterOutputGain,
       updatePhonesVol,
       updateCueVol,
       setCueSend,
@@ -1173,6 +1346,11 @@ export function AudioEngineProvider({ children }) {
       getHeadphoneOutputSupport,
       setHeadphoneOutputDevice,
       getHeadphoneOutputDevice,
+      setMixerSettingsMode,
+      getMixerSettingsMode,
+      connectExternalLineIn,
+      setExternalLineOutDevice,
+      getExternalLineOutDevice,
       djConnected,
       getAnalyser,
       getMasterAnalyser,
