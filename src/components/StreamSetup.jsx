@@ -563,6 +563,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
   const reconnectTimerRef = useRef(null)
   const connectionAttemptRef = useRef(0)
   const manualStopRef = useRef(false)
+  const wakeLockRef = useRef(null)
 
   function setStatusBoth(s) {
     if (broadcastMode === 'hub') {
@@ -590,6 +591,21 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
     if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
     doCleanup()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-acquire the wake lock if the OS released it (e.g. screen locked then
+  // unlocked) while we're still supposed to be broadcasting.
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState !== 'visible') return
+      if (statusRef.current === 'live' && 'wakeLock' in navigator && !wakeLockRef.current) {
+        navigator.wakeLock.request('screen')
+          .then(lock => { wakeLockRef.current = lock })
+          .catch(() => {})
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [])
 
   // Register start/stop handlers into context so NowPlaying's GO LIVE button works.
   // No deps: runs every render so the refs always point to the latest closures.
@@ -650,6 +666,8 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
     wsRef.current = null
     const canvas = canvasRef.current
     if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height)
+    wakeLockRef.current?.release().catch(() => {})
+    wakeLockRef.current = null
   }
 
   function startRecorder(stream, ws) {
@@ -744,6 +762,15 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
           if (msg.status === 'live') {
             setStatusBoth('live')
             addLog('🔴 ' + (msg.msg || 'Live'))
+            // Prevent the OS/browser from suspending this tab while broadcasting —
+            // a suspended tab stops sending audio to the backend, which starves
+            // ffmpeg and drops the Icecast source (even though nothing looks wrong
+            // locally).
+            if ('wakeLock' in navigator && !wakeLockRef.current) {
+              navigator.wakeLock.request('screen')
+                .then(lock => { wakeLockRef.current = lock })
+                .catch(() => {})
+            }
             startRecorder(stream, ws)
             keepaliveRef.current = setInterval(() => {
               if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ action: 'ping' }))
@@ -771,7 +798,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
         addLog(`WebSocket closed (code=${event.code}${event.reason ? ` reason=${event.reason}` : ''})`)
         if (terminalErrorRef.current || manualStopRef.current) return
         if (statusRef.current === 'live' || statusRef.current === 'connecting') {
-          addLog('Connection lost. Reconnecting in 3s...')
+          addLog('Connection lost. Reconnecting in 1.5s...')
           setStatusBoth('reconnecting')
           doCleanup({ closeSocket: false })
           if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
@@ -780,7 +807,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
             if (statusRef.current === 'reconnecting' && connectionAttemptRef.current === attempt) {
               goLive()
             }
-          }, 3000)
+          }, 1500)
         }
       }
     } catch (err) {

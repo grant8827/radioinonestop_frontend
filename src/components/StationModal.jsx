@@ -175,6 +175,7 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
   const listenerSessionRef = useRef(null)
   const heartbeatRef       = useRef(null)
   const autoPlayStartedRef = useRef(false)
+  const wakeLockRef        = useRef(null)
 
   const hlsUrl    = `/hls/${info.slug}/index.m3u8`
   const streamUrl  = `/listen/${info.slug}` // WebM fallback (desktop Chrome/Firefox)
@@ -205,13 +206,38 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
   // (e.g. device woke from sleep, user switches back from another app).
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible' && acRef.current?.state === 'suspended') {
-        acRef.current.resume().catch(() => {})
+      if (document.visibilityState !== 'visible') return
+      if (acRef.current?.state === 'suspended') acRef.current.resume().catch(() => {})
+      // Re-acquire the wake lock too — the OS releases it automatically on
+      // screen-lock/tab-hide even though we're still playing.
+      if (playing && 'wakeLock' in navigator && !wakeLockRef.current) {
+        navigator.wakeLock.request('screen')
+          .then(lock => { wakeLockRef.current = lock })
+          .catch(() => {})
       }
     }
     document.addEventListener('visibilitychange', handleVisibility)
     return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [])
+  }, [playing])
+
+  // Screen Wake Lock — keep the device awake while a station is actually
+  // playing, so the browser doesn't suspend the tab/AudioContext mid-stream.
+  useEffect(() => {
+    if (!playing) {
+      wakeLockRef.current?.release().catch(() => {})
+      wakeLockRef.current = null
+      return
+    }
+    if ('wakeLock' in navigator) {
+      navigator.wakeLock.request('screen')
+        .then(lock => { wakeLockRef.current = lock })
+        .catch(() => {})
+    }
+    return () => {
+      wakeLockRef.current?.release().catch(() => {})
+      wakeLockRef.current = null
+    }
+  }, [playing])
 
   // Volume / mute
   useEffect(() => {

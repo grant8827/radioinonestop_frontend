@@ -14,6 +14,7 @@ export function StreamProvider({ children }) {
   const radioRecorderRef   = useRef(null)
   const radioKeepaliveRef  = useRef(null)
   const radioStatusRef     = useRef('idle')
+  const radioWakeLockRef   = useRef(null)
 
   // ── Icecast encoder shared state (consumed by NowPlaying button) ──────────
   const [broadcastMode, setBroadcastMode] = useState('icecast') // 'hub' | 'icecast'
@@ -39,6 +40,8 @@ export function StreamProvider({ children }) {
     if (radioKeepaliveRef.current) { clearInterval(radioKeepaliveRef.current); radioKeepaliveRef.current = null }
     if (radioRecorderRef.current) { try { radioRecorderRef.current.stop() } catch {} radioRecorderRef.current = null }
     if (radioWsRef.current) { try { radioWsRef.current.close() } catch {} radioWsRef.current = null }
+    radioWakeLockRef.current?.release().catch(() => {})
+    radioWakeLockRef.current = null
   }
 
   const startRadio = useCallback(async () => {
@@ -67,6 +70,14 @@ export function StreamProvider({ children }) {
           const msg = JSON.parse(e.data)
           if (msg.status === 'live') {
             setRadioStatusBoth('live')
+            // Prevent the OS/browser from suspending this tab (and its AudioContext/
+            // MediaRecorder) while broadcasting — a suspended tab stops sending audio
+            // to the backend, which starves ffmpeg and drops the Icecast source.
+            if ('wakeLock' in navigator && !radioWakeLockRef.current) {
+              navigator.wakeLock.request('screen')
+                .then(lock => { radioWakeLockRef.current = lock })
+                .catch(() => {})
+            }
             if (radioRecorderRef.current && radioRecorderRef.current.state !== 'inactive') return
             const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
               ? 'audio/webm;codecs=opus' : 'audio/webm'
@@ -103,7 +114,7 @@ export function StreamProvider({ children }) {
             if (radioStatusRef.current === 'reconnecting') {
               startRadio()
             }
-          }, 3000)
+          }, 1500)
         }
       }
     } catch {
@@ -128,6 +139,21 @@ export function StreamProvider({ children }) {
 
   // Cleanup on unmount
   useEffect(() => () => { radioCleanup() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-acquire the wake lock if it was released by the OS (e.g. screen locked then
+  // unlocked) while still broadcasting.
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState !== 'visible') return
+      if (radioStatusRef.current === 'live' && 'wakeLock' in navigator && !radioWakeLockRef.current) {
+        navigator.wakeLock.request('screen')
+          .then(lock => { radioWakeLockRef.current = lock })
+          .catch(() => {})
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [])
 
   // Warn before page close/refresh when a stream is live, and save state for auto-reconnect
   useEffect(() => {
