@@ -508,7 +508,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
   const [cfg, setCfg] = useState(() => {
     try {
       const saved = localStorage.getItem('icecast_encoder_cfg')
-      if (saved) return { host: defaultHost, port: '8000', mount: defaultMount, username: 'source', password: '', codec: 'mp3', bitrate: '192k', ...JSON.parse(saved) }
+      if (saved) return { host: defaultHost, port: '8000', mount: defaultMount, username: 'source', password: '', bitrate: '192k', ...JSON.parse(saved), codec: 'mp3' }
     } catch {}
     return { host: defaultHost, port: '8000', mount: defaultMount, username: 'source', password: '', codec: 'mp3', bitrate: '192k' }
   })
@@ -798,7 +798,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
         addLog(`WebSocket closed (code=${event.code}${event.reason ? ` reason=${event.reason}` : ''})`)
         if (terminalErrorRef.current || manualStopRef.current) return
         if (statusRef.current === 'live' || statusRef.current === 'connecting') {
-          addLog('Connection lost. Reconnecting in 1.5s...')
+          addLog('Connection lost. Reconnecting...')
           setStatusBoth('reconnecting')
           doCleanup({ closeSocket: false })
           if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current)
@@ -807,7 +807,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
             if (statusRef.current === 'reconnecting' && connectionAttemptRef.current === attempt) {
               goLive()
             }
-          }, 1500)
+          }, 250)
         }
       }
     } catch (err) {
@@ -911,8 +911,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
             <select value={cfg.codec} disabled={!canStart}
               onChange={e => setCfg(p => ({ ...p, codec: e.target.value }))}
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none disabled:opacity-50">
-              <option value="mp3">MP3 (libmp3lame)</option>
-              <option value="aac">AAC</option>
+              <option value="mp3">MP3 (drop-protected)</option>
             </select>
           </div>
           <div>

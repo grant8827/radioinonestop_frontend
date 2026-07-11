@@ -114,7 +114,7 @@ export function StreamProvider({ children }) {
             if (radioStatusRef.current === 'reconnecting') {
               startRadio()
             }
-          }, 1500)
+          }, 250)
         }
       }
     } catch {
