@@ -36,6 +36,9 @@ export function AudioEngineProvider({ children }) {
 
   // Master output AnalyserNode
   const masterAnalyserRef = useRef(null)
+  // Final encoder-bus analyser. Unlike masterAnalyser, this also receives the
+  // external mixer line-in when External Mixer mode is selected.
+  const streamAnalyserRef = useRef(null)
   const appStreamGainRef = useRef(null)
   const externalStreamGainRef = useRef(null)
 
@@ -323,9 +326,16 @@ export function AudioEngineProvider({ children }) {
       })
 
       // Stream path — switchable between app mixer and external mixer line-in.
+      // Analyse after the selector so broadcast meters show the audio that is
+      // actually reaching MediaRecorder in either mixer mode.
+      const streamAnalyser = ac.createAnalyser()
+      streamAnalyser.fftSize = 256
+      streamAnalyser.smoothingTimeConstant = 0.85
+      streamAnalyserRef.current = streamAnalyser
       masterAnalyser.connect(appStreamGain)
-      appStreamGain.connect(streamDest)
-      externalStreamGain.connect(streamDest)
+      appStreamGain.connect(streamAnalyser)
+      externalStreamGain.connect(streamAnalyser)
+      streamAnalyser.connect(streamDest)
 
       // Auto-resume if the OS suspends the context mid-playback
       ac.addEventListener('statechange', () => {
@@ -1134,6 +1144,11 @@ export function AudioEngineProvider({ children }) {
     return masterAnalyserRef.current
   }, [])
 
+  const getStreamAnalyser = useCallback(() => {
+    getAC()
+    return streamAnalyserRef.current
+  }, [getAC])
+
   const getDeckAnalyser = useCallback((key) => {
     return deckAnalysers.current[key] ?? null
   }, [])
@@ -1417,6 +1432,7 @@ export function AudioEngineProvider({ children }) {
       djConnected,
       getAnalyser,
       getMasterAnalyser,
+      getStreamAnalyser,
       getDeckAnalyser,
       getSchedulerAnalyser,
       updateSchedulerVolume,

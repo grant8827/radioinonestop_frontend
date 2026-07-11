@@ -496,7 +496,7 @@ function BrowserStreamer({ audioKey }) {
 
 function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl = '', isSuspended = false }) {
   const { token } = useAuth()
-  const { getStreamTrack, getMasterAnalyser, resume } = useAudioEngine()
+  const { getStreamTrack, getStreamAnalyser, resume } = useAudioEngine()
   const { radioStatus, startRadio, stopRadio,
           broadcastMode, setBroadcastMode,
           setIcecastStatus, icecastStartRef, icecastStopRef } = useStream()
@@ -620,8 +620,8 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
     if (broadcastMode !== 'hub') return
     statusRef.current = radioStatus
     if (radioStatus === 'live') {
-      const masterAnalyser = getMasterAnalyser()
-      if (masterAnalyser) { analyserRef.current = masterAnalyser; drawSpectrum() }
+      const streamAnalyser = getStreamAnalyser()
+      if (streamAnalyser) { analyserRef.current = streamAnalyser; drawSpectrum() }
       addLog('🔴 Hub broadcast active')
     } else if (radioStatus === 'idle' || radioStatus === 'stopped') {
       if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
@@ -717,10 +717,11 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
       streamRef.current = stream
       addLog('Mixer main output ready ✓')
 
-      // Reuse the shared master analyser for the spectrum visualizer
-      const masterAnalyser = getMasterAnalyser()
-      if (masterAnalyser) {
-        analyserRef.current = masterAnalyser
+      // Read the final encoder bus so the visualizer follows either the app
+      // mixer or the external mixer line-in, whichever is being broadcast.
+      const streamAnalyser = getStreamAnalyser()
+      if (streamAnalyser) {
+        analyserRef.current = streamAnalyser
         drawSpectrum()
       }
 
