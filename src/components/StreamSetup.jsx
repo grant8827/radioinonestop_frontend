@@ -137,10 +137,14 @@ function StreamSettingsTab({ audioKey, liveStreams, viewers, creds }) {
   const icecastListenPath = creds?.icecast_listen_url || (creds?.stream_key ? `/icecast/${creds.stream_key}` : '')
   const hubListenUrl = hubListenPath ? new URL(hubListenPath, window.location.origin).toString() : ''
   const radioBossListenUrl = icecastListenPath
-    ? new URL(icecastListenPath, 'https://radioinonestop.com').toString()
+    ? new URL(icecastListenPath, window.location.origin).toString()
     : ''
   const [encoderSettings, setEncoderSettings] = useState({
+    host: '',
+    port: '8000',
     mount: `/${audioKey}`,
+    username: 'source',
+    password: '',
     codec: 'mp3',
     bitrate: '192k',
   })
@@ -150,12 +154,16 @@ function StreamSettingsTab({ audioKey, liveStreams, viewers, creds }) {
       try {
         const saved = JSON.parse(localStorage.getItem('icecast_encoder_cfg') || '{}')
         setEncoderSettings({
+          host: saved.host || '',
+          port: saved.port || '8000',
           mount: saved.mount || `/${audioKey}`,
+          username: saved.username || 'source',
+          password: saved.password || '',
           codec: saved.codec || 'mp3',
           bitrate: saved.bitrate || '192k',
         })
       } catch {
-        setEncoderSettings({ mount: `/${audioKey}`, codec: 'mp3', bitrate: '192k' })
+        setEncoderSettings({ host: '', port: '8000', mount: `/${audioKey}`, username: 'source', password: '', codec: 'mp3', bitrate: '192k' })
       }
     }
     loadEncoderSettings()
@@ -211,16 +219,32 @@ function StreamSettingsTab({ audioKey, liveStreams, viewers, creds }) {
         <div className="px-5 py-4 space-y-4">
           {creds && (
             <>
-              {hubListenUrl && <Field label="Station Hub — browser broadcast" value={hubListenUrl} />}
               {radioBossListenUrl && (
-                <Field label="RadioBOSS / External Player URL" value={radioBossListenUrl} />
+                <div className="rounded-lg border border-green-700/50 bg-green-950/20 p-4">
+                  <div className="mb-3 flex items-center gap-2">
+                    <span className="rounded bg-green-600/20 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-green-400">
+                      Recommended
+                    </span>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-green-300">
+                      RadioBOSS pull URL (MP3 / Icecast)
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-lg border border-green-800/60 bg-gray-950 px-3 py-2">
+                    <code className="flex-1 truncate font-mono text-sm text-green-400 select-all">{radioBossListenUrl}</code>
+                    <CopyButton text={radioBossListenUrl} />
+                  </div>
+                  <p className="mt-2 text-xs text-gray-400">
+                    Copy this URL into RadioBOSS as an internet stream. Do not use the Station Hub URL in RadioBOSS.
+                  </p>
+                </div>
               )}
+              {hubListenUrl && <Field label="Browser player only — do not use in RadioBOSS" value={hubListenUrl} />}
               {hubListenPath && <LiveListenerPlayer listenPath={hubListenPath} />}
             </>
           )}
           <div className="bg-gray-800/40 border border-gray-700/50 rounded-lg px-4 py-3 text-sm text-gray-400">
-            Add the RadioBOSS URL to a playlist as an internet stream. It becomes playable after the Icecast
-            encoder is live. Use the Station Hub link only for Hub-mode browser listening.
+            The RadioBOSS URL becomes playable after the Icecast encoder is live. The Station Hub link uses WebM
+            and is intended only for Hub-mode browser listening.
           </div>
         </div>
       </div>
@@ -231,7 +255,11 @@ function StreamSettingsTab({ audioKey, liveStreams, viewers, creds }) {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 px-5 py-4">
           <Field label="Broadcast Mode" value={broadcastMode === 'icecast' ? 'Icecast' : 'Station Hub'} />
-          <Field label="Mount Point" value={encoderSettings.mount} />
+          <Field label="Host" value={creds?.icecast_host || encoderSettings.host || '146.190.75.221'} />
+          <Field label="Port" value={creds?.icecast_port || encoderSettings.port || '8000'} />
+          <Field label="Mount Point" value={`/${creds?.stream_key || audioKey}`} />
+          <Field label="Username" value={creds?.icecast_username || encoderSettings.username || 'source'} />
+          <Field label="Source Password" value={creds?.source_password || encoderSettings.password || 'Not available'} />
           <Field label="Output Codec" value={encoderSettings.codec.toUpperCase()} />
           <Field label="Bitrate" value={encoderSettings.bitrate.replace(/k$/i, ' kbps')} />
           <Field label="Sample Rate" value="44.1 kHz" />
