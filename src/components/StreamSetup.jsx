@@ -134,10 +134,14 @@ function StreamSettingsTab({ audioKey, liveStreams, viewers, creds }) {
   const anyLive = liveStreams.some(s => s.live)
   const otherStreams = liveStreams.filter(s => s.key !== audioKey)
   const hubListenPath = creds?.hub_listen_url || creds?.listen_url || ''
-  const icecastListenPath = creds?.icecast_listen_url || (creds?.stream_key ? `/icecast/${creds.stream_key}` : '')
   const hubListenUrl = hubListenPath ? new URL(hubListenPath, window.location.origin).toString() : ''
-  const radioBossListenUrl = icecastListenPath
-    ? new URL(icecastListenPath, window.location.origin).toString()
+  const icecastHost = creds?.icecast_host || '146.190.75.221'
+  const icecastPort = creds?.icecast_port || '8000'
+  const icecastMount = creds?.stream_key || audioKey
+  // RadioBOSS must pull directly from DigitalOcean so its connection does not
+  // pass through Railway's 15-minute HTTP request limit.
+  const radioBossListenUrl = icecastMount
+    ? `http://${icecastHost}:${icecastPort}/${icecastMount}`
     : ''
   const [encoderSettings, setEncoderSettings] = useState({
     host: '',
