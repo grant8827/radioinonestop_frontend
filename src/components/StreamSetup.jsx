@@ -15,6 +15,17 @@ const MAX_CHANNELS = {
   ultimate: 6,      // Up to 6 channels
 }
 
+const PLAN_AUDIO_BITRATES = {
+  starter: ['96k'],
+  professional: ['96k', '128k'],
+  enterprise: ['96k', '128k', '192k'],
+  ultimate: ['96k', '128k', '192k', '320k'],
+}
+
+function audioBitratesForPlan(plan) {
+  return PLAN_AUDIO_BITRATES[plan] || PLAN_AUDIO_BITRATES.starter
+}
+
 /* ─── Shared helpers ──────────────────────────────────────────── */
 
 function CopyButton({ text }) {
@@ -129,7 +140,10 @@ function DashboardCard({ label, colorClass, iconPath, stream, viewers }) {
 /* ─── Tab content ─────────────────────────────────────────────── */
 
 function StreamSettingsTab({ audioKey, liveStreams, viewers, creds }) {
+  const { user } = useAuth()
   const { broadcastMode } = useStream()
+  const allowedBitrates = audioBitratesForPlan(user?.plan)
+  const defaultBitrate = allowedBitrates[allowedBitrates.length - 1]
   const audioStream = liveStreams.find(s => s.key === audioKey)
   const anyLive = liveStreams.some(s => s.live)
   const otherStreams = liveStreams.filter(s => s.key !== audioKey)
@@ -150,7 +164,7 @@ function StreamSettingsTab({ audioKey, liveStreams, viewers, creds }) {
     username: 'source',
     password: '',
     codec: 'mp3',
-    bitrate: '192k',
+    bitrate: defaultBitrate,
   })
 
   useEffect(() => {
@@ -164,16 +178,16 @@ function StreamSettingsTab({ audioKey, liveStreams, viewers, creds }) {
           username: saved.username || 'source',
           password: saved.password || '',
           codec: saved.codec || 'mp3',
-          bitrate: saved.bitrate || '192k',
+          bitrate: allowedBitrates.includes(saved.bitrate) ? saved.bitrate : defaultBitrate,
         })
       } catch {
-        setEncoderSettings({ host: '', port: '8000', mount: `/${audioKey}`, username: 'source', password: '', codec: 'mp3', bitrate: '192k' })
+        setEncoderSettings({ host: '', port: '8000', mount: `/${audioKey}`, username: 'source', password: '', codec: 'mp3', bitrate: defaultBitrate })
       }
     }
     loadEncoderSettings()
     window.addEventListener('radio-encoder-config-saved', loadEncoderSettings)
     return () => window.removeEventListener('radio-encoder-config-saved', loadEncoderSettings)
-  }, [audioKey])
+  }, [audioKey, defaultBitrate])
 
   return (
     <div className="space-y-6">
@@ -527,7 +541,9 @@ function BrowserStreamer({ audioKey }) {
 /* ─── Icecast / Shoutcast browser encoder ────────────────────── */
 
 function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl = '', isSuspended = false }) {
-  const { token } = useAuth()
+  const { token, user } = useAuth()
+  const allowedBitrates = audioBitratesForPlan(user?.plan)
+  const defaultBitrate = allowedBitrates[allowedBitrates.length - 1]
   const { getStreamTrack, getStreamAnalyser, resume } = useAudioEngine()
   const { radioStatus, startRadio, stopRadio,
           broadcastMode, setBroadcastMode,
@@ -540,10 +556,28 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
   const [cfg, setCfg] = useState(() => {
     try {
       const saved = localStorage.getItem('icecast_encoder_cfg')
-      if (saved) return { host: defaultHost, port: '8000', mount: defaultMount, username: 'source', password: '', bitrate: '192k', ...JSON.parse(saved), codec: 'mp3' }
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        return {
+          host: defaultHost,
+          port: '8000',
+          mount: defaultMount,
+          username: 'source',
+          password: '',
+          ...parsed,
+          codec: 'mp3',
+          bitrate: allowedBitrates.includes(parsed.bitrate) ? parsed.bitrate : defaultBitrate,
+        }
+      }
     } catch {}
-    return { host: defaultHost, port: '8000', mount: defaultMount, username: 'source', password: '', codec: 'mp3', bitrate: '192k' }
+    return { host: defaultHost, port: '8000', mount: defaultMount, username: 'source', password: '', codec: 'mp3', bitrate: defaultBitrate }
   })
+
+  useEffect(() => {
+    setCfg(current => allowedBitrates.includes(current.bitrate)
+      ? current
+      : { ...current, bitrate: defaultBitrate })
+  }, [defaultBitrate, user?.plan])
 
   const [cfgSaved, setCfgSaved] = useState(false)
   function saveConfig() {
@@ -952,11 +986,11 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
             <select value={cfg.bitrate} disabled={!canStart}
               onChange={e => setCfg(p => ({ ...p, bitrate: e.target.value }))}
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none disabled:opacity-50">
-              <option value="96k">96 kbps</option>
-              <option value="128k">128 kbps</option>
-              <option value="192k">192 kbps</option>
-              <option value="320k">320 kbps</option>
+              {allowedBitrates.map(bitrate => (
+                <option key={bitrate} value={bitrate}>{bitrate.replace('k', ' kbps')}</option>
+              ))}
             </select>
+            <p className="mt-1 text-[10px] text-gray-500 capitalize">{user?.plan || 'starter'} package bitrate</p>
           </div>
           <div className="col-span-2">
             <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Audio Source</label>

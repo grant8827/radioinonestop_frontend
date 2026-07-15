@@ -14,6 +14,7 @@ const DEFAULT_PLANS = [
     yearlyPrice: 290,
     features: [
       'Radio DJ & Mixer',
+      '96 kbps audio streaming',
       'Custom stream URL',
       'Embeddable player widget',
       'Listeners analytics',
@@ -31,6 +32,7 @@ const DEFAULT_PLANS = [
     yearlyPrice: 390,
     features: [
       'Everything in Starter',
+      '96 or 128 kbps audio streaming',
       'Track Scheduler',
       'Conference rooms (up to 2 guests)',
       'Priority audio processing',
@@ -48,7 +50,7 @@ const DEFAULT_PLANS = [
     features: [
       'Everything in Professional',
       'Conference rooms (up to 5 guests)',
-      'Higher bitrate radio streaming',
+      '96, 128 or 192 kbps audio streaming',
       'Advanced listener reporting',
       'Priority station support',
       'Up to 2,000 concurrent listeners',
@@ -64,6 +66,7 @@ const DEFAULT_PLANS = [
     yearlyPrice: 990,
     features: [
       'Everything in Enterprise',
+      '96, 128, 192 or 320 kbps audio streaming',
       'Conference rooms (up to 20 guests)',
       'Premium radio automation',
       'Advanced analytics dashboard',
