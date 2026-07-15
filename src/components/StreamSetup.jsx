@@ -138,11 +138,14 @@ function StreamSettingsTab({ audioKey, liveStreams, viewers, creds }) {
   const icecastHost = creds?.icecast_host || '146.190.75.221'
   const icecastPort = creds?.icecast_port || '8000'
   const icecastMount = creds?.stream_key || audioKey
+  const publicIcecastUrl = /^https?:\/\//i.test(creds?.icecast_listen_url || '')
+    ? creds.icecast_listen_url
+    : ''
   // RadioBOSS must pull directly from DigitalOcean so its connection does not
   // pass through Railway's 15-minute HTTP request limit.
-  const radioBossListenUrl = icecastMount
+  const radioBossListenUrl = publicIcecastUrl || (icecastMount
     ? `http://${icecastHost}:${icecastPort}/${icecastMount}`
-    : ''
+    : '')
   const [encoderSettings, setEncoderSettings] = useState({
     host: '',
     port: '8000',
