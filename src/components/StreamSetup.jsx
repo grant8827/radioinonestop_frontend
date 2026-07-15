@@ -135,17 +135,14 @@ function StreamSettingsTab({ audioKey, liveStreams, viewers, creds }) {
   const otherStreams = liveStreams.filter(s => s.key !== audioKey)
   const hubListenPath = creds?.hub_listen_url || creds?.listen_url || ''
   const hubListenUrl = hubListenPath ? new URL(hubListenPath, window.location.origin).toString() : ''
-  const icecastHost = creds?.icecast_host || '146.190.75.221'
+  const icecastHost = 'stream.radioinonestop.com'
   const icecastPort = creds?.icecast_port || '8000'
   const icecastMount = creds?.stream_key || audioKey
-  const publicIcecastUrl = /^https?:\/\//i.test(creds?.icecast_listen_url || '')
-    ? creds.icecast_listen_url
-    : ''
   // RadioBOSS must pull directly from DigitalOcean so its connection does not
   // pass through Railway's 15-minute HTTP request limit.
-  const radioBossListenUrl = publicIcecastUrl || (icecastMount
-    ? `http://${icecastHost}:${icecastPort}/${icecastMount}`
-    : '')
+  const radioBossListenUrl = icecastMount
+    ? `https://${icecastHost}/${icecastMount}`
+    : ''
   const [encoderSettings, setEncoderSettings] = useState({
     host: '',
     port: '8000',
@@ -262,8 +259,8 @@ function StreamSettingsTab({ audioKey, liveStreams, viewers, creds }) {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 px-5 py-4">
           <Field label="Broadcast Mode" value={broadcastMode === 'icecast' ? 'Icecast' : 'Station Hub'} />
-          <Field label="Host" value={creds?.icecast_host || encoderSettings.host || '146.190.75.221'} />
-          <Field label="Port" value={creds?.icecast_port || encoderSettings.port || '8000'} />
+          <Field label="Host" value={icecastHost} />
+          <Field label="Port" value={icecastPort} />
           <Field label="Mount Point" value={`/${creds?.stream_key || audioKey}`} />
           <Field label="Username" value={creds?.icecast_username || encoderSettings.username || 'source'} />
           <Field label="Source Password" value={creds?.source_password || encoderSettings.password || 'Not available'} />
