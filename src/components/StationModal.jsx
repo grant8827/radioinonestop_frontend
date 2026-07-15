@@ -1,14 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import Hls from 'hls.js'
 
-const ICECAST_PUBLIC_BASE = (import.meta.env.VITE_ICECAST_PUBLIC_URL || 'https://stream.radioinonestop.com').replace(/\/$/, '')
-
 function publicIcecastListenUrl(value) {
   if (!value) return ''
   try {
-    const url = new URL(value, window.location.origin)
-    const mountPath = url.pathname.replace(/^\/icecast\//, '/')
-    return `${ICECAST_PUBLIC_BASE}${mountPath}${url.search}`
+    return new URL(value, window.location.origin).toString()
   } catch {
     return ''
   }
