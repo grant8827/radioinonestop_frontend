@@ -1,6 +1,19 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import Hls from 'hls.js'
 
+const ICECAST_PUBLIC_BASE = (import.meta.env.VITE_ICECAST_PUBLIC_URL || 'https://stream.radioinonestop.com').replace(/\/$/, '')
+
+function publicIcecastListenUrl(value) {
+  if (!value) return ''
+  try {
+    const url = new URL(value, window.location.origin)
+    const mountPath = url.pathname.replace(/^\/icecast\//, '/')
+    return `${ICECAST_PUBLIC_BASE}${mountPath}${url.search}`
+  } catch {
+    return ''
+  }
+}
+
 // ─── Canvas Visualizer ────────────────────────────────────────────────────────
 function CanvasVisualizer({ analyser, isPlaying, isLive }) {
   const canvasRef = useRef(null)
@@ -370,7 +383,8 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
       } catch { /* MediaSession unavailable */ }
     }
 
-    const hasIcecastStream = !!info.icecast_listen_url
+    const icecastListenUrl = publicIcecastListenUrl(info.icecast_listen_url)
+    const hasIcecastStream = !!icecastListenUrl
     const markPlaying = () => { setPlaying(true); setConnecting(false) }
     const fail = (message = 'Stream is not ready yet') => {
       setPlaying(false); setConnecting(false); setPlayError(message)
@@ -437,7 +451,7 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
 
     if (hasIcecastStream) {
       // Icecast path: station is streaming via external encoder — play directly, no HLS needed.
-      playDirect(info.icecast_listen_url, 8000)
+      playDirect(icecastListenUrl, 8000)
         .catch((err) => {
           if (err?.name === 'NotAllowedError') {
             fail('Tap Listen Live to start audio')
