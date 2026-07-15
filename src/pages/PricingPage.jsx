@@ -81,7 +81,8 @@ const DEFAULT_PLANS = [
 
 export default function PricingPage() {
   const navigate = useNavigate()
-  const { isAuthenticated, logout } = useAuth()
+  const { isAuthenticated, logout, user } = useAuth()
+  const currentPlan = (user?.plan || '').toLowerCase()
   const [billingCycle, setBillingCycle] = useState('monthly') // 'monthly' or 'yearly'
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
@@ -257,17 +258,27 @@ export default function PricingPage() {
           {plans.map((plan) => {
             const pricing = getDisplayPrice(plan)
             const isHighlighted = plan.isFeatured
+            const isCurrentPlan = isAuthenticated && plan.id.toLowerCase() === currentPlan
 
             return (
               <div
                 key={plan.id}
                 className={`relative rounded-2xl border ${
-                  isHighlighted
+                  isCurrentPlan
+                    ? 'border-green-500/70 bg-green-900/10 shadow-xl shadow-green-900/20 ring-1 ring-green-500/30'
+                    : isHighlighted
                     ? 'border-red-500/60 bg-red-900/10 shadow-xl shadow-red-900/20'
                     : 'border-white/10 bg-white/3'
                 } p-8 transition-all hover:border-amber-500/40 hover:shadow-lg`}
               >
-                {isHighlighted && (
+                {isCurrentPlan ? (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="inline-flex items-center gap-1.5 bg-green-600 text-white text-xs font-bold uppercase tracking-wider px-4 py-1 rounded-full whitespace-nowrap">
+                      <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                      Current Plan
+                    </span>
+                  </div>
+                ) : isHighlighted && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                     <span className="inline-block rio-logo-gradient text-white text-xs font-bold uppercase tracking-wider px-4 py-1 rounded-full">
                       Most Popular
@@ -307,14 +318,17 @@ export default function PricingPage() {
                 </div>
 
                 <button
-                  onClick={() => selectPlan(plan.id)}
+                  onClick={() => !isCurrentPlan && selectPlan(plan.id)}
+                  disabled={isCurrentPlan}
                   className={`w-full py-3 rounded-xl font-semibold text-sm transition-all mb-6 ${
-                    isHighlighted
+                    isCurrentPlan
+                      ? 'bg-green-600/20 text-green-300 border border-green-500/40 cursor-default'
+                      : isHighlighted
                       ? 'rio-logo-gradient text-white shadow-lg shadow-red-900/40'
                       : 'bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-white/20'
                   }`}
                 >
-                  Select {plan.name}
+                  {isCurrentPlan ? `✓ ${plan.name} — Active` : `Select ${plan.name}`}
                 </button>
 
                 <div className="space-y-3">
