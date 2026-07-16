@@ -316,6 +316,16 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
   const play = useCallback(async () => {
     const audio = audioRef.current
     if (!audio) return
+    const icecastListenUrl = publicIcecastListenUrl(info.icecast_listen_url)
+    const hasIcecastStream = !!icecastListenUrl
+    const isCrossOriginIcecast = hasIcecastStream && new URL(icecastListenUrl).origin !== window.location.origin
+
+    // A cross-origin <audio crossorigin="anonymous"> request requires the
+    // stream server to send CORS headers. Icecast does not, but native media
+    // playback itself does not need CORS, so omit the attribute for that path.
+    if (isCrossOriginIcecast) audio.removeAttribute('crossorigin')
+    else audio.crossOrigin = 'anonymous'
+
     setConnecting(true)
     setPlayError('')
     hlsRef.current?.destroy()
@@ -328,7 +338,7 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
     // the background (exactly like Spotify/Apple Music). The idle sine animation shows
     // instead of the live waveform, which is the correct trade-off.
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
-    if (!acRef.current && !isIOS) {
+    if (!acRef.current && !isIOS && !isCrossOriginIcecast) {
       try {
         const ac           = new (window.AudioContext || window.webkitAudioContext)()
         const analyserNode = ac.createAnalyser()
@@ -379,8 +389,6 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
       } catch { /* MediaSession unavailable */ }
     }
 
-    const icecastListenUrl = publicIcecastListenUrl(info.icecast_listen_url)
-    const hasIcecastStream = !!icecastListenUrl
     const markPlaying = () => { setPlaying(true); setConnecting(false) }
     const fail = (message = 'Stream is not ready yet') => {
       setPlaying(false); setConnecting(false); setPlayError(message)
@@ -746,7 +754,7 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
 
       {/* Hidden audio element — playsInline keeps iOS from hijacking to fullscreen,
           x-webkit-airplay enables AirPlay on iOS Safari */}
-      <audio ref={audioRef} crossOrigin="anonymous" preload="none" playsInline x-webkit-airplay="allow" />
+      <audio ref={audioRef} preload="none" playsInline x-webkit-airplay="allow" />
     </>
   )
 }
