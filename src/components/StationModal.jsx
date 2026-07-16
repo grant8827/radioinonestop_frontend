@@ -446,18 +446,17 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
     }
 
     if (hasIcecastStream) {
-      // Icecast path: station is streaming via external encoder — play directly, no HLS needed.
+      // Icecast stations do not produce an HLS manifest or a browser-hub WebM
+      // stream. Report a direct-stream failure instead of issuing guaranteed
+      // 404 requests and making the listener wait through HLS retries.
       playDirect(icecastListenUrl, 8000)
         .catch((err) => {
           if (err?.name === 'NotAllowedError') {
             fail('Tap Listen Live to start audio')
             return
           }
-          // Icecast failed — fall back to HLS (browser broadcaster) then WebM
-          return playHlsWithRetry()
+          fail('Live stream is temporarily unavailable')
         })
-        .catch(() => playDirect(streamUrl, 8000))
-        .catch(() => fail('Stream is not ready yet'))
     } else {
       // Browser broadcaster path: try HLS first, then WebM fallback.
       playHlsWithRetry()
