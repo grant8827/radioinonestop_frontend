@@ -238,12 +238,39 @@ export default function SettingsPage() {
   }, [outputGain, updateMasterOutputGain])
 
   useEffect(() => {
-    if (mixerMode !== 'external' || !lineInDeviceId || connectedLineInRef.current === lineInDeviceId) return
-    connectedLineInRef.current = lineInDeviceId
-    connectExternalLineIn?.(lineInDeviceId).then((result) => {
-      if (result && !result.ok) setMixerError('Could not reconnect the saved line-in source. Check browser permissions and device availability.')
+    if (mixerMode !== 'external' || !lineInDeviceId || mixerInputDevices.length === 0) return
+
+    const savedLabel = localStorage.getItem('externalMixerLineInDeviceLabel') || ''
+    const savedDevice = mixerInputDevices.find((device) => device.deviceId === lineInDeviceId)
+      || (savedLabel ? mixerInputDevices.find((device) => device.label === savedLabel) : null)
+
+    // Browsers can assign a new device ID after permissions or browser data
+    // change. Recover the same physical input by its saved label when possible.
+    if (!savedDevice) {
+      connectedLineInRef.current = ''
+      return
+    }
+
+    const deviceId = savedDevice.deviceId
+    if (deviceId !== lineInDeviceId) {
+      localStorage.setItem('externalMixerLineInDeviceId', deviceId)
+      queueMicrotask(() => setLineInDeviceId(deviceId))
+      return
+    }
+    if (connectedLineInRef.current === deviceId) return
+
+    connectedLineInRef.current = deviceId
+    connectExternalLineIn?.(deviceId).then((result) => {
+      if (result?.ok) {
+        setMixerError('')
+        return
+      }
+      // Do not leave a failed startup attempt marked as connected. A later
+      // devicechange event or user interaction can now retry it.
+      connectedLineInRef.current = ''
+      setMixerError('Could not reconnect the saved line-in source. Allow microphone access or click the page, then try again.')
     })
-  }, [mixerMode, lineInDeviceId, connectExternalLineIn])
+  }, [mixerMode, lineInDeviceId, mixerInputDevices, connectExternalLineIn])
 
   const pickFolder = async () => {
     try {
@@ -347,6 +374,7 @@ export default function SettingsPage() {
     if (selected?.label) localStorage.setItem('externalMixerLineInDeviceLabel', selected.label)
     const result = await connectExternalLineIn?.(deviceId)
     if (!result?.ok) {
+      connectedLineInRef.current = ''
       setMixerError('Could not connect the selected line-in source. Check browser permissions and device availability.')
       setLineInDeviceId(localStorage.getItem('externalMixerLineInDeviceId') || '')
     }
