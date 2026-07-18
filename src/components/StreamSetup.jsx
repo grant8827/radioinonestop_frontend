@@ -15,6 +15,8 @@ const MAX_CHANNELS = {
   ultimate: 6,      // Up to 6 channels
 }
 
+const ENCODER_WS_URL = import.meta.env.VITE_ENCODER_WS_URL || 'wss://stream.radioinonestop.com/ws/encode'
+
 const PLAN_AUDIO_BITRATES = {
   starter: ['96k'],
   professional: ['96k', '128k'],
@@ -795,7 +797,9 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
       addLog('Opening WebSocket connection…')
 
       const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      const ws = new WebSocket(`${proto}//${window.location.host}/ws/encode?token=${encodeURIComponent(token)}`)
+      const mainServerWsUrl = `${proto}//${window.location.host}/ws/encode`
+      const wsBaseUrl = broadcastMode === 'icecast' ? ENCODER_WS_URL : mainServerWsUrl
+      const ws = new WebSocket(`${wsBaseUrl}?token=${encodeURIComponent(token)}`)
       wsRef.current = ws
       ws.binaryType = 'arraybuffer'
 
@@ -874,7 +878,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
             if (statusRef.current === 'reconnecting' && connectionAttemptRef.current === attempt) {
               goLive()
             }
-          }, 250)
+          }, 1500)
         }
       }
     } catch (err) {
