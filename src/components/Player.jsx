@@ -1126,12 +1126,12 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
       if (!isFinite(media.duration) || media.duration === 0) return
       setProgressA(media.currentTime / media.duration)
 
-      // Start transition 5 s before end so next track begins seamlessly
+      // Start transition 8 s before end so the next track has time to load.
       const remaining = media.duration - media.currentTime
       if (
         autoDJRef.current &&
         media.duration > 10 &&
-        remaining <= 5 &&
+        remaining <= 8 &&
         remaining > 0 &&
         earlyTransitionRef.current !== 'A'
       ) {
@@ -1182,12 +1182,12 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
             }
           }
 
-          // Sweep crossfader toward B (1.0) over 3 s
+          // Sweep crossfader toward B (1.0) over 4 s
           const x0 = crossfaderRef.current
           if (sweepRAFRef.current) cancelAnimationFrame(sweepRAFRef.current)
           const t0 = performance.now()
           const sweep = (now) => {
-            const p = Math.min(1, (now - t0) / 3000)
+            const p = Math.min(1, (now - t0) / 4000)
             const v = x0 + (1 - x0) * p
             crossfaderRef.current = v; setCrossfader(v)
             if (p < 1) {
@@ -1234,12 +1234,12 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
       if (!isFinite(media.duration) || media.duration === 0) return
       setProgressB(media.currentTime / media.duration)
 
-      // Start transition 5 s before end so next track begins seamlessly
+      // Start transition 8 s before end so the next track has time to load.
       const remaining = media.duration - media.currentTime
       if (
         autoDJRef.current &&
         media.duration > 10 &&
-        remaining <= 5 &&
+        remaining <= 8 &&
         remaining > 0 &&
         earlyTransitionRef.current !== 'B'
       ) {
@@ -1290,12 +1290,12 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
             }
           }
 
-          // Sweep crossfader toward A (0.0) over 3 s
+          // Sweep crossfader toward A (0.0) over 4 s
           const x0 = crossfaderRef.current
           if (sweepRAFRef.current) cancelAnimationFrame(sweepRAFRef.current)
           const t0 = performance.now()
           const sweep = (now) => {
-            const p = Math.min(1, (now - t0) / 3000)
+            const p = Math.min(1, (now - t0) / 4000)
             const v = x0 * (1 - p)
             crossfaderRef.current = v; setCrossfader(v)
             if (p < 1) {
