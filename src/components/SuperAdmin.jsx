@@ -18,6 +18,12 @@ export default function SuperAdmin() {
       {/* Tab Navigation */}
       <div className="flex gap-2 border-b border-gray-800 pb-4">
         <TabButton
+          active={activeTab === 'messages'}
+          onClick={() => setActiveTab('messages')}
+          icon={<MessagesIcon />}
+          label="Messages"
+        />
+        <TabButton
           active={activeTab === 'users'}
           onClick={() => setActiveTab('users')}
           icon={<UsersIcon />}
@@ -46,12 +52,63 @@ export default function SuperAdmin() {
       {/* Tab Content */}
       <div>
         {activeTab === 'users' && <UsersTab token={token} />}
+        {activeTab === 'messages' && <MessagesTab token={token} />}
         {activeTab === 'pricing' && <PricingTab token={token} />}
         {activeTab === 'marketing' && <MarketingTab token={token} />}
         {activeTab === 'ads' && <AdsManager />}
       </div>
     </div>
   )
+}
+
+function MessagesTab({ token }) {
+  const [messages, setMessages] = useState([])
+  const [selected, setSelected] = useState(null)
+  const [reply, setReply] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState('')
+
+  async function loadMessages() {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/admin/support', { headers: { Authorization: `Bearer ${token}` } })
+      if (!res.ok) throw new Error(await res.text())
+      setMessages(await res.json())
+    } catch (err) { setError(err.message || 'Could not load messages') }
+    setLoading(false)
+  }
+  useEffect(() => { loadMessages() }, [token])
+
+  async function sendReply(e) {
+    e.preventDefault(); setSending(true); setError('')
+    try {
+      const res = await fetch('/api/admin/support', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ id: selected.id, reply }) })
+      if (!res.ok) throw new Error((await res.text()).trim())
+      setReply(''); setSelected(null); await loadMessages()
+    } catch (err) { setError(err.message || 'Could not send reply') }
+    setSending(false)
+  }
+
+  const labels = { pricing: 'Pricing question', station_not_streaming: 'Station not streaming', account: 'Account help', technical: 'Technical support', other: 'Something else' }
+  if (loading) return <div className="py-12 text-center text-gray-400">Loading messages...</div>
+  return <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
+    <div className="overflow-hidden rounded-xl border border-gray-800 bg-gray-900">
+      {messages.length === 0 && <p className="p-8 text-center text-sm text-gray-500">No messages yet.</p>}
+      {messages.map((m) => <button key={m.id} onClick={() => { setSelected(m); setReply(''); setError('') }} className={`block w-full border-b border-gray-800 p-4 text-left hover:bg-gray-800 ${selected?.id === m.id ? 'bg-gray-800' : ''}`}>
+        <div className="flex items-center justify-between gap-2"><span className="truncate text-sm font-medium text-white">{m.email}</span><span className={`rounded-full px-2 py-0.5 text-[11px] ${m.status === 'replied' ? 'bg-green-900/40 text-green-400' : 'bg-amber-900/40 text-amber-400'}`}>{m.status}</span></div>
+        <p className="mt-1 text-xs text-purple-400">{labels[m.reason] || m.reason}</p><p className="mt-2 truncate text-xs text-gray-500">{m.message}</p>
+      </button>)}
+    </div>
+    <div className="min-h-80 rounded-xl border border-gray-800 bg-gray-900 p-6">
+      {!selected ? <div className="flex h-full items-center justify-center text-sm text-gray-500">Select a message to read it.</div> : <div>
+        <div className="border-b border-gray-800 pb-4"><p className="text-xs uppercase tracking-wide text-purple-400">{labels[selected.reason] || selected.reason}</p><h2 className="mt-1 font-semibold text-white">{selected.email}</h2><p className="mt-1 text-xs text-gray-500">{new Date(selected.createdAt).toLocaleString()}</p></div>
+        <p className="whitespace-pre-wrap py-6 text-sm leading-6 text-gray-300">{selected.message}</p>
+        {selected.adminReply && <div className="mb-5 rounded-lg border border-green-900/40 bg-green-950/20 p-4"><p className="mb-2 text-xs font-semibold text-green-400">Previous reply</p><p className="whitespace-pre-wrap text-sm text-gray-300">{selected.adminReply}</p></div>}
+        <form onSubmit={sendReply}><label className="mb-2 block text-sm font-medium text-white">Reply by email</label><textarea required maxLength={4000} rows={5} value={reply} onChange={(e) => setReply(e.target.value)} className="w-full resize-none rounded-lg border border-gray-700 bg-gray-950 p-3 text-sm text-white outline-none focus:border-purple-500" placeholder="Write your reply..." />{error && <p className="mt-2 text-sm text-red-400">{error}</p>}<button disabled={sending || !reply.trim()} className="mt-3 rounded-lg bg-purple-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-purple-500 disabled:opacity-50">{sending ? 'Sending...' : 'Send email reply'}</button></form>
+      </div>}
+    </div>
+  </div>
 }
 
 function TabButton({ active, onClick, icon, label }) {
@@ -875,6 +932,10 @@ function UsersIcon() {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
     </svg>
   )
+}
+
+function MessagesIcon() {
+  return <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.9 9.9 0 01-4.255-.949L3 20l1.395-3.72A7.45 7.45 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
 }
 
 function PricingIcon() {

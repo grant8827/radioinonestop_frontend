@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import LoginModal from '../components/LoginModal'
 import RegisterModal from '../components/RegisterModal'
 import StationModal from '../components/StationModal'
+import ContactModal from '../components/ContactModal'
 import appLogo from '../assets/radioinonestop_logo .png'
 
 const FEATURES = [
@@ -111,6 +112,7 @@ export default function LandingPage() {
   const [selectedStation, setSelectedStation] = useState(null)
   const [stations, setStations] = useState(DEMO_STATIONS)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [showContact, setShowContact] = useState(false)
 
   // Fetch stations on mount, refresh every 30s
   useEffect(() => {
@@ -484,7 +486,7 @@ export default function LandingPage() {
       <footer className="border-t border-white/5">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <span className="text-xs text-gray-600">© 2026 Radio In One Stop</span>
-          <span className="text-xs text-gray-700">Built with Go + React</span>
+          <button onClick={() => setShowContact(true)} className="text-xs font-medium text-gray-400 transition-colors hover:text-white">Get in touch</button>
         </div>
       </footer>
 
@@ -494,6 +496,7 @@ export default function LandingPage() {
           onClose={() => setSelectedStation(null)}
         />
       )}
+      {showContact && <ContactModal onClose={() => setShowContact(false)} />}
 
       {/* ── Auth Modals ── */}
       {showLogin && (
