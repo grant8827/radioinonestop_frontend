@@ -137,6 +137,17 @@ export default function PricingPage() {
     }
   }
 
+  const yearlySalePercents = [...new Set(
+    plans
+      .map((plan) => Number(plan.yearlySalePercent))
+      .filter((percent) => Number.isFinite(percent) && percent > 0)
+  )]
+  const yearlySaleLabel = yearlySalePercents.length === 1
+    ? `Save ${yearlySalePercents[0]}%`
+    : yearlySalePercents.length > 1
+      ? `Save up to ${Math.max(...yearlySalePercents)}%`
+      : ''
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0a0a0f] text-white flex items-center justify-center">
@@ -243,6 +254,11 @@ export default function PricingPage() {
             <span className={`text-sm font-medium transition-colors ${billingCycle === 'yearly' ? 'text-white' : 'text-gray-500'}`}>
               Yearly
             </span>
+            {yearlySaleLabel && (
+              <span className="rounded-full border border-green-500/30 bg-green-500/10 px-2.5 py-1 text-xs font-semibold text-green-400">
+                {yearlySaleLabel}
+              </span>
+            )}
           </div>
         </div>
       </section>
