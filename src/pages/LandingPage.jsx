@@ -486,7 +486,7 @@ export default function LandingPage() {
       <footer className="border-t border-white/5">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <span className="text-xs text-gray-600">© 2026 Radio In One Stop</span>
-          <button onClick={() => setShowContact(true)} className="text-xs font-medium text-gray-400 transition-colors hover:text-white">Get in touch</button>
+          <button onClick={() => setShowContact(true)} className="text-xs font-medium text-gray-400 transition-colors hover:text-white">Technical Support</button>
         </div>
       </footer>
 
