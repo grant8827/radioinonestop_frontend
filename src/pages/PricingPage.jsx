@@ -2,9 +2,36 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import appLogo from '../assets/radioinonestop_logo .png'
+import DowngradeWarningModal from '../components/DowngradeWarningModal'
 
 const RAW_API_BASE = import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_BASE_URL || ''
 const API_BASE = import.meta.env.DEV ? '' : RAW_API_BASE
+const PLAN_ORDER = ['starter', 'professional', 'enterprise', 'ultimate']
+
+const DOWNGRADE_LOSSES = {
+  professional: [
+    '128 kbps audio streaming (Starter is limited to 96 kbps)',
+    'Track Scheduler',
+    'Conference rooms for up to 2 guests',
+    'Priority audio processing',
+    'Listener capacity above 500 concurrent listeners',
+  ],
+  enterprise: [
+    '192 kbps audio streaming',
+    'Conference room capacity above 2 guests',
+    'Advanced listener reporting',
+    'Priority station support',
+    'Listener capacity above 1,000 concurrent listeners',
+  ],
+  ultimate: [
+    '320 kbps audio streaming',
+    'Conference room capacity above 5 guests',
+    'Premium radio automation',
+    'Advanced analytics dashboard',
+    'Custom branding options',
+    'Listener capacity above 2,000 concurrent listeners',
+  ],
+}
 
 const DEFAULT_PLANS = [
   {
@@ -87,6 +114,7 @@ export default function PricingPage() {
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadWarning, setLoadWarning] = useState('')
+  const [pendingDowngrade, setPendingDowngrade] = useState(null)
 
   useEffect(() => {
     async function fetchPricing() {
@@ -117,6 +145,28 @@ export default function PricingPage() {
   }, [])
 
   function selectPlan(planId) {
+    const currentRank = PLAN_ORDER.indexOf(currentPlan)
+    const targetRank = PLAN_ORDER.indexOf(planId.toLowerCase())
+
+    if (isAuthenticated && currentRank >= 0 && targetRank >= 0 && targetRank < currentRank) {
+      const currentPlanInfo = plans.find((plan) => plan.id.toLowerCase() === currentPlan)
+      const targetPlanInfo = plans.find((plan) => plan.id.toLowerCase() === planId.toLowerCase())
+      const losses = PLAN_ORDER
+        .slice(targetRank + 1, currentRank + 1)
+        .flatMap((lostPlan) => DOWNGRADE_LOSSES[lostPlan] || [])
+
+      setPendingDowngrade({
+        currentPlan: currentPlanInfo || { name: currentPlan },
+        targetPlan: targetPlanInfo || { id: planId, name: planId },
+        losses,
+      })
+      return
+    }
+
+    continueToCheckout(planId)
+  }
+
+  function continueToCheckout(planId) {
     const checkoutPath = `/payment?plan=${planId}&billing=${billingCycle}`
     navigate(isAuthenticated ? checkoutPath : `/register?plan=${planId}&billing=${billingCycle}`)
   }
@@ -262,6 +312,16 @@ export default function PricingPage() {
           </div>
         </div>
       </section>
+
+      {pendingDowngrade && (
+        <DowngradeWarningModal
+          currentPlan={pendingDowngrade.currentPlan}
+          targetPlan={pendingDowngrade.targetPlan}
+          losses={pendingDowngrade.losses}
+          onCancel={() => setPendingDowngrade(null)}
+          onConfirm={() => continueToCheckout(pendingDowngrade.targetPlan.id)}
+        />
+      )}
 
       {/* ── Pricing Cards ── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
