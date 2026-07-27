@@ -565,7 +565,7 @@ function LoopControls({ active, sizeIdx, onToggle, onResize }) {
 function DeckUnit({
   side, color, active, playing, onTogglePlay,
   streamLive, stationName, waveData, progress, onSeek,
-  cuePoint, onCueDown, onCueUp, onRestart,
+  cuePoint, cueActive, onCueToggle, onRestart,
   onScratch, onScratchEnd,
   pitch, onPitchChange,
   hotCues, onHotCueSet, onHotCueClear, onHotCueJump,
@@ -668,16 +668,14 @@ function DeckUnit({
         </button>
 
         <button
-          onPointerDown={active ? onCueDown : undefined}
-          onPointerUp={active ? onCueUp : undefined}
-          onPointerLeave={active ? onCueUp : undefined}
+          onClick={active ? onCueToggle : undefined}
           className="flex-1 h-9 rounded-lg text-[8px] font-black tracking-wider transition-all select-none"
-          title="Cue (Hold to preview)"
+          title={cueActive ? "Stop headphone cue" : "Cue in headphones"}
           style={{
-            backgroundColor: active ? (cuePoint !== null ? '#f9731620' : '#1a1d24') : '#1a1d24',
+            backgroundColor: active ? (cueActive ? '#f9731635' : '#1a1d24') : '#1a1d24',
             color: active ? '#f97316' : '#4b5563',
-            border: `1px solid ${active ? (cuePoint !== null ? '#f97316aa' : '#f9731640') : '#2d3340'}`,
-            boxShadow: active && cuePoint !== null ? '0 0 8px #f9731640' : 'none',
+            border: `1px solid ${active ? (cueActive ? '#f97316' : '#f9731640') : '#2d3340'}`,
+            boxShadow: active && cueActive ? '0 0 10px #f9731660' : 'none',
             cursor: active ? 'pointer' : 'not-allowed',
           }}
         >
@@ -1350,6 +1348,8 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
   // ── CUE points (stored as 0–1 fraction for waveform display) ──────────────
   const [cuePointA, setCuePointA] = useState(null)
   const [cuePointB, setCuePointB] = useState(null)
+  const [cueActiveA, setCueActiveA] = useState(false)
+  const [cueActiveB, setCueActiveB] = useState(false)
   const cuePointASecRef  = useRef(0)   // seconds, for seeking
   const cuePointBSecRef  = useRef(0)
   const cuePreviewingA   = useRef(false)
@@ -1892,6 +1892,70 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
 
   const handleFullscreen = () => mediaRef.current?.requestFullscreen?.()
 
+  const releaseCueA = () => {
+    audioEngineRef.current?.setCueSend('dj-a', false)
+    setCueActiveA(false)
+    if (!cuePreviewingA.current) return
+    cuePreviewingA.current = false
+    const m = mediaRef.current
+    if (!m) return
+    m.pause()
+    m.currentTime = cuePointASecRef.current
+    setPlaying(false)
+    setProgressA(m.duration > 0 ? cuePointASecRef.current / m.duration : 0)
+  }
+
+  const releaseCueB = () => {
+    audioEngineRef.current?.setCueSend('dj-b', false)
+    setCueActiveB(false)
+    if (!cuePreviewingB.current) return
+    cuePreviewingB.current = false
+    const m = mediaRefB.current
+    if (!m) return
+    m.pause()
+    m.currentTime = cuePointBSecRef.current
+    setPlayingB(false)
+    setProgressB(m.duration > 0 ? cuePointBSecRef.current / m.duration : 0)
+  }
+
+  const toggleCueA = () => {
+    if (cueActiveA) { releaseCueA(); return }
+    if (crossfaderRef.current < 0.5) return
+    releaseCueB()
+    const m = mediaRef.current
+    if (!m || !isFinite(m.duration)) return
+    audioEngineRef.current?.setCueSend('dj-a', true)
+    setCueActiveA(true)
+    if (!playing) {
+      const t = m.currentTime
+      cuePointASecRef.current = t
+      setCuePointA(m.duration > 0 ? t / m.duration : 0)
+      cuePreviewingA.current = true
+      audioEngineRef.current?.resume()
+      m.play().catch(() => {})
+      setPlaying(true)
+    }
+  }
+
+  const toggleCueB = () => {
+    if (cueActiveB) { releaseCueB(); return }
+    if (crossfaderRef.current > 0.5) return
+    releaseCueA()
+    const m = mediaRefB.current
+    if (!m || !isFinite(m.duration)) return
+    audioEngineRef.current?.setCueSend('dj-b', true)
+    setCueActiveB(true)
+    if (!playingB) {
+      const t = m.currentTime
+      cuePointBSecRef.current = t
+      setCuePointB(m.duration > 0 ? t / m.duration : 0)
+      cuePreviewingB.current = true
+      audioEngineRef.current?.resume()
+      m.play().catch(() => {})
+      setPlayingB(true)
+    }
+  }
+
   return (
     <div className="bg-[#0a0c10] rounded-2xl overflow-hidden border border-[#1e2128]">
       {/* VIDEO DISABLED: keep the former video player branch unreachable. */}
@@ -2051,33 +2115,7 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
               onLoopResize={(d) => setLoopIdxA((v) => Math.max(0, Math.min(LOOP_SIZES.length - 1, v + d)))}
               synced={syncA} onSyncToggle={() => { if (!syncA) setPitchA(pitchB); setSyncA(v => !v) }}
               keyLock={keyA} onKeyLockToggle={() => setKeyA((v) => !v)}
-              cuePoint={cuePointA}
-              onCueDown={() => {
-                const m = mediaRef.current
-                if (!m || !isFinite(m.duration)) return
-                // Only monitor Deck A in headphones when it's the off-air deck (crossfader ≥ 0.5 → B is on air)
-                if (crossfaderRef.current >= 0.5) audioEngineRef.current?.setCueSend('dj-a', true)
-                if (!playing) {
-                  // Paused: set cue point at current position and preview while held
-                  const t = m.currentTime
-                  cuePointASecRef.current = t
-                  setCuePointA(m.duration > 0 ? t / m.duration : 0)
-                  cuePreviewingA.current = true
-                  audioEngineRef.current?.resume()
-                  m.play().catch(() => {}); setPlaying(true)
-                }
-                // Playing: just monitor the deck through headphones — don't pause
-              }}
-              onCueUp={() => {
-                audioEngineRef.current?.setCueSend('dj-a', false)
-                if (!cuePreviewingA.current) return
-                cuePreviewingA.current = false
-                const m = mediaRef.current
-                if (!m) return
-                m.pause(); m.currentTime = cuePointASecRef.current
-                setPlaying(false)
-                setProgressA(m.duration > 0 ? cuePointASecRef.current / m.duration : 0)
-              }}
+              cuePoint={cuePointA} cueActive={cueActiveA} onCueToggle={toggleCueA}
               onRestart={() => {
                 const m = mediaRef.current
                 if (!m) return
@@ -2165,33 +2203,7 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
               onLoopResize={(d) => setLoopIdxB((v) => Math.max(0, Math.min(LOOP_SIZES.length - 1, v + d)))}
               synced={syncB} onSyncToggle={() => { if (!syncB) setPitchB(pitchA); setSyncB(v => !v) }}
               keyLock={keyB} onKeyLockToggle={() => setKeyB((v) => !v)}
-              cuePoint={cuePointB}
-              onCueDown={() => {
-                const m = mediaRefB.current
-                if (!m || !isFinite(m.duration)) return
-                // Only monitor Deck B in headphones when it's the off-air deck (crossfader ≤ 0.5 → A is on air)
-                if (crossfaderRef.current <= 0.5) audioEngineRef.current?.setCueSend('dj-b', true)
-                if (!playingB) {
-                  // Paused: set cue point at current position and preview while held
-                  const t = m.currentTime
-                  cuePointBSecRef.current = t
-                  setCuePointB(m.duration > 0 ? t / m.duration : 0)
-                  cuePreviewingB.current = true
-                  audioEngineRef.current?.resume()
-                  m.play().catch(() => {}); setPlayingB(true)
-                }
-                // Playing: just monitor the deck through headphones — don't pause
-              }}
-              onCueUp={() => {
-                audioEngineRef.current?.setCueSend('dj-b', false)
-                if (!cuePreviewingB.current) return
-                cuePreviewingB.current = false
-                const m = mediaRefB.current
-                if (!m) return
-                m.pause(); m.currentTime = cuePointBSecRef.current
-                setPlayingB(false)
-                setProgressB(m.duration > 0 ? cuePointBSecRef.current / m.duration : 0)
-              }}
+              cuePoint={cuePointB} cueActive={cueActiveB} onCueToggle={toggleCueB}
               onRestart={() => {
                 const m = mediaRefB.current
                 if (!m) return
