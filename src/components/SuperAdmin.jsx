@@ -469,7 +469,7 @@ function PricingTab({ token }) {
         <div>
           <h3 className="text-white font-semibold mb-1">PayPal Plan Sync</h3>
           <p className="text-sm text-gray-300">
-            Auto-create PayPal subscription plans for any package missing a Plan ID. Uses current prices and sale percentages.
+            Create replacement PayPal subscription plans using the current prices and sale percentages.
           </p>
         </div>
         <button

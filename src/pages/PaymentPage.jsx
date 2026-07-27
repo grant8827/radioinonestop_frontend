@@ -6,11 +6,11 @@ const RAW_API_BASE = import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_B
 const API_BASE = import.meta.env.DEV ? '' : RAW_API_BASE
 
 const PLAN_INFO = {
-    starter: { name: 'Starter', monthly: 29, yearly: 290 },
-    professional: { name: 'Professional', monthly: 39, yearly: 390 },
-    enterprise: { name: 'Enterprise', monthly: 59, yearly: 590 },
-    ultimate: { name: 'Ultimate', monthly: 99, yearly: 990 },
-  }
+  starter: { name: 'Starter', monthlyPrice: 29, yearlyPrice: 290, monthlySalePercent: 0, yearlySalePercent: 0 },
+  professional: { name: 'Professional', monthlyPrice: 39, yearlyPrice: 390, monthlySalePercent: 0, yearlySalePercent: 0 },
+  enterprise: { name: 'Enterprise', monthlyPrice: 59, yearlyPrice: 590, monthlySalePercent: 0, yearlySalePercent: 0 },
+  ultimate: { name: 'Ultimate', monthlyPrice: 99, yearlyPrice: 990, monthlySalePercent: 0, yearlySalePercent: 0 },
+}
 
 export default function PaymentPage() {
   const navigate = useNavigate()
@@ -23,8 +23,13 @@ export default function PaymentPage() {
   const stripeSessionId = searchParams.get('session_id') || ''
   const planId = PLAN_INFO[requestedPlan] ? requestedPlan : 'starter'
   const billingCycle = ['monthly', 'yearly'].includes(requestedBilling) ? requestedBilling : 'monthly'
-  const planInfo = PLAN_INFO[planId] || PLAN_INFO.starter
-  const planPrice = planInfo[billingCycle] || planInfo.monthly
+  const fallbackPlanInfo = PLAN_INFO[planId] || PLAN_INFO.starter
+  const [livePlanInfo, setLivePlanInfo] = useState(null)
+  const planInfo = livePlanInfo?.id === planId ? livePlanInfo : fallbackPlanInfo
+  const basePrice = billingCycle === 'yearly' ? planInfo.yearlyPrice : planInfo.monthlyPrice
+  const salePercent = billingCycle === 'yearly' ? planInfo.yearlySalePercent : planInfo.monthlySalePercent
+  const hasSale = Number(salePercent) > 0 && Number(salePercent) < 100
+  const planPrice = Math.round((hasSale ? basePrice * (1 - salePercent / 100) : basePrice) * 100) / 100
   const [provider, setProvider] = useState(requestedProvider === 'paypal' ? 'paypal' : 'stripe')
 
   // PayPal states
@@ -43,6 +48,29 @@ export default function PaymentPage() {
       navigate('/')
     }
   }, [isAuthenticated, navigate])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function fetchPlanInfo() {
+      try {
+        const response = await fetch(`${API_BASE}/api/public/pricing`)
+        if (!response.ok) return
+        const plans = await response.json()
+        const livePlan = Array.isArray(plans) ? plans.find((plan) => plan.id === planId) : null
+        if (livePlan && !cancelled) {
+          setLivePlanInfo(livePlan)
+        }
+      } catch (err) {
+        console.error('Failed to load checkout pricing:', err)
+      }
+    }
+
+    fetchPlanInfo()
+    return () => {
+      cancelled = true
+    }
+  }, [planId])
 
   // Finalize Stripe purchase after redirect back from Checkout.
   useEffect(() => {
@@ -233,17 +261,20 @@ export default function PaymentPage() {
             <span className="text-gray-400 text-sm">Billing Cycle</span>
             <span className="font-semibold">{billingCycle === 'yearly' ? 'Yearly' : 'Monthly'}</span>
           </div>
-          {billingCycle === 'yearly' && (
+          {hasSale && (
             <div className="flex items-center justify-between mb-4">
-              <span className="text-gray-400 text-sm">Savings</span>
-              <span className="font-semibold text-green-400">17% off</span>
+              <span className="text-gray-400 text-sm">Discount</span>
+              <span className="font-semibold text-green-400">{salePercent}% off</span>
             </div>
           )}
           <div className="border-t border-white/10 pt-4 flex items-center justify-between">
             <span className="text-lg font-bold">Total</span>
-            <span className="text-2xl font-extrabold text-amber-400">
-              ${planPrice}{billingCycle === 'yearly' ? '/yr' : '/mo'}
-            </span>
+            <div className="text-right">
+              {hasSale && <div className="text-sm text-gray-500 line-through">${basePrice}</div>}
+              <span className="text-2xl font-extrabold text-amber-400">
+                ${planPrice.toFixed(2)}{billingCycle === 'yearly' ? '/yr' : '/mo'}
+              </span>
+            </div>
           </div>
         </div>
 
