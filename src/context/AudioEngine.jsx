@@ -60,6 +60,9 @@ export function AudioEngineProvider({ children }) {
   const cueOutElRef = useRef(null)
   const cueOutGainRef = useRef(null)
   const externalLineInRef = useRef(null)
+  // Holds the current restore attempt token. A token, rather than a boolean,
+  // prevents an obsolete/cancelled attempt from clearing a newer attempt's lock.
+  const externalLineInConnectingRef = useRef(null)
 
   // Gain node between masterAnalyser and phonesGain — set to 0 when CUE is held (switches phones to cue)
   const mainToPhonesGainRef = useRef(null)
@@ -398,6 +401,7 @@ export function AudioEngineProvider({ children }) {
   const setMixerSettingsMode = useCallback((mode = 'app') => {
     const nextMode = mode === 'external' ? 'external' : 'app'
     localStorage.setItem('mixerSettingsMode', nextMode)
+    window.dispatchEvent(new Event('external-mixer-mode-change'))
     getAC()
     if (!acRef.current) return
     const t = acRef.current.currentTime
@@ -454,6 +458,69 @@ export function AudioEngineProvider({ children }) {
       return { ok: false, reason: error?.name || 'input-error' }
     }
   }, [getAC])
+
+  // A MediaStream cannot survive a reload/login. Reopen the saved physical
+  // input whenever the always-mounted audio engine starts in External Mixer
+  // mode. Retry after a user gesture because some browsers will not resume an
+  // AudioContext or grant device access during initial page startup.
+  useEffect(() => {
+    let cancelled = false
+
+    const restoreExternalLineIn = async () => {
+      if (cancelled || externalLineInRef.current || externalLineInConnectingRef.current) return
+      if (localStorage.getItem('mixerSettingsMode') !== 'external') return
+
+      const savedDeviceId = localStorage.getItem('externalMixerLineInDeviceId') || ''
+      const savedLabel = localStorage.getItem('externalMixerLineInDeviceLabel') || ''
+      if (!savedDeviceId && !savedLabel) return
+
+      const attempt = Symbol('external-line-in-restore')
+      externalLineInConnectingRef.current = attempt
+      try {
+        const devices = await navigator.mediaDevices?.enumerateDevices?.()
+        if (cancelled || externalLineInConnectingRef.current !== attempt) return
+        const inputs = (devices || []).filter((device) => device.kind === 'audioinput' && device.deviceId)
+        const savedDevice = inputs.find((device) => device.deviceId === savedDeviceId)
+          || (savedLabel ? inputs.find((device) => device.label === savedLabel) : null)
+        const deviceId = savedDevice?.deviceId || savedDeviceId
+        if (!deviceId) return
+
+        const result = await connectExternalLineIn(deviceId)
+        if (cancelled || externalLineInConnectingRef.current !== attempt || !result?.ok) return
+        if (savedDevice?.label) {
+          localStorage.setItem('externalMixerLineInDeviceLabel', savedDevice.label)
+        }
+      } catch {
+        // A devicechange event or the next user gesture will retry.
+      } finally {
+        if (externalLineInConnectingRef.current === attempt) {
+          externalLineInConnectingRef.current = null
+        }
+      }
+    }
+
+    const retry = () => {
+      restoreExternalLineIn()
+    }
+
+    restoreExternalLineIn()
+    navigator.mediaDevices?.addEventListener?.('devicechange', retry)
+    window.addEventListener('external-mixer-mode-change', retry)
+    window.addEventListener('pointerdown', retry, true)
+    window.addEventListener('keydown', retry, true)
+
+    return () => {
+      cancelled = true
+      // React StrictMode intentionally mounts, cleans up, and mounts effects
+      // again. Release this effect's pending restore so the real mount can
+      // immediately reconnect the saved input.
+      externalLineInConnectingRef.current = null
+      navigator.mediaDevices?.removeEventListener?.('devicechange', retry)
+      window.removeEventListener('external-mixer-mode-change', retry)
+      window.removeEventListener('pointerdown', retry, true)
+      window.removeEventListener('keydown', retry, true)
+    }
+  }, [connectExternalLineIn])
 
   const setExternalLineOutDevice = useCallback(async (deviceId = '') => {
     const ac = getAC()

@@ -12,15 +12,16 @@ function parseToken(token) {
 
 function loadFromStorage() {
   const t = localStorage.getItem('rio_token')
-  if (!t) return { token: null, user: null }
+  if (!t) return { token: null, user: null, profileLoaded: true }
   const payload = parseToken(t)
   if (!payload || payload.exp * 1000 < Date.now()) {
     localStorage.removeItem('rio_token')
-    return { token: null, user: null }
+    return { token: null, user: null, profileLoaded: true }
   }
   return { 
     token: t, 
-    user: { 
+    profileLoaded: false,
+    user: {
       id: payload.user_id, 
       email: payload.email, 
       stationName: payload.station_name || '',
@@ -29,12 +30,15 @@ function loadFromStorage() {
       plan: 'starter', // default until profile loads
       billingCycle: 'monthly',
       isSuspended: false,
+      paymentRequired: false,
+      trialActive: false,
+      trialEndsAt: null,
     } 
   }
 }
 
 export function AuthProvider({ children }) {
-  const [{ token, user }, setAuth] = useState(loadFromStorage)
+  const [{ token, user, profileLoaded }, setAuth] = useState(loadFromStorage)
 
   // Fetch full user profile
   const refreshProfile = useCallback(() => {
@@ -54,10 +58,16 @@ export function AuthProvider({ children }) {
             stationName: profile.station_name || prev.user.stationName,
             logoUrl: profile.logo_url || '',
             isSuspended: !!profile.is_suspended,
-          } : prev.user
+            paymentRequired: !!profile.payment_required,
+            trialActive: !!profile.trial_active,
+            trialEndsAt: profile.trial_ends_at || null,
+          } : prev.user,
+          profileLoaded: true,
         }))
       })
-      .catch(() => {}) // Ignore errors, keep defaults
+      .catch(() => {
+        setAuth(prev => ({ ...prev, profileLoaded: true }))
+      })
   }, [token])
 
   // Fetch full user profile when authenticated
@@ -70,6 +80,7 @@ export function AuthProvider({ children }) {
     const payload = parseToken(newToken)
     setAuth({
       token: newToken,
+      profileLoaded: false,
       user: payload ? { 
         id: payload.user_id, 
         email: payload.email, 
@@ -79,17 +90,20 @@ export function AuthProvider({ children }) {
         plan: 'starter',
         billingCycle: 'monthly',
         isSuspended: false,
+        paymentRequired: false,
+        trialActive: false,
+        trialEndsAt: null,
       } : null,
     })
   }, [])
 
   const logout = useCallback(() => {
     localStorage.removeItem('rio_token')
-    setAuth({ token: null, user: null })
+    setAuth({ token: null, user: null, profileLoaded: true })
   }, [])
 
   return (
-    <AuthContext.Provider value={{ token, user, login, logout, refreshProfile, isAuthenticated: !!token && !!user }}>
+    <AuthContext.Provider value={{ token, user, profileLoaded, login, logout, refreshProfile, isAuthenticated: !!token && !!user }}>
       {children}
     </AuthContext.Provider>
   )

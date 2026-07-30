@@ -20,6 +20,7 @@ export default function PaymentPage() {
   const requestedBilling = (searchParams.get('billing') || 'monthly').toLowerCase()
   const requestedProvider = (searchParams.get('provider') || 'stripe').toLowerCase()
   const requestedStatus = (searchParams.get('status') || '').toLowerCase()
+  const paymentReason = (searchParams.get('reason') || '').toLowerCase()
   const stripeSessionId = searchParams.get('session_id') || ''
   const planId = PLAN_INFO[requestedPlan] ? requestedPlan : 'starter'
   const billingCycle = ['monthly', 'yearly'].includes(requestedBilling) ? requestedBilling : 'monthly'
@@ -236,6 +237,11 @@ export default function PaymentPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
+        {paymentReason === 'trial-ended' && (
+          <div className="mb-5 rounded-xl border border-amber-700/50 bg-amber-950/30 p-4 text-sm text-amber-200">
+            Your 30-day free trial has ended. Subscribe to the selected package to continue using your studio.
+          </div>
+        )}
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 text-sm font-semibold text-amber-300 bg-red-900/20 border border-red-800/40 rounded-full px-4 py-1.5 mb-4">

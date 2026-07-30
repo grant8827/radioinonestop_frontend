@@ -174,12 +174,17 @@ function UsersTab({ token }) {
         body: JSON.stringify(updates),
       })
       if (res.ok) {
-        loadUsers()
+        await loadUsers()
         setEditUser(null)
+        return true
       }
+      const message = (await res.text()).trim() || 'Could not update this user.'
+      alert(message)
     } catch (err) {
       console.error('Failed to update user:', err)
+      alert(err.message || 'Could not update this user.')
     }
+    return false
   }
 
   async function handleActionChange(user, action) {
@@ -239,7 +244,11 @@ function UsersTab({ token }) {
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-300">{user.billingCycle || 'monthly'}</td>
                 <td className="px-6 py-4 text-sm">
-                  {user.isSuspended ? (
+                  {user.trialEndsAt && new Date(user.trialEndsAt) > new Date() ? (
+                    <span className="px-2 py-1 bg-cyan-900/30 text-cyan-400 text-xs rounded-full border border-cyan-700/30">
+                      Trial until {new Date(user.trialEndsAt).toLocaleDateString()}
+                    </span>
+                  ) : user.isSuspended ? (
                     <span className="px-2 py-1 bg-red-900/30 text-red-400 text-xs rounded-full border border-red-700/30">
                       Suspended
                     </span>
@@ -301,10 +310,11 @@ function EditUserModal({ user, onClose, onSave }) {
   const [plan, setPlan] = useState(user.plan || 'starter')
   const [billingCycle, setBillingCycle] = useState(user.billingCycle || 'monthly')
   const [isSuspended, setIsSuspended] = useState(user.isSuspended || false)
+  const [startTrial, setStartTrial] = useState(false)
 
   function handleSubmit(e) {
     e.preventDefault()
-    onSave(user.id, { plan, billingCycle, isSuspended })
+    onSave(user.id, { plan, billingCycle, isSuspended, startTrial })
   }
 
   return (
@@ -360,6 +370,34 @@ function EditUserModal({ user, onClose, onSave }) {
             <label htmlFor="suspended" className="text-sm text-gray-300">
               Suspend account
             </label>
+          </div>
+
+          <div className="rounded-lg border border-cyan-900/50 bg-cyan-950/20 p-4">
+            <div className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                id="start-trial"
+                checked={startTrial}
+                disabled={user.trialUsed}
+                onChange={(e) => {
+                  setStartTrial(e.target.checked)
+                  if (e.target.checked) setIsSuspended(false)
+                }}
+                className="mt-0.5 w-4 h-4"
+              />
+              <label htmlFor="start-trial" className="text-sm text-gray-300">
+                <span className="block font-medium text-cyan-300">Start 30-day free trial</span>
+                <span className="mt-1 block text-xs text-gray-500">
+                  Activates the selected package without payment. Access is suspended and payment is required when the trial ends.
+                </span>
+              </label>
+            </div>
+            {user.trialUsed && (
+              <p className="mt-2 text-xs text-amber-400">
+                This account has already used its free trial
+                {user.trialEndsAt ? ` (ended ${new Date(user.trialEndsAt).toLocaleDateString()})` : ''}.
+              </p>
+            )}
           </div>
 
           <div className="flex gap-3 pt-4">

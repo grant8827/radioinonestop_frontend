@@ -31,9 +31,21 @@ function ProtectedRoute({ children }) {
 }
 
 function ActiveAccountRoute({ children }) {
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, user, profileLoaded } = useAuth()
   if (!isAuthenticated) return <Navigate to="/" replace />
-  if (user?.isSuspended) return <Navigate to="/payment" replace />
+  if (!profileLoaded) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <span className="text-gray-500 text-lg">Checking account…</span>
+      </div>
+    )
+  }
+  if (user?.paymentRequired || user?.isSuspended) {
+    const plan = encodeURIComponent(user?.plan || 'starter')
+    const billing = encodeURIComponent(user?.billingCycle || 'monthly')
+    const reason = user?.paymentRequired ? '&reason=trial-ended' : ''
+    return <Navigate to={`/payment?plan=${plan}&billing=${billing}${reason}`} replace />
+  }
   return children
 }
 

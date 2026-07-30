@@ -170,7 +170,6 @@ export default function SettingsPage() {
   const [cueOutDeviceId, setCueOutDeviceId] = useState(() => localStorage.getItem('externalMixerCueOutDeviceId') || '')
   const [mixerError, setMixerError] = useState('')
   const [mixerLoading, setMixerLoading] = useState(false)
-  const connectedLineInRef = useRef('')
 
   // Listen for open-settings-record event dispatched by the Mixer nudge
   useEffect(() => {
@@ -196,8 +195,14 @@ export default function SettingsPage() {
   const refreshMixerDevices = async () => {
     if (!navigator.mediaDevices?.enumerateDevices) return
     const devices = await navigator.mediaDevices.enumerateDevices()
-    setMixerInputDevices(devices.filter((d) => d.kind === 'audioinput' && d.deviceId))
+    const inputs = devices.filter((d) => d.kind === 'audioinput' && d.deviceId)
+    setMixerInputDevices(inputs)
     setMixerOutputDevices(devices.filter((d) => d.kind === 'audiooutput' && d.deviceId))
+    const savedDeviceId = localStorage.getItem('externalMixerLineInDeviceId') || ''
+    const savedLabel = localStorage.getItem('externalMixerLineInDeviceLabel') || ''
+    const savedInput = inputs.find((device) => device.deviceId === savedDeviceId)
+      || (savedLabel ? inputs.find((device) => device.label === savedLabel) : null)
+    if (savedInput?.deviceId) setLineInDeviceId(savedInput.deviceId)
     setLineOutDeviceId(getExternalLineOutDevice?.() || localStorage.getItem('externalMixerLineOutDeviceId') || '')
     setCueOutDeviceId(getExternalCueOutDevice?.() || localStorage.getItem('externalMixerCueOutDeviceId') || '')
   }
@@ -236,41 +241,6 @@ export default function SettingsPage() {
   useEffect(() => {
     updateMasterOutputGain?.(outputGain)
   }, [outputGain, updateMasterOutputGain])
-
-  useEffect(() => {
-    if (mixerMode !== 'external' || !lineInDeviceId || mixerInputDevices.length === 0) return
-
-    const savedLabel = localStorage.getItem('externalMixerLineInDeviceLabel') || ''
-    const savedDevice = mixerInputDevices.find((device) => device.deviceId === lineInDeviceId)
-      || (savedLabel ? mixerInputDevices.find((device) => device.label === savedLabel) : null)
-
-    // Browsers can assign a new device ID after permissions or browser data
-    // change. Recover the same physical input by its saved label when possible.
-    if (!savedDevice) {
-      connectedLineInRef.current = ''
-      return
-    }
-
-    const deviceId = savedDevice.deviceId
-    if (deviceId !== lineInDeviceId) {
-      localStorage.setItem('externalMixerLineInDeviceId', deviceId)
-      queueMicrotask(() => setLineInDeviceId(deviceId))
-      return
-    }
-    if (connectedLineInRef.current === deviceId) return
-
-    connectedLineInRef.current = deviceId
-    connectExternalLineIn?.(deviceId).then((result) => {
-      if (result?.ok) {
-        setMixerError('')
-        return
-      }
-      // Do not leave a failed startup attempt marked as connected. A later
-      // devicechange event or user interaction can now retry it.
-      connectedLineInRef.current = ''
-      setMixerError('Could not reconnect the saved line-in source. Allow microphone access or click the page, then try again.')
-    })
-  }, [mixerMode, lineInDeviceId, mixerInputDevices, connectExternalLineIn])
 
   const pickFolder = async () => {
     try {
@@ -369,12 +339,10 @@ export default function SettingsPage() {
   const handleLineInChange = async (deviceId) => {
     setMixerError('')
     setLineInDeviceId(deviceId)
-    connectedLineInRef.current = deviceId
     const selected = mixerInputDevices.find((device) => device.deviceId === deviceId)
     if (selected?.label) localStorage.setItem('externalMixerLineInDeviceLabel', selected.label)
     const result = await connectExternalLineIn?.(deviceId)
     if (!result?.ok) {
-      connectedLineInRef.current = ''
       setMixerError('Could not connect the selected line-in source. Check browser permissions and device availability.')
       setLineInDeviceId(localStorage.getItem('externalMixerLineInDeviceId') || '')
     }
