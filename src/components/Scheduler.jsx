@@ -210,12 +210,7 @@ export default function Scheduler() {
         addLog(`Track unavailable in this browser: ${item.title}`, 'error')
         continue
       }
-      const url = isURL
-        ? `/api/scheduler/url-stream?token=${encodeURIComponent(token || '')}&url=${encodeURIComponent(schedule.source_url || '')}`
-        : URL.createObjectURL(localTrack.blob)
       const activeSchedule = { ...schedule, title: item.title, artist: item.artist, playlist_position: index + 1, playlist_total: scheduledTracks.length }
-      audio.src = url
-      audio.load()
       const publish = () => {
         window.dispatchEvent(new CustomEvent('scheduler:playback', {
           detail: {
@@ -226,23 +221,50 @@ export default function Scheduler() {
           },
         }))
       }
-      audio.addEventListener('timeupdate', publish)
-      audio.addEventListener('loadedmetadata', publish)
-      try {
-        await audio.play()
-        setPlaying(activeSchedule)
-        addLog(`Scheduler Monitor playing "${item.title}"`, 'live')
-        publish()
-        await new Promise((resolve) => {
-          audio.addEventListener('ended', resolve, { once: true })
-          audio.addEventListener('error', resolve, { once: true })
-        })
-      } catch (err) {
-        addLog(`Scheduler Monitor could not play "${item.title}"${err?.message ? ` (${err.message})` : ''}`, 'error')
-      } finally {
-        audio.removeEventListener('timeupdate', publish)
-        audio.removeEventListener('loadedmetadata', publish)
-        if (!isURL) URL.revokeObjectURL(url)
+
+      let reconnectAttempt = 0
+      while (playbackRunRef.current === runID) {
+        const url = isURL
+          ? `/api/scheduler/url-stream?token=${encodeURIComponent(token || '')}&url=${encodeURIComponent(schedule.source_url || '')}&reconnect=${Date.now()}`
+          : URL.createObjectURL(localTrack.blob)
+        audio.src = url
+        audio.load()
+        audio.addEventListener('timeupdate', publish)
+        audio.addEventListener('loadedmetadata', publish)
+        try {
+          await audio.play()
+          setPlaying(activeSchedule)
+          addLog(
+            reconnectAttempt === 0
+              ? `Scheduler Monitor playing "${item.title}"`
+              : `URL stream reconnected: "${item.title}"`,
+            'live'
+          )
+          publish()
+          await new Promise((resolve) => {
+            const finish = (event) => {
+              audio.removeEventListener('ended', finish)
+              audio.removeEventListener('error', finish)
+              resolve(event.type)
+            }
+            audio.addEventListener('ended', finish)
+            audio.addEventListener('error', finish)
+          })
+        } catch (err) {
+          addLog(`Scheduler Monitor could not play "${item.title}"${err?.message ? ` (${err.message})` : ''}`, 'error')
+        } finally {
+          audio.removeEventListener('timeupdate', publish)
+          audio.removeEventListener('loadedmetadata', publish)
+          if (!isURL) URL.revokeObjectURL(url)
+        }
+
+        if (playbackRunRef.current !== runID) return
+        if (!isURL) break
+
+        reconnectAttempt += 1
+        const retryDelay = Math.min(30000, 2000 * (2 ** Math.min(reconnectAttempt - 1, 4)))
+        addLog(`URL stream interrupted; reconnecting in ${Math.round(retryDelay / 1000)}s…`, 'error')
+        await new Promise((resolve) => setTimeout(resolve, retryDelay))
       }
     }
     if (playbackRunRef.current !== runID) return

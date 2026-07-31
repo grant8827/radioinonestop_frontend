@@ -75,6 +75,41 @@ export function AuthProvider({ children }) {
     refreshProfile()
   }, [refreshProfile])
 
+  // Keep an already-open studio session in sync with trial expiration. The
+  // timeout is capped because browsers cannot schedule a single 30-day timer;
+  // the effect schedules the remaining portion after each capped check.
+  useEffect(() => {
+    if (!token || !user?.trialActive || !user?.trialEndsAt) return undefined
+
+    const trialEnd = new Date(user.trialEndsAt).getTime()
+    if (!Number.isFinite(trialEnd)) return undefined
+
+    const checkTrial = () => {
+      if (Date.now() >= trialEnd) refreshProfile()
+    }
+    const maxBrowserTimeout = 2147483647
+    let timeoutId
+    const scheduleExpiryCheck = () => {
+      const remaining = Math.max(0, trialEnd - Date.now())
+      timeoutId = setTimeout(
+        remaining + 1000 <= maxBrowserTimeout ? () => refreshProfile() : scheduleExpiryCheck,
+        Math.min(remaining + 1000, maxBrowserTimeout)
+      )
+    }
+    scheduleExpiryCheck()
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') checkTrial()
+    }
+
+    window.addEventListener('focus', checkTrial)
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      clearTimeout(timeoutId)
+      window.removeEventListener('focus', checkTrial)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [token, user?.trialActive, user?.trialEndsAt, refreshProfile])
+
   const login = useCallback((newToken) => {
     localStorage.setItem('rio_token', newToken)
     const payload = parseToken(newToken)
