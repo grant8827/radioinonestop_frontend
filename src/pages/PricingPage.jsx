@@ -51,6 +51,7 @@ const DEFAULT_PLANS = [
     monthlySalePercent: 0,
     yearlySalePercent: 0,
     isFeatured: false,
+    trialEnabled: false,
   },
   {
     id: 'professional',
@@ -68,6 +69,7 @@ const DEFAULT_PLANS = [
     monthlySalePercent: 0,
     yearlySalePercent: 0,
     isFeatured: true,
+    trialEnabled: false,
   },
   {
     id: 'enterprise',
@@ -85,6 +87,7 @@ const DEFAULT_PLANS = [
     monthlySalePercent: 0,
     yearlySalePercent: 0,
     isFeatured: false,
+    trialEnabled: false,
   },
   {
     id: 'ultimate',
@@ -103,6 +106,7 @@ const DEFAULT_PLANS = [
     monthlySalePercent: 0,
     yearlySalePercent: 0,
     isFeatured: false,
+    trialEnabled: false,
   },
 ]
 
@@ -404,8 +408,18 @@ export default function PricingPage() {
                       : 'bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-white/20'
                   }`}
                 >
-                  {isCurrentPlan ? `✓ ${plan.name} — Active` : `Select ${plan.name}`}
+                  {isCurrentPlan
+                    ? `✓ ${plan.name} — Active`
+                    : plan.trialEnabled
+                      ? 'Start 30-Day Free Trial'
+                      : `Select ${plan.name}`}
                 </button>
+
+                {plan.trialEnabled && !isCurrentPlan && (
+                  <p className="-mt-3 mb-6 text-center text-xs font-semibold text-cyan-300">
+                    30 days free — no payment today
+                  </p>
+                )}
 
                 <div className="space-y-3">
                   {plan.features && plan.features.map((feature, idx) => (
@@ -432,9 +446,6 @@ export default function PricingPage() {
 
         {/* FAQ or additional info */}
         <div className="mt-16 text-center">
-          <p className="text-gray-400 text-sm mb-4">
-            All plans include a 14-day free trial. No credit card required.
-          </p>
           <p className="text-gray-500 text-xs">
             Need a custom enterprise solution?{' '}
             <button className="text-amber-400 hover:text-amber-300 underline">

@@ -43,6 +43,7 @@ export default function PaymentPage() {
   const [error, setError] = useState('')
   const [stripeLoading, setStripeLoading] = useState(false)
   const [stripeVerifying, setStripeVerifying] = useState(false)
+  const [trialLoading, setTrialLoading] = useState(false)
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -230,6 +231,35 @@ export default function PaymentPage() {
     }
   }
 
+  async function startFreeTrial() {
+    if (!token) return
+    setTrialLoading(true)
+    setError('')
+    try {
+      const response = await fetch(`${API_BASE}/api/trial/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          plan: planId,
+          billing_cycle: billingCycle,
+        }),
+      })
+      if (!response.ok) {
+        const message = await response.text()
+        throw new Error(message || 'Could not start the free trial')
+      }
+      await refreshProfile()
+      navigate('/app')
+    } catch (err) {
+      setError(err.message || 'Could not start the free trial')
+    } finally {
+      setTrialLoading(false)
+    }
+  }
+
   if (!isAuthenticated) {
     return null
   }
@@ -309,6 +339,23 @@ export default function PaymentPage() {
         )}
 
         {/* Payment Form */}
+        {livePlanInfo?.trialEnabled && paymentReason !== 'trial-ended' && (
+          <div className="mb-5 rounded-xl border border-cyan-600/40 bg-cyan-950/30 p-5">
+            <h2 className="text-lg font-bold text-cyan-200">Start your 30-day free trial</h2>
+            <p className="mt-1 text-sm text-gray-300">
+              Use the complete {planInfo.name} package for 30 days. No payment is taken today.
+            </p>
+            <button
+              type="button"
+              onClick={startFreeTrial}
+              disabled={trialLoading}
+              className="mt-4 w-full rounded-lg bg-cyan-600 px-4 py-3 font-semibold text-white hover:bg-cyan-500 disabled:opacity-60"
+            >
+              {trialLoading ? 'Starting trial…' : 'Start 30-Day Free Trial'}
+            </button>
+          </div>
+        )}
+
         <div className="bg-white/3 border border-white/10 rounded-xl p-6">
           <h2 className="font-semibold text-sm uppercase tracking-wider text-gray-400 mb-4">Complete Payment</h2>
 

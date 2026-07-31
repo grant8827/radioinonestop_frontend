@@ -310,16 +310,15 @@ function EditUserModal({ user, onClose, onSave }) {
   const [plan, setPlan] = useState(user.plan || 'starter')
   const [billingCycle, setBillingCycle] = useState(user.billingCycle || 'monthly')
   const [isSuspended, setIsSuspended] = useState(user.isSuspended || false)
-  const [startTrial, setStartTrial] = useState(false)
 
   function handleSubmit(e) {
     e.preventDefault()
-    onSave(user.id, { plan, billingCycle, isSuspended, startTrial })
+    onSave(user.id, { plan, billingCycle, isSuspended })
   }
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 max-w-md w-full">
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
         <h3 className="text-xl font-bold text-white mb-4">Edit User</h3>
         
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -370,34 +369,6 @@ function EditUserModal({ user, onClose, onSave }) {
             <label htmlFor="suspended" className="text-sm text-gray-300">
               Suspend account
             </label>
-          </div>
-
-          <div className="rounded-lg border border-cyan-900/50 bg-cyan-950/20 p-4">
-            <div className="flex items-start gap-3">
-              <input
-                type="checkbox"
-                id="start-trial"
-                checked={startTrial}
-                disabled={user.trialUsed}
-                onChange={(e) => {
-                  setStartTrial(e.target.checked)
-                  if (e.target.checked) setIsSuspended(false)
-                }}
-                className="mt-0.5 w-4 h-4"
-              />
-              <label htmlFor="start-trial" className="text-sm text-gray-300">
-                <span className="block font-medium text-cyan-300">Start 30-day free trial</span>
-                <span className="mt-1 block text-xs text-gray-500">
-                  Activates the selected package without payment. Access is suspended and payment is required when the trial ends.
-                </span>
-              </label>
-            </div>
-            {user.trialUsed && (
-              <p className="mt-2 text-xs text-amber-400">
-                This account has already used its free trial
-                {user.trialEndsAt ? ` (ended ${new Date(user.trialEndsAt).toLocaleDateString()})` : ''}.
-              </p>
-            )}
           </div>
 
           <div className="flex gap-3 pt-4">
@@ -584,6 +555,12 @@ function PricingTab({ token }) {
               </div>
             )}
 
+            {plan.trialEnabled && (
+              <div className="mb-4 px-3 py-2 bg-cyan-900/30 border border-cyan-700/30 rounded-lg">
+                <div className="text-sm font-semibold text-cyan-300">30-day free trial enabled</div>
+              </div>
+            )}
+
             <button
               onClick={() => setEditPlan(plan)}
               className="w-full bg-gray-800 hover:bg-gray-700 text-white text-sm font-medium py-2 rounded-lg transition-colors"
@@ -614,6 +591,7 @@ function EditPlanModal({ plan, onClose, onSave }) {
   const [paypalPlanIdMonthly, setPaypalPlanIdMonthly] = useState(plan.paypalPlanIdMonthly || '')
   const [paypalPlanIdYearly, setPaypalPlanIdYearly] = useState(plan.paypalPlanIdYearly || '')
   const [isFeatured, setIsFeatured] = useState(plan.isFeatured || false)
+  const [trialEnabled, setTrialEnabled] = useState(plan.trialEnabled || false)
 
   function handleSubmit(e) {
     e.preventDefault()
@@ -627,12 +605,13 @@ function EditPlanModal({ plan, onClose, onSave }) {
       paypalPlanIdMonthly,
       paypalPlanIdYearly,
       isFeatured,
+      trialEnabled,
     })
   }
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 max-w-md w-full">
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
         <h3 className="text-xl font-bold text-white mb-4 capitalize">Edit {plan.name} Plan</h3>
         
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -706,6 +685,19 @@ function EditPlanModal({ plan, onClose, onSave }) {
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white font-mono text-sm"
             />
             <p className="text-xs text-gray-500 mt-1">Create in PayPal Dashboard → Subscriptions</p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="trial-enabled"
+              checked={trialEnabled}
+              onChange={(e) => setTrialEnabled(e.target.checked)}
+              className="w-4 h-4"
+            />
+            <label htmlFor="trial-enabled" className="text-sm text-gray-300">
+              Offer a 30-day free trial for this package
+            </label>
           </div>
 
           <div className="flex items-center gap-3">
