@@ -242,13 +242,42 @@ export default function Scheduler() {
           )
           publish()
           await new Promise((resolve) => {
-            const finish = (event) => {
+            let finished = false
+            let lastPlaybackTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0
+            let lastProgressAt = Date.now()
+            let watchdogId
+
+            const noteProgress = () => {
+              const currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : lastPlaybackTime
+              if (currentTime > lastPlaybackTime + 0.05) {
+                lastPlaybackTime = currentTime
+                lastProgressAt = Date.now()
+              }
+            }
+            const finish = (reason) => {
+              if (finished) return
+              finished = true
+              clearInterval(watchdogId)
               audio.removeEventListener('ended', finish)
               audio.removeEventListener('error', finish)
-              resolve(event.type)
+              audio.removeEventListener('timeupdate', noteProgress)
+              audio.removeEventListener('playing', noteProgress)
+              resolve(reason?.type || reason)
             }
             audio.addEventListener('ended', finish)
             audio.addEventListener('error', finish)
+            if (isURL) {
+              audio.addEventListener('timeupdate', noteProgress)
+              audio.addEventListener('playing', noteProgress)
+              watchdogId = setInterval(() => {
+                noteProgress()
+                if (!audio.paused && Date.now() - lastProgressAt >= 20000) {
+                  addLog('URL stream stalled for 20 seconds; forcing a fresh connection…', 'error')
+                  audio.pause()
+                  finish('stalled-timeout')
+                }
+              }, 2000)
+            }
           })
         } catch (err) {
           addLog(`Scheduler Monitor could not play "${item.title}"${err?.message ? ` (${err.message})` : ''}`, 'error')
