@@ -271,8 +271,8 @@ export default function Scheduler() {
               audio.addEventListener('playing', noteProgress)
               watchdogId = setInterval(() => {
                 noteProgress()
-                if (!audio.paused && Date.now() - lastProgressAt >= 20000) {
-                  addLog('URL stream stalled for 20 seconds; forcing a fresh connection…', 'error')
+                if (!audio.paused && Date.now() - lastProgressAt >= 7000) {
+                  addLog('URL stream stalled for 7 seconds; forcing a fresh connection…', 'error')
                   audio.pause()
                   finish('stalled-timeout')
                 }
