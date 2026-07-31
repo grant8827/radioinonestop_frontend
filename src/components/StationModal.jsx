@@ -184,7 +184,6 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
   const listenerSessionRef = useRef(null)
   const heartbeatRef       = useRef(null)
   const autoPlayStartedRef = useRef(false)
-  const wakeLockRef        = useRef(null)
 
   const hlsUrl    = `/hls/${info.slug}/index.m3u8`
   const streamUrl  = `/listen/${info.slug}` // WebM fallback (desktop Chrome/Firefox)
@@ -211,42 +210,17 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
     return () => clearInterval(pollRef.current)
   }, [info.slug])
 
-  // Resume AudioContext if the OS suspended it while the tab/app was backgrounded
-  // (e.g. device woke from sleep, user switches back from another app).
+  // Resume the desktop visualizer AudioContext after returning to the page.
+  // Mobile playback stays on the native audio path so it can continue while
+  // the screen is locked.
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState !== 'visible') return
       if (acRef.current?.state === 'suspended') acRef.current.resume().catch(() => {})
-      // Re-acquire the wake lock too — the OS releases it automatically on
-      // screen-lock/tab-hide even though we're still playing.
-      if (playing && 'wakeLock' in navigator && !wakeLockRef.current) {
-        navigator.wakeLock.request('screen')
-          .then(lock => { wakeLockRef.current = lock })
-          .catch(() => {})
-      }
     }
     document.addEventListener('visibilitychange', handleVisibility)
     return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [playing])
-
-  // Screen Wake Lock — keep the device awake while a station is actually
-  // playing, so the browser doesn't suspend the tab/AudioContext mid-stream.
-  useEffect(() => {
-    if (!playing) {
-      wakeLockRef.current?.release().catch(() => {})
-      wakeLockRef.current = null
-      return
-    }
-    if ('wakeLock' in navigator) {
-      navigator.wakeLock.request('screen')
-        .then(lock => { wakeLockRef.current = lock })
-        .catch(() => {})
-    }
-    return () => {
-      wakeLockRef.current?.release().catch(() => {})
-      wakeLockRef.current = null
-    }
-  }, [playing])
+  }, [])
 
   // Volume / mute
   useEffect(() => {
@@ -310,6 +284,15 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
       stopListenerSession(true)
       srcRef.current?.disconnect()
       acRef.current?.close()
+      if ('mediaSession' in navigator) {
+        try {
+          navigator.mediaSession.setActionHandler('play', null)
+          navigator.mediaSession.setActionHandler('pause', null)
+          navigator.mediaSession.setActionHandler('stop', null)
+          navigator.mediaSession.metadata = null
+          navigator.mediaSession.playbackState = 'none'
+        } catch { /* MediaSession unavailable */ }
+      }
     }
   }, [stopListenerSession])
 
@@ -332,13 +315,12 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
     hlsRef.current = null
 
     // Build AudioContext + analyser for visualizer.
-    // IMPORTANT: On iOS, routing audio through AudioContext (createMediaElementSource)
-    // causes the AudioContext to suspend when the screen locks, killing the stream.
-    // We skip the wiring on iOS so the native <audio> element plays uninterrupted in
-    // the background (exactly like Spotify/Apple Music). The idle sine animation shows
-    // instead of the live waveform, which is the correct trade-off.
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
-    if (!acRef.current && !isIOS && !isCrossOriginIcecast) {
+    // IMPORTANT: On mobile, routing audio through AudioContext
+    // (createMediaElementSource) can suspend when the screen locks. Keep mobile
+    // on the native <audio> path for reliable background playback. The idle sine
+    // animation replaces the live waveform there, which is the correct trade-off.
+    const isMobile = /Android|iPad|iPhone|iPod/i.test(navigator.userAgent)
+    if (!acRef.current && !isMobile && !isCrossOriginIcecast) {
       try {
         const ac           = new (window.AudioContext || window.webkitAudioContext)()
         const analyserNode = ac.createAnalyser()
@@ -368,12 +350,16 @@ export default function StationModal({ station, onClose, autoPlay = false }) {
             : [],
         })
         navigator.mediaSession.setActionHandler('play',  () => {
-          audioRef.current?.play().catch(() => {})
-          if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'
+          audioRef.current?.play()
+            .then(() => {
+              setPlaying(true)
+              startListenerSession().catch(() => {})
+              if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'
+            })
+            .catch(() => {})
         })
         navigator.mediaSession.setActionHandler('pause', () => {
-          hlsRef.current?.destroy(); hlsRef.current = null
-          if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = '' }
+          audioRef.current?.pause()
           stopListenerSession(true)
           setPlaying(false)
           if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused'
