@@ -55,7 +55,7 @@ export function AuthProvider({ children }) {
             ...prev.user,
             plan: profile.plan || 'starter',
             billingCycle: profile.billing_cycle || 'monthly',
-            stationName: profile.station_name || prev.user.stationName,
+            stationName: profile.station_name || '',
             logoUrl: profile.logo_url || '',
             isSuspended: !!profile.is_suspended,
             paymentRequired: !!profile.payment_required,

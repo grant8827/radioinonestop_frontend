@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Player from './components/Player'
 import ViewerCount from './components/ViewerCount'
 import AdminPanel from './components/AdminPanel'
@@ -19,6 +19,7 @@ import StationsPage from './pages/StationsPage'
 import PricingPage from './pages/PricingPage'
 import RegisterPage from './pages/RegisterPage'
 import PaymentPage from './pages/PaymentPage'
+import CompleteStationPage from './pages/CompleteStationPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import ListenerLimitModal from './components/ListenerLimitModal'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -32,6 +33,8 @@ function ProtectedRoute({ children }) {
 
 function ActiveAccountRoute({ children }) {
   const { isAuthenticated, user, profileLoaded } = useAuth()
+  const location = useLocation()
+
   if (!isAuthenticated) return <Navigate to="/" replace />
   if (!profileLoaded) {
     return (
@@ -40,11 +43,34 @@ function ActiveAccountRoute({ children }) {
       </div>
     )
   }
+  if (!user?.stationName) {
+    const next = encodeURIComponent(`${location.pathname}${location.search}`)
+    return <Navigate to={`/complete-station?next=${next}`} replace />
+  }
   if (user?.paymentRequired || user?.isSuspended) {
     const plan = encodeURIComponent(user?.plan || 'starter')
     const billing = encodeURIComponent(user?.billingCycle || 'monthly')
     const reason = user?.paymentRequired ? '&reason=trial-ended' : ''
     return <Navigate to={`/payment?plan=${plan}&billing=${billing}${reason}`} replace />
+  }
+  return children
+}
+
+function CompletedStationRoute({ children }) {
+  const { isAuthenticated, user, profileLoaded } = useAuth()
+  const location = useLocation()
+
+  if (!isAuthenticated) return <Navigate to="/" replace />
+  if (!profileLoaded) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <span className="text-gray-500 text-lg">Checking account…</span>
+      </div>
+    )
+  }
+  if (!user?.stationName) {
+    const next = encodeURIComponent(`${location.pathname}${location.search}`)
+    return <Navigate to={`/complete-station?next=${next}`} replace />
   }
   return children
 }
@@ -284,7 +310,15 @@ export default function App() {
           <Route path="/stations" element={<StationsPage />} />
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/payment" element={<PaymentPage />} />
+          <Route
+            path="/payment"
+            element={
+              <CompletedStationRoute>
+                <PaymentPage />
+              </CompletedStationRoute>
+            }
+          />
+          <Route path="/complete-station" element={<CompleteStationPage />} />
           <Route path="/conference/:roomId" element={<ConferenceRoom />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route
