@@ -60,7 +60,6 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
   const { login } = useAuth()
   const [step, setStep] = useState(1)
 
-  // Personal info
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
@@ -68,23 +67,21 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
   const [confirm, setConfirm] = useState('')
   const [showPass, setShowPass] = useState(false)
 
-  // Radio info
+  const [otp, setOtp] = useState('')
+  const [pendingEmail, setPendingEmail] = useState('')
+  const [pendingToken, setPendingToken] = useState('')
+  const [resendCooldown, setResendCooldown] = useState(0)
+
   const [stationName, setStationName] = useState('')
   const [genre, setGenre] = useState('')
   const [description, setDescription] = useState('')
   const [logoPreview, setLogoPreview] = useState('')
-
-  // OTP verification
-  const [otp, setOtp] = useState('')
-  const [pendingEmail, setPendingEmail] = useState('')
-  const [resendCooldown, setResendCooldown] = useState(0)
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const firstInputRef = useRef(null)
   const logoInputRef = useRef(null)
 
-  // Plan display mapping
   const PLAN_NAMES = {
     starter: 'Starter ($29/mo)',
     professional: 'Professional ($39/mo)',
@@ -97,6 +94,12 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
   }, [step])
 
   useEffect(() => { setError('') }, [step])
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const t = setTimeout(() => setResendCooldown((value) => value - 1), 1000)
+    return () => clearTimeout(t)
+  }, [resendCooldown])
 
   useEffect(() => {
     function onKey(e) { if (e.key === 'Escape') onClose() }
@@ -119,15 +122,15 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
     setError('')
     if (!firstName.trim()) { setError('First name is required'); return }
     if (!lastName.trim()) { setError('Last name is required'); return }
+    if (!email.trim()) { setError('Email is required'); return }
     if (password.length < 8) { setError('Password must be at least 8 characters'); return }
     if (password !== confirm) { setError('Passwords do not match'); return }
     setStep(2)
   }
 
-  async function handleSubmit(e) {
+  async function handleSendVerification(e) {
     e.preventDefault()
     setError('')
-    if (!stationName.trim()) { setError('Station name is required'); return }
     setLoading(true)
     try {
       const resp = await fetch('/api/auth/register', {
@@ -138,22 +141,21 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
           password,
           first_name: firstName.trim(),
           last_name: lastName.trim(),
-          station_name: stationName.trim(),
-          genre,
-          description: description.trim(),
-          logo_url: logoPreview,
         }),
       })
       const text = await resp.text()
-      if (!resp.ok) { setError(text.trim() || 'Registration failed'); return }
-      const data = JSON.parse(text)
-      if (data.status === 'verify_email') {
-        setPendingEmail(data.email || email.trim().toLowerCase())
-        setStep(3)
+      if (!resp.ok) {
+        if (resp.status === 409) {
+          setError('An account with this email already exists. Please sign in instead.')
+        } else {
+          setError(text.trim() || 'Registration failed')
+        }
         return
       }
-      login(data.token)
-      onSuccess()
+      const data = JSON.parse(text)
+      setPendingEmail(data.email || email.trim().toLowerCase())
+      setResendCooldown(60)
+      setStep(3)
     } catch {
       setError('Network error — is the server running?')
     } finally {
@@ -175,8 +177,8 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
       const text = await resp.text()
       if (!resp.ok) { setError(text.trim() || 'Invalid or expired code'); return }
       const data = JSON.parse(text)
-      login(data.token)
-      onSuccess()
+      setPendingToken(data.token)
+      setStep(4)
     } catch {
       setError('Network error — is the server running?')
     } finally {
@@ -199,14 +201,45 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
         return
       }
       setResendCooldown(60)
-      const interval = setInterval(() => {
-        setResendCooldown(v => {
-          if (v <= 1) { clearInterval(interval); return 0 }
-          return v - 1
-        })
-      }, 1000)
     } catch {
       setError('Network error — could not resend verification code')
+    }
+  }
+
+  async function handleComplete(e) {
+    e.preventDefault()
+    setError('')
+    if (!stationName.trim()) { setError('Station name is required'); return }
+    setLoading(true)
+    try {
+      const resp = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${pendingToken}`,
+        },
+        body: JSON.stringify({
+          station_name: stationName.trim(),
+          genre,
+          description: description.trim(),
+          logo_url: logoPreview,
+        }),
+      })
+      if (!resp.ok) {
+        const text = await resp.text()
+        if (resp.status === 409) {
+          setError('That station name is already taken. Please choose a different name.')
+        } else {
+          setError(text.trim() || 'Failed to save station info')
+        }
+        return
+      }
+      login(pendingToken)
+      onSuccess()
+    } catch {
+      setError('Network error — could not finish setup')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -217,9 +250,7 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
     >
       <div className="w-full max-w-lg bg-[#0d0d16] border border-white/8 rounded-2xl shadow-2xl shadow-black/60 overflow-hidden">
 
-        {/* Gradient header banner */}
         <div className="relative bg-linear-to-br from-purple-900/60 via-blue-900/40 to-transparent px-7 pt-7 pb-6">
-          {/* Close */}
           <button
             onClick={onClose}
             className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
@@ -230,7 +261,6 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
             </svg>
           </button>
 
-          {/* Icon + title */}
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-xl rio-logo-gradient flex items-center justify-center shadow-lg shadow-red-900/40">
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -239,10 +269,10 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
             </div>
             <div className="flex-1">
               <h2 className="text-lg font-bold text-white">
-                {step === 1 ? 'Create your account' : step === 2 ? 'Set up your radio station' : 'Verify your email'}
+                {step === 1 ? 'Create your account' : step === 2 ? 'Verify your email' : step === 3 ? 'Enter your verification code' : 'Set up your radio station'}
               </h2>
               <p className="text-xs text-gray-400 mt-0.5">
-                {step === 1 ? 'Step 1 of 3 — Personal info' : step === 2 ? 'Step 2 of 3 — Radio info' : 'Step 3 of 3 — Email verification'}
+                {step === 1 ? 'Step 1 of 4 — Personal info' : step === 2 ? 'Step 2 of 4 — Send verification' : step === 3 ? 'Step 3 of 4 — Email verification' : 'Step 4 of 4 — Radio info'}
               </p>
             </div>
             {selectedPlan && (
@@ -254,16 +284,14 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
             )}
           </div>
 
-          {/* Progress bar */}
           <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
             <div
               className="h-full rio-logo-gradient rounded-full transition-all duration-500"
-              style={{ width: step === 1 ? '33%' : step === 2 ? '66%' : '100%' }}
+              style={{ width: step === 1 ? '25%' : step === 2 ? '50%' : step === 3 ? '75%' : '100%' }}
             />
           </div>
         </div>
 
-        {/* ══ STEP 1 — Personal Info ══ */}
         {step === 1 && (
           <form onSubmit={handleStep1} className="px-7 py-6 space-y-4">
             <div className="grid grid-cols-2 gap-3">
@@ -282,7 +310,7 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
             <Field label="Password" required hint="Min. 8 characters">
               <div className="relative">
                 <TextInput type={showPass ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" placeholder="Create a password" />
-                <button type="button" onClick={() => setShowPass(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors">
+                <button type="button" onClick={() => setShowPass((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors">
                   <EyeIcon open={showPass} />
                 </button>
               </div>
@@ -298,7 +326,7 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
               type="submit"
               className="w-full py-2.5 rounded-xl rio-logo-gradient text-white font-semibold text-sm transition-all shadow-lg shadow-red-900/30"
             >
-              Next: Set up your station →
+              Next: Verify your email →
             </button>
 
             <p className="text-center text-xs text-gray-600 pt-1">
@@ -308,10 +336,96 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
           </form>
         )}
 
-        {/* ══ STEP 2 — Radio Info ══ */}
         {step === 2 && (
-          <form onSubmit={handleSubmit} className="px-7 py-6 space-y-4">
-            {/* Logo + station name */}
+          <form onSubmit={handleSendVerification} className="px-7 py-6 space-y-4">
+            <div className="text-center space-y-3">
+              <div className="w-14 h-14 rounded-2xl bg-purple-900/30 border border-purple-700/30 flex items-center justify-center mx-auto">
+                <svg className="w-7 h-7 text-purple-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                </svg>
+              </div>
+              <p className="text-sm text-gray-400 leading-relaxed">
+                Send a 6-digit code to<br />
+                <span className="text-white font-semibold">{email.trim().toLowerCase()}</span>
+              </p>
+            </div>
+
+            <ErrorBox message={error} />
+
+            <div className="flex gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-700 hover:border-gray-500 text-gray-400 hover:text-white font-semibold text-sm transition-all"
+              >
+                ← Back
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-2 py-2.5 rounded-xl rio-logo-gradient disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm transition-all shadow-lg shadow-red-900/30"
+              >
+                {loading ? 'Sending code…' : 'Send verification code'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {step === 3 && (
+          <form onSubmit={handleVerifyOTP} className="px-7 py-6 space-y-5">
+            <div className="text-center">
+              <div className="w-14 h-14 rounded-2xl bg-purple-900/30 border border-purple-700/30 flex items-center justify-center mx-auto mb-4">
+                <svg className="w-7 h-7 text-purple-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                </svg>
+              </div>
+              <p className="text-sm text-gray-400 leading-relaxed">
+                We sent a 6-digit code to<br />
+                <span className="text-white font-semibold">{pendingEmail}</span>
+              </p>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1.5">Verification Code</label>
+              <input
+                ref={firstInputRef}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                placeholder="000000"
+                className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-2xl font-mono text-white text-center tracking-[0.5em] placeholder-gray-700 focus:outline-none focus:border-amber-500 transition-colors"
+              />
+            </div>
+
+            <ErrorBox message={error} />
+
+            <button
+              type="submit"
+              disabled={loading || otp.length !== 6}
+              className="w-full py-2.5 rounded-xl rio-logo-gradient disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm transition-all shadow-lg shadow-red-900/30"
+            >
+              {loading ? 'Verifying…' : 'Verify email'}
+            </button>
+
+            <p className="text-center text-xs text-gray-600">
+              Didn't receive it?{' '}
+              <button
+                type="button"
+                onClick={handleResendOTP}
+                disabled={resendCooldown > 0}
+                className="text-amber-400 hover:text-amber-300 font-semibold disabled:text-gray-600 disabled:cursor-not-allowed"
+              >
+                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
+              </button>
+            </p>
+          </form>
+        )}
+
+        {step === 4 && (
+          <form onSubmit={handleComplete} className="px-7 py-6 space-y-4">
             <div className="flex items-start gap-4">
               <div className="shrink-0 flex flex-col items-center gap-1">
                 <button
@@ -349,7 +463,7 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
                 className="w-full bg-gray-900/60 border border-gray-700/80 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500 transition-colors"
               >
                 <option value="">Choose a genre…</option>
-                {GENRES.map(g => <option key={g} value={g}>{g}</option>)}
+                {GENRES.map((g) => <option key={g} value={g}>{g}</option>)}
               </select>
             </Field>
 
@@ -369,7 +483,7 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
             <div className="flex gap-3 pt-1">
               <button
                 type="button"
-                onClick={() => setStep(1)}
+                onClick={() => setStep(3)}
                 className="flex-1 py-2.5 rounded-xl border border-gray-700 hover:border-gray-500 text-gray-400 hover:text-white font-semibold text-sm transition-all"
               >
                 ← Back
@@ -379,63 +493,9 @@ export default function RegisterModal({ selectedPlan, onSuccess, onClose, onSwit
                 disabled={loading}
                 className="flex-2 py-2.5 rounded-xl rio-logo-gradient disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm transition-all shadow-lg shadow-red-900/30"
               >
-                {loading ? 'Creating station…' : '🎙️ Launch My Station'}
+                {loading ? 'Finishing setup…' : 'Complete setup'}
               </button>
             </div>
-          </form>
-        )}
-
-        {/* ══ STEP 3 — Email Verification ══ */}
-        {step === 3 && (
-          <form onSubmit={handleVerifyOTP} className="px-7 py-6 space-y-5">
-            <div className="text-center">
-              <div className="w-14 h-14 rounded-2xl bg-purple-900/30 border border-purple-700/30 flex items-center justify-center mx-auto mb-4">
-                <svg className="w-7 h-7 text-purple-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-                </svg>
-              </div>
-              <p className="text-sm text-gray-400 leading-relaxed">
-                We sent a 6-digit code to<br />
-                <span className="text-white font-semibold">{pendingEmail}</span>
-              </p>
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-1.5">Verification Code</label>
-              <input
-                ref={firstInputRef}
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={6}
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                placeholder="000000"
-                className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-2xl font-mono text-white text-center tracking-[0.5em] placeholder-gray-700 focus:outline-none focus:border-amber-500 transition-colors"
-              />
-            </div>
-
-            <ErrorBox message={error} />
-
-            <button
-              type="submit"
-              disabled={loading || otp.length !== 6}
-              className="w-full py-2.5 rounded-xl rio-logo-gradient disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm transition-all shadow-lg shadow-red-900/30"
-            >
-              {loading ? 'Verifying…' : 'Verify & Create Account'}
-            </button>
-
-            <p className="text-center text-xs text-gray-600">
-              Didn't receive it?{' '}
-              <button
-                type="button"
-                onClick={handleResendOTP}
-                disabled={resendCooldown > 0}
-                className="text-amber-400 hover:text-amber-300 font-semibold disabled:text-gray-600 disabled:cursor-not-allowed"
-              >
-                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
-              </button>
-            </p>
           </form>
         )}
       </div>

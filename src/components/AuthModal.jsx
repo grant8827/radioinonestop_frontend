@@ -55,12 +55,9 @@ function ErrorBox({ message }) {
 
 export default function AuthModal({ initialMode = 'login', onSuccess, onClose }) {
   const { login } = useAuth()
-  // 'login' | 'register'
   const [mode, setMode] = useState(initialMode)
-  // register step: 1 = personal info, 2 = radio info
   const [step, setStep] = useState(1)
 
-  // ── shared ──
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -68,11 +65,14 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // ── personal info (register step 1) ──
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
 
-  // ── radio info (register step 2) ──
+  const [otp, setOtp] = useState('')
+  const [pendingEmail, setPendingEmail] = useState('')
+  const [pendingToken, setPendingToken] = useState('')
+  const [resendCooldown, setResendCooldown] = useState(0)
+
   const [stationName, setStationName] = useState('')
   const [genre, setGenre] = useState('')
   const [description, setDescription] = useState('')
@@ -81,7 +81,6 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
   const firstInputRef = useRef(null)
   const logoInputRef = useRef(null)
 
-  // Reset on mode change
   useEffect(() => {
     setError('')
     setStep(1)
@@ -89,6 +88,10 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
     setConfirm('')
     setFirstName('')
     setLastName('')
+    setPendingEmail('')
+    setPendingToken('')
+    setOtp('')
+    setResendCooldown(0)
     setStationName('')
     setGenre('')
     setDescription('')
@@ -96,10 +99,14 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
     setTimeout(() => firstInputRef.current?.focus(), 50)
   }, [mode])
 
-  // Reset error on step change
   useEffect(() => { setError('') }, [step])
 
-  // Close on Escape
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const t = setTimeout(() => setResendCooldown((value) => value - 1), 1000)
+    return () => clearTimeout(t)
+  }, [resendCooldown])
+
   useEffect(() => {
     function onKey(e) { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
@@ -116,23 +123,20 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
     reader.readAsDataURL(file)
   }
 
-  // Step 1 validation → advance to step 2
   function handleStep1(e) {
     e.preventDefault()
     setError('')
     if (!firstName.trim()) { setError('First name is required'); return }
     if (!lastName.trim()) { setError('Last name is required'); return }
+    if (!email.trim()) { setError('Email is required'); return }
     if (password !== confirm) { setError('Passwords do not match'); return }
     if (password.length < 8) { setError('Password must be at least 8 characters'); return }
     setStep(2)
   }
 
-  // Step 2 → submit
   async function handleRegister(e) {
     e.preventDefault()
     setError('')
-    if (!stationName.trim()) { setError('Station name is required'); return }
-
     setLoading(true)
     try {
       const resp = await fetch('/api/auth/register', {
@@ -143,19 +147,103 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
           password,
           first_name: firstName.trim(),
           last_name: lastName.trim(),
+        }),
+      })
+      const text = await resp.text()
+      if (!resp.ok) {
+        if (resp.status === 409) {
+          setError('An account with this email already exists. Please sign in instead.')
+        } else {
+          setError(text.trim() || 'Registration failed')
+        }
+        return
+      }
+      const data = JSON.parse(text)
+      setPendingEmail(data.email || email.trim().toLowerCase())
+      setResendCooldown(60)
+      setStep(3)
+    } catch {
+      setError('Network error — is the server running?')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleVerifyOTP(e) {
+    e.preventDefault()
+    setError('')
+    if (otp.trim().length !== 6) { setError('Enter the 6-digit code'); return }
+    setLoading(true)
+    try {
+      const resp = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: pendingEmail, otp: otp.trim() }),
+      })
+      const text = await resp.text()
+      if (!resp.ok) { setError(text.trim() || 'Invalid or expired code'); return }
+      const data = JSON.parse(text)
+      setPendingToken(data.token)
+      setStep(4)
+    } catch {
+      setError('Network error — is the server running?')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleResendOTP() {
+    if (resendCooldown > 0) return
+    setError('')
+    try {
+      const resp = await fetch('/api/auth/resend-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: pendingEmail }),
+      })
+      const text = await resp.text()
+      if (!resp.ok) {
+        setError(text.trim() || 'Could not resend verification code')
+        return
+      }
+      setResendCooldown(60)
+    } catch {
+      setError('Network error — could not resend verification code')
+    }
+  }
+
+  async function handleComplete(e) {
+    e.preventDefault()
+    setError('')
+    if (!stationName.trim()) { setError('Station name is required'); return }
+    setLoading(true)
+    try {
+      const resp = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${pendingToken}`,
+        },
+        body: JSON.stringify({
           station_name: stationName.trim(),
           genre,
           description: description.trim(),
           logo_url: logoPreview,
         }),
       })
-      const text = await resp.text()
-      if (!resp.ok) { setError(text.trim() || 'Registration failed'); return }
-      const data = JSON.parse(text)
-      login(data.token)
+      if (!resp.ok) {
+        const text = await resp.text()
+        if (resp.status === 409) {
+          setError('That station name is already taken. Please choose a different name.')
+        } else {
+          setError(text.trim() || 'Failed to save station info')
+        }
+        return
+      }
+      login(pendingToken)
       onSuccess()
     } catch {
-      setError('Network error — is the server running?')
+      setError('Network error — could not finish setup')
     } finally {
       setLoading(false)
     }
@@ -191,7 +279,6 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
     >
       <div className="w-full max-w-md bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden">
 
-        {/* ── Header ── */}
         <div className="flex items-center justify-between px-6 pt-6 pb-5">
           <div>
             {mode === 'login' ? (
@@ -202,10 +289,10 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
             ) : (
               <>
                 <h2 className="text-lg font-bold text-white">
-                  {step === 1 ? 'Create your account' : 'Set up your radio station'}
+                  {step === 1 ? 'Create your account' : step === 2 ? 'Verify your email' : step === 3 ? 'Enter your verification code' : 'Set up your radio station'}
                 </h2>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  {step === 1 ? 'Step 1 of 2 — Personal info' : 'Step 2 of 2 — Radio info'}
+                  {step === 1 ? 'Step 1 of 4 — Personal info' : step === 2 ? 'Step 2 of 4 — Send verification' : step === 3 ? 'Step 3 of 4 — Email verification' : 'Step 4 of 4 — Radio info'}
                 </p>
               </>
             )}
@@ -217,7 +304,6 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
           </button>
         </div>
 
-        {/* ── Mode tabs (only when not mid-register) ── */}
         {(mode === 'login' || step === 1) && (
           <div className="flex mx-6 mb-5 bg-gray-800/60 rounded-xl p-1">
             {['login', 'register'].map((m) => (
@@ -234,17 +320,15 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
           </div>
         )}
 
-        {/* ── Register step progress bar ── */}
         {mode === 'register' && (
           <div className="mx-6 mb-5 h-1 bg-gray-800 rounded-full overflow-hidden">
             <div
               className="h-full rio-logo-gradient rounded-full transition-all duration-300"
-              style={{ width: step === 1 ? '50%' : '100%' }}
+              style={{ width: step === 1 ? '25%' : step === 2 ? '50%' : step === 3 ? '75%' : '100%' }}
             />
           </div>
         )}
 
-        {/* ══ LOGIN FORM ══ */}
         {mode === 'login' && (
           <form onSubmit={handleLogin} className="px-6 pb-6 space-y-4">
             <Field label="Email" required>
@@ -254,7 +338,7 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
             <Field label="Password" required>
               <div className="relative">
                 <Input type={showPass ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" placeholder="Your password" />
-                <button type="button" onClick={() => setShowPass(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors">
+                <button type="button" onClick={() => setShowPass((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors">
                   <EyeIcon open={showPass} />
                 </button>
               </div>
@@ -273,7 +357,6 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
           </form>
         )}
 
-        {/* ══ REGISTER STEP 1 — Personal Info ══ */}
         {mode === 'register' && step === 1 && (
           <form onSubmit={handleStep1} className="px-6 pb-6 space-y-4">
             <div className="grid grid-cols-2 gap-3">
@@ -292,7 +375,7 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
             <Field label="Password" required>
               <div className="relative">
                 <Input type={showPass ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password" placeholder="Min. 8 characters" />
-                <button type="button" onClick={() => setShowPass(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors">
+                <button type="button" onClick={() => setShowPass((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors">
                   <EyeIcon open={showPass} />
                 </button>
               </div>
@@ -305,7 +388,7 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
             <ErrorBox message={error} />
 
             <button type="submit" className="w-full py-3 rounded-xl rio-logo-gradient text-white font-semibold text-sm transition-all shadow-lg shadow-red-900/30">
-              Next: Set up your station →
+              Next: Verify your email →
             </button>
 
             <p className="text-center text-xs text-gray-600">
@@ -315,10 +398,76 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
           </form>
         )}
 
-        {/* ══ REGISTER STEP 2 — Radio Info ══ */}
         {mode === 'register' && step === 2 && (
           <form onSubmit={handleRegister} className="px-6 pb-6 space-y-4">
-            {/* Logo + Station name row */}
+            <p className="text-sm text-gray-400 text-center leading-relaxed">
+              Send a 6-digit verification code to<br />
+              <span className="text-white font-semibold">{email.trim().toLowerCase()}</span>
+            </p>
+
+            <ErrorBox message={error} />
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="flex-1 py-3 rounded-xl border border-gray-700 hover:border-gray-500 text-gray-400 hover:text-white font-semibold text-sm transition-all"
+              >
+                ← Back
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-2 py-3 rounded-xl rio-logo-gradient disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm transition-all shadow-lg shadow-red-900/30"
+              >
+                {loading ? 'Sending code…' : 'Send verification code'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {mode === 'register' && step === 3 && (
+          <form onSubmit={handleVerifyOTP} className="px-6 pb-6 space-y-4">
+            <p className="text-sm text-gray-400 text-center leading-relaxed">
+              Enter the 6-digit code we sent to<br />
+              <span className="text-white font-semibold">{pendingEmail}</span>
+            </p>
+
+            <Field label="Verification Code" required>
+              <Input
+                inputRef={firstInputRef}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                placeholder="000000"
+              />
+            </Field>
+
+            <ErrorBox message={error} />
+
+            <button type="submit" disabled={loading || otp.length !== 6} className="w-full py-3 rounded-xl rio-logo-gradient disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm transition-all shadow-lg shadow-red-900/30">
+              {loading ? 'Verifying…' : 'Verify email'}
+            </button>
+
+            <p className="text-center text-xs text-gray-600">
+              Didn&apos;t receive it?{' '}
+              <button
+                type="button"
+                onClick={handleResendOTP}
+                disabled={resendCooldown > 0}
+                className="text-amber-400 hover:text-amber-300 font-semibold disabled:text-gray-600 disabled:cursor-not-allowed"
+              >
+                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
+              </button>
+            </p>
+          </form>
+        )}
+
+        {mode === 'register' && step === 4 && (
+          <form onSubmit={handleComplete} className="px-6 pb-6 space-y-4">
             <div className="flex items-start gap-4">
               <div className="shrink-0">
                 <button
@@ -339,7 +488,6 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
                   )}
                 </button>
                 <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
-                <p className="text-center text-xs text-gray-600 mt-1">optional</p>
               </div>
               <div className="flex-1">
                 <Field label="Station Name" required>
@@ -355,7 +503,7 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
                 className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500 transition-colors"
               >
                 <option value="">Select a genre (optional)</option>
-                {GENRES.map(g => <option key={g} value={g}>{g}</option>)}
+                {GENRES.map((g) => <option key={g} value={g}>{g}</option>)}
               </select>
             </Field>
 
@@ -375,7 +523,7 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={() => setStep(1)}
+                onClick={() => setStep(3)}
                 className="flex-1 py-3 rounded-xl border border-gray-700 hover:border-gray-500 text-gray-400 hover:text-white font-semibold text-sm transition-all"
               >
                 ← Back
@@ -385,7 +533,7 @@ export default function AuthModal({ initialMode = 'login', onSuccess, onClose })
                 disabled={loading}
                 className="flex-2 py-3 rounded-xl rio-logo-gradient disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm transition-all shadow-lg shadow-red-900/30"
               >
-                {loading ? 'Creating station…' : 'Launch My Station 🎙️'}
+                {loading ? 'Finishing setup…' : 'Complete setup'}
               </button>
             </div>
           </form>
