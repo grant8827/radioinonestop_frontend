@@ -547,7 +547,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
   const allowedBitrates = audioBitratesForPlan(user?.plan)
   const defaultBitrate = allowedBitrates[allowedBitrates.length - 1]
   const { getStreamTrack, getStreamAnalyser, resume } = useAudioEngine()
-  const { radioStatus, startRadio, stopRadio,
+  const { radioStatus, radioError, startRadio, stopRadio,
           broadcastMode, setBroadcastMode,
           setIcecastStatus, icecastStartRef, icecastStopRef } = useStream()
 
@@ -632,6 +632,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
   const connectionAttemptRef = useRef(0)
   const manualStopRef = useRef(false)
   const wakeLockRef = useRef(null)
+  const lastHubErrorRef = useRef('')
 
   function setStatusBoth(s) {
     if (broadcastMode === 'hub') {
@@ -691,13 +692,18 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
       const streamAnalyser = getStreamAnalyser()
       if (streamAnalyser) { analyserRef.current = streamAnalyser; drawSpectrum() }
       addLog('🔴 Hub broadcast active')
+      lastHubErrorRef.current = ''
+    } else if (radioStatus === 'error' && radioError && radioError !== lastHubErrorRef.current) {
+      addLog('Error: ' + radioError)
+      lastHubErrorRef.current = radioError
     } else if (radioStatus === 'idle' || radioStatus === 'stopped') {
       if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
       analyserRef.current = null
       const canvas = canvasRef.current
       if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height)
+      lastHubErrorRef.current = ''
     }
-  }, [radioStatus, broadcastMode]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [radioStatus, radioError, broadcastMode]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Frequency spectrum canvas ──────────────────────────────────────────
   function drawSpectrum() {
@@ -1044,6 +1050,12 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
             <div ref={logsEndRef} />
           </div>
         </div>
+
+        {broadcastMode === 'hub' && status === 'error' && radioError && (
+          <div className="rounded-lg border border-red-800/60 bg-red-950/30 px-4 py-3 text-sm text-red-300">
+            {radioError}
+          </div>
+        )}
 
         {/* Listener share link — hub mode only */}
         {broadcastMode === 'hub' && listenUrl && (

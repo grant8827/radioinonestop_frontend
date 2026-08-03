@@ -10,6 +10,7 @@ export function StreamProvider({ children }) {
 
   // ── Radio stream ──────────────────────────────────────────────────────────
   const [radioStatus, setRadioStatus] = useState('idle') // idle | connecting | live | stopped | error
+  const [radioError, setRadioError] = useState('')
   const radioWsRef         = useRef(null)
   const radioRecorderRef   = useRef(null)
   const radioKeepaliveRef  = useRef(null)
@@ -49,11 +50,13 @@ export function StreamProvider({ children }) {
     const s = radioStatusRef.current
     if (s === 'live' || s === 'connecting') return
     try {
+      setRadioError('')
       setRadioStatusBoth('connecting')
       await audioEngine?.resume()
 
       const stream = audioEngine?.getStreamTrack?.()
       if (!stream || stream.getTracks().length === 0) {
+        setRadioError('Mixer is not active. Open the Mixer and start a channel first.')
         setRadioStatusBoth('error')
         return
       }
@@ -94,9 +97,11 @@ export function StreamProvider({ children }) {
               if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ action: 'ping' }))
             }, 10_000)
           } else if (msg.status === 'stopped') {
+            setRadioError('')
             setRadioStatusBoth('stopped')
             radioCleanup()
           } else if (msg.status === 'error') {
+            setRadioError(msg.msg || 'Broadcast failed')
             setRadioStatusBoth('error')
             radioCleanup()
           }
@@ -118,6 +123,7 @@ export function StreamProvider({ children }) {
         }
       }
     } catch {
+      setRadioError('Could not start the broadcast')
       setRadioStatusBoth('error')
       radioCleanup()
     }
@@ -127,6 +133,7 @@ export function StreamProvider({ children }) {
     if (radioWsRef.current?.readyState === WebSocket.OPEN) {
       radioWsRef.current.send(JSON.stringify({ action: 'stop' }))
     }
+    setRadioError('')
     setRadioStatusBoth('idle')
     radioCleanup()
   }, [])
@@ -197,7 +204,7 @@ export function StreamProvider({ children }) {
 
   return (
     <StreamCtx.Provider value={{
-      radioStatus, startRadio, stopRadio,
+      radioStatus, radioError, startRadio, stopRadio,
       videoStatus, startVideo, stopVideo,
       broadcastMode, setBroadcastMode,
       icecastStatus, setIcecastStatus,
