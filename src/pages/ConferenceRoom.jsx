@@ -347,10 +347,9 @@ function BusCanvas({ analyser, label, color, muted = false }) {
 }
 
 // ── Participant grid ───────────────────────────────────────────────────────────
-function GroupTab({ myPeerId, iAmHost, peers, participantControls, speakingMap, onRouteChange, onGainChange, onMuteToggle, onDisconnect }) {
+function GroupTab({ myPeerId, localUsername, iAmHost, peers, participantControls, speakingMap, onRouteChange, onGainChange, onMuteToggle, onDisconnect }) {
   const myEntry = myPeerId ? [{ peerId: myPeerId, isLocal: true }] : []
   const others = Object.keys(peers)
-    .filter((id) => id !== myPeerId)
     .map((id) => ({ peerId: id, isLocal: false }))
   const allPeers = [...myEntry, ...others]
 
@@ -372,7 +371,7 @@ function GroupTab({ myPeerId, iAmHost, peers, participantControls, speakingMap, 
         <ParticipantTile
           key={peerId}
           peerId={peerId}
-          username={peers[peerId]?.username || (isLocal ? 'You' : 'Guest')}
+          username={isLocal ? localUsername : (peers[peerId]?.username || 'Guest')}
           isLocalPeer={isLocal}
           iAmHost={iAmHost}
           speaking={speakingMap[peerId] || false}
@@ -574,8 +573,9 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
           setMyPeerId(msg.peerId)
           setIAmHost(msg.isHost)
           setConnected(true)
-          // Build initial peers map (self + existing)
-          const initial = { [msg.peerId]: { username, isHost: msg.isHost } }
+          // Track only remote peers in shared state. The local participant is
+          // rendered separately so reconnects cannot show the host twice.
+          const initial = {}
           for (const p of (msg.peers || [])) {
             initial[p.peerId] = { username: p.username, isHost: p.isHost }
           }
@@ -805,7 +805,7 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
     : outboundStatus.status === 'mic' ? 'bg-blue-400'
     : 'bg-yellow-400'
 
-  const guestCount = Object.keys(peers).length - 1
+  const guestCount = Object.keys(peers).length
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
@@ -926,6 +926,7 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
         {tab === 'group' && (
           <GroupTab
             myPeerId={myPeerId}
+            localUsername={username}
             iAmHost={iAmHost}
             peers={peers}
             participantControls={participantControls}
