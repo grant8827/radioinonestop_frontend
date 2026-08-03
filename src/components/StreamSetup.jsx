@@ -549,7 +549,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
   const { getStreamTrack, getStreamAnalyser, resume } = useAudioEngine()
   const { radioStatus, radioError, startRadio, stopRadio,
           broadcastMode, setBroadcastMode,
-          setIcecastStatus, icecastStartRef, icecastStopRef } = useStream()
+          setIcecastStatus, icecastError, setIcecastError, icecastStartRef, icecastStopRef } = useStream()
 
   // 'hub' = broadcast directly to this server's fan-out hub (no Icecast needed)
   // 'icecast' = legacy path: server transcodes via ffmpeg and pushes to Icecast
@@ -774,6 +774,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
       reconnectTimerRef.current = null
     }
     try {
+      setIcecastError('')
       setStatusBoth('requesting')
       terminalErrorRef.current = false
       addLog('Tapping Mixer main output…')
@@ -784,6 +785,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
       // Get the mixer's master output as a MediaStream
       const stream = getStreamTrack()
       if (!stream || stream.getTracks().length === 0) {
+        setIcecastError('Mixer is not active. Open the Mixer and start a channel first.')
         setStatusBoth('error')
         addLog('Error: Mixer is not active — open the Mixer and start a channel first')
         return
@@ -837,6 +839,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
         try {
           const msg = JSON.parse(e.data)
           if (msg.status === 'live') {
+            setIcecastError('')
             setStatusBoth('live')
             addLog('🔴 ' + (msg.msg || 'Live'))
             // Prevent the OS/browser from suspending this tab while broadcasting —
@@ -853,11 +856,13 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
               if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ action: 'ping' }))
             }, 10_000)
           } else if (msg.status === 'stopped') {
+            setIcecastError('')
             setStatusBoth('stopped')
             addLog(msg.msg || 'Broadcast stopped')
             doCleanup()
           } else if (msg.status === 'error') {
             terminalErrorRef.current = true
+            setIcecastError(msg.msg || 'Broadcast failed')
             setStatusBoth('error')
             addLog('Error: ' + msg.msg)
             doCleanup()
@@ -888,6 +893,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
         }
       }
     } catch (err) {
+      setIcecastError(err.message || 'Could not start the broadcast')
       setStatusBoth('error')
       addLog('Error: ' + err.message)
       doCleanup()
@@ -906,6 +912,7 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ action: 'stop' }))
     }
+    setIcecastError('')
     doCleanup()
     setStatusBoth('stopped')
   }
@@ -1054,6 +1061,12 @@ function IcecastEncoder({ defaultHost = '', defaultMount = '/radio', listenUrl =
         {broadcastMode === 'hub' && status === 'error' && radioError && (
           <div className="rounded-lg border border-red-800/60 bg-red-950/30 px-4 py-3 text-sm text-red-300">
             {radioError}
+          </div>
+        )}
+
+        {broadcastMode === 'icecast' && status === 'error' && icecastError && (
+          <div className="rounded-lg border border-red-800/60 bg-red-950/30 px-4 py-3 text-sm text-red-300">
+            {icecastError}
           </div>
         )}
 

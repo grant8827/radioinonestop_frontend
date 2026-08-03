@@ -20,6 +20,7 @@ export function StreamProvider({ children }) {
   // ── Icecast encoder shared state (consumed by NowPlaying button) ──────────
   const [broadcastMode, setBroadcastMode] = useState('icecast') // 'hub' | 'icecast'
   const [icecastStatus, setIcecastStatus] = useState('idle')
+  const [icecastError, setIcecastError] = useState('')
   const icecastStartRef = useRef(null) // set by IcecastEncoder on mount
   const icecastStopRef  = useRef(null) // set by IcecastEncoder on mount
   // ── Reconnect after refresh ─────────────────────────────────────────────
@@ -207,7 +208,7 @@ export function StreamProvider({ children }) {
       radioStatus, radioError, startRadio, stopRadio,
       videoStatus, startVideo, stopVideo,
       broadcastMode, setBroadcastMode,
-      icecastStatus, setIcecastStatus,
+      icecastStatus, setIcecastStatus, icecastError, setIcecastError,
       icecastStartRef, icecastStopRef,
       reconnectNeeded, doReconnect, dismissReconnect,
     }}>

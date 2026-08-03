@@ -4,8 +4,8 @@ import { useStream } from '../context/StreamContext'
 export default function NowPlaying({ config, mode }) {
   const audioEngine = useAudioEngine()
   const micOn = audioEngine?.micOnAirMap?.[1] ?? false
-  const { radioStatus, startRadio, stopRadio,
-          broadcastMode, icecastStatus, icecastStartRef, icecastStopRef } = useStream()
+  const { radioStatus, radioError, startRadio, stopRadio,
+          broadcastMode, icecastStatus, icecastError, icecastStartRef, icecastStopRef } = useStream()
 
   // Which status and handlers to use depends on the broadcast mode set in the encoder tab
   const isIcecast = broadcastMode === 'icecast'
@@ -19,6 +19,7 @@ export default function NowPlaying({ config, mode }) {
 
   const radioLive       = liveStatus === 'live'
   const radioConnecting = liveStatus === 'connecting' || liveStatus === 'requesting' || liveStatus === 'reconnecting'
+  const activeError = isIcecast ? icecastError : radioError
 
   return (
     <div className="bg-gray-900 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
@@ -57,6 +58,12 @@ export default function NowPlaying({ config, mode }) {
         </svg>
         {radioLive ? '● GO LIVE RADIO' : liveStatus === 'reconnecting' ? 'RECONNECTING…' : radioConnecting ? 'CONNECTING…' : liveStatus === 'error' ? 'RETRY LIVE' : 'GO LIVE RADIO'}
       </button>
+
+      {liveStatus === 'error' && activeError && (
+        <div className="basis-full rounded-lg border border-red-800/60 bg-red-950/30 px-4 py-2 text-sm text-red-300">
+          {activeError}
+        </div>
+      )}
     </div>
   )
 }
