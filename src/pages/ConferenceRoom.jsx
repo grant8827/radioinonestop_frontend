@@ -10,6 +10,12 @@ const RTC_CONFIG = {
   ],
 }
 
+const CONFERENCE_GUEST_LIMITS = {
+  professional: 2,
+  enterprise: 5,
+  ultimate: 20,
+}
+
 function nameFromEmail(email) {
   if (!email) return null
   return email
@@ -80,7 +86,7 @@ function LeaveButton({ onLeave }) {
 }
 
 // ── Settings panel ─────────────────────────────────────────────────────────────
-function SettingsPanel({ inviteUrl, passcode, limit, onPasscodeChange, onLimitChange }) {
+function SettingsPanel({ inviteUrl, passcode, guestCapacity, onPasscodeChange }) {
   const [copied, setCopied] = useState(false)
   const url = inviteUrl || window.location.href
 
@@ -111,18 +117,12 @@ function SettingsPanel({ inviteUrl, passcode, limit, onPasscodeChange, onLimitCh
             className="bg-gray-900 border border-gray-800 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-red-500"
           />
         </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Guest limit</span>
-          <select
-            value={limit}
-            onChange={(e) => onLimitChange(e.target.value)}
-            className="bg-gray-900 border border-gray-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-red-500"
-          >
-            <option value="8">8 guests</option>
-            <option value="16">16 guests</option>
-            <option value="32">32 guests</option>
-          </select>
-        </label>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Package capacity</span>
+          <div className="bg-gray-900 border border-gray-800 rounded-lg px-3 py-2.5 text-sm text-white">
+            {guestCapacity} guest{guestCapacity === 1 ? '' : 's'} max
+          </div>
+        </div>
       </div>
       <div>
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Invite link</p>
@@ -393,6 +393,10 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
   const inviteUrl = `${window.location.origin}/conference/${roomId}`
   const { user, token: authToken } = useAuth()
   const audioEngine = useAudioEngine()
+  const userPlan = (user?.plan || 'starter').toLowerCase()
+  const hostGuestCapacity = CONFERENCE_GUEST_LIMITS[userPlan] || 0
+  const isOwnHostedRoom = !!authToken && !!user?.id && roomId === user.id
+  const conferenceAllowedForHost = hostGuestCapacity > 0
 
   // hasBecomeVisible triggers WS connect — set once when tab is first selected
   const [hasBecomeVisible, setHasBecomeVisible] = useState(false)
@@ -418,7 +422,6 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
   const [speakingMap] = useState({})
   const [tab, setTab] = useState('group')
   const [passcode, setPasscode] = useState('')
-  const [limit, setLimit] = useState('8')
   const [conferenceChannelId, setConferenceChannelId] = useState(null)
   const [outboundStatus, setOutboundStatus] = useState({ status: 'connecting', message: '' })
   const [microphoneError, setMicrophoneError] = useState('')
@@ -438,12 +441,11 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
       const url = new URL(inviteUrl)
       if (passcode) url.searchParams.set('pwd', passcode)
       else url.searchParams.delete('pwd')
-      if (limit) url.searchParams.set('limit', limit)
       return url.toString()
     } catch {
       return inviteUrl
     }
-  }, [inviteUrl, passcode, limit])
+  }, [inviteUrl, passcode])
 
   // Poll conferenceChannelId for host
   useEffect(() => {
@@ -456,6 +458,7 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
   // available when the host's offer arrives. micReady gates the signaling effect.
   const [micReady, setMicReady] = useState(!!audioEngine)
   useEffect(() => {
+    if (isOwnHostedRoom && !conferenceAllowedForHost) return
     if (!readyToJoin) return
     if (audioEngine) { setMicReady(true); return }
     let cancelled = false
@@ -476,10 +479,11 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
       micStreamRef.current?.getTracks().forEach((t) => t.stop())
       micStreamRef.current = null
     }
-  }, [readyToJoin, audioEngine])
+  }, [readyToJoin, audioEngine, isOwnHostedRoom, conferenceAllowedForHost])
 
   // WebRTC signaling lifecycle — runs only after mic is ready
   useEffect(() => {
+    if (isOwnHostedRoom && !conferenceAllowedForHost) return
     if (!micReady || !roomId) return
 
     isMountedRef.current = true
@@ -657,7 +661,7 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
       audioEngine?.disconnectAllConferenceStreams?.()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [micReady, roomId])
+  }, [micReady, roomId, isOwnHostedRoom, conferenceAllowedForHost])
 
   const handleLeave = useCallback(() => {
     leavingRef.current = true
@@ -742,6 +746,19 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
               Join Room
             </button>
           </form>
+        </div>
+      </div>
+    )
+  }
+
+  if (isOwnHostedRoom && !conferenceAllowedForHost) {
+    return (
+      <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-gray-900 border border-gray-800 rounded-2xl p-6 text-center">
+          <p className="text-base font-semibold text-white mb-2">Conference requires a higher package</p>
+          <p className="text-sm text-gray-400">
+            Conference rooms are available on Professional and above. Upgrade to host guests in your room.
+          </p>
         </div>
       </div>
     )
@@ -942,9 +959,8 @@ export default function ConferenceRoom({ roomId: propRoomId, onLeave, username: 
           <SettingsPanel
             inviteUrl={secureInviteUrl}
             passcode={passcode}
-            limit={limit}
+            guestCapacity={hostGuestCapacity}
             onPasscodeChange={setPasscode}
-            onLimitChange={setLimit}
           />
         )}
       </main>

@@ -1,6 +1,7 @@
 import { createContext, useContext, useRef, useCallback, useState, useEffect } from 'react'
 
 const AudioEngineCtx = createContext(null)
+const MIC_CHANNEL_IDS = [1, 2, 3]
 
 export function AudioEngineProvider({ children }) {
   const acRef         = useRef(null)   // AudioContext
@@ -101,6 +102,7 @@ export function AudioEngineProvider({ children }) {
 
   // channelId → { on, mute, fader } — cached so setMicOnAir can act without Mixer mounted
   const channelStateRef = useRef({})
+  const micOnAirMapRef = useRef({})
 
   // ── Lazy AudioContext init ────────────────────────────────────────────────
   const getAC = useCallback(() => {
@@ -695,6 +697,16 @@ export function AudioEngineProvider({ children }) {
     nodes.faderNode.gain.setTargetAtTime(target, acRef.current.currentTime, 0.02)
   }, [])
 
+  const persistChannelState = useCallback((channelId, patch) => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('mixer_channels') || '{}')
+      saved[channelId] = { ...(saved[channelId] || {}), ...patch }
+      localStorage.setItem('mixer_channels', JSON.stringify(saved))
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
   // ── Per-deck EQ ──────────────────────────────────────────────────────────
   // ── Per-deck mix gain (fader × crossfader) — applied in graph so element.volume stays 1 ──
   const updateDeckMix = useCallback((key, value) => {
@@ -862,6 +874,7 @@ export function AudioEngineProvider({ children }) {
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('mixer_channels') || '{}')
+      const nextMicOnAir = {}
       Object.entries(saved).forEach(([id, ch]) => {
         if (parseInt(id) > 3 && ch?.sourceType === 'conference') saved[id] = { ...ch, sourceType: 'none' }
       })
@@ -873,6 +886,7 @@ export function AudioEngineProvider({ children }) {
         if (!isFinite(id)) return
         setupChannelNodes(id, ch)
         channelStateRef.current[id] = { on: ch.on ?? false, mute: ch.mute ?? false, fader: ch.fader ?? 0 }
+        if (MIC_CHANNEL_IDS.includes(id)) nextMicOnAir[id] = !!(ch.on ?? false)
         // Queue the DJ player connection — wiring completes in registerMediaElement once
         // both dj-a and dj-b elements are registered by Player
         const isMic = id <= 3
@@ -882,6 +896,9 @@ export function AudioEngineProvider({ children }) {
           setDjConnected(true)
         }
       })
+      micOnAirMapRef.current = nextMicOnAir
+      setMicOnAirMap(nextMicOnAir)
+      duckLineChannels(Object.values(nextMicOnAir).some(Boolean))
     } catch { /* ignore */ }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1367,6 +1384,8 @@ export function AudioEngineProvider({ children }) {
     setMicOnAirMap(prev => {
       if (prev[channelId] === bool) return prev
       const next = { ...prev, [channelId]: bool }
+      micOnAirMapRef.current = next
+      persistChannelState(channelId, { on: bool })
       const anyMicOn = Object.values(next).some(v => v)
       duckLineChannels(anyMicOn)
       // Directly open/close the fader — works even when Mixer is not mounted
@@ -1374,7 +1393,46 @@ export function AudioEngineProvider({ children }) {
       setChannelActive(channelId, bool, state.mute, bool ? state.fader : state.fader)
       return next
     })
-  }, [duckLineChannels, setChannelActive])
+  }, [duckLineChannels, persistChannelState, setChannelActive])
+
+  const setAllMicOnAir = useCallback((bool) => {
+    setMicOnAirMap(prev => {
+      const next = { ...prev }
+      let changed = false
+      MIC_CHANNEL_IDS.forEach((channelId) => {
+        if (next[channelId] === bool) return
+        next[channelId] = bool
+        persistChannelState(channelId, { on: bool })
+        const state = channelStateRef.current[channelId] ?? { mute: false, fader: 0.8 }
+        setChannelActive(channelId, bool, state.mute, state.fader)
+        changed = true
+      })
+      if (!changed) return prev
+      micOnAirMapRef.current = next
+      duckLineChannels(Object.values(next).some(Boolean))
+      return next
+    })
+  }, [duckLineChannels, persistChannelState, setChannelActive])
+
+  const getPreferredMicChannelId = useCallback(() => {
+    const liveMicId = MIC_CHANNEL_IDS.find((channelId) => micOnAirMapRef.current[channelId])
+    if (liveMicId) return liveMicId
+
+    const connectedMicId = MIC_CHANNEL_IDS.find((channelId) => !!micStreams.current[channelId]?.stream)
+    if (connectedMicId) return connectedMicId
+
+    try {
+      const saved = JSON.parse(localStorage.getItem('mixer_channels') || '{}')
+      const configuredMicId = MIC_CHANNEL_IDS.find((channelId) => !!saved[channelId]?.deviceId)
+      if (configuredMicId) return configuredMicId
+      const enabledMicId = MIC_CHANNEL_IDS.find((channelId) => !!saved[channelId]?.on)
+      if (enabledMicId) return enabledMicId
+    } catch {
+      /* ignore */
+    }
+
+    return MIC_CHANNEL_IDS[0]
+  }, [])
 
   // ── Recording ─────────────────────────────────────────────────────────────
   const recDirHandleRef = useRef(null)
@@ -1511,6 +1569,8 @@ export function AudioEngineProvider({ children }) {
       setDjActive,
       micOnAirMap,
       setMicOnAir,
+      setAllMicOnAir,
+      getPreferredMicChannelId,
       // Recording
       recording,
       recTime,

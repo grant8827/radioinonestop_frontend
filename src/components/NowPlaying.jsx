@@ -3,7 +3,7 @@ import { useStream } from '../context/StreamContext'
 
 export default function NowPlaying({ config, mode }) {
   const audioEngine = useAudioEngine()
-  const micOn = audioEngine?.micOnAirMap?.[1] ?? false
+  const micOn = Object.values(audioEngine?.micOnAirMap || {}).some(Boolean)
   const { radioStatus, radioError, startRadio, stopRadio,
           broadcastMode, icecastStatus, icecastError, icecastStartRef, icecastStopRef } = useStream()
 
@@ -21,10 +21,20 @@ export default function NowPlaying({ config, mode }) {
   const radioConnecting = liveStatus === 'connecting' || liveStatus === 'requesting' || liveStatus === 'reconnecting'
   const activeError = isIcecast ? icecastError : radioError
 
+  const toggleMic = () => {
+    if (!audioEngine) return
+    if (micOn) {
+      audioEngine.setAllMicOnAir?.(false)
+      return
+    }
+    const channelId = audioEngine.getPreferredMicChannelId?.() ?? 1
+    audioEngine.setMicOnAir(channelId, true)
+  }
+
   return (
     <div className="bg-gray-900 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
       <button
-        onClick={() => audioEngine?.setMicOnAir(1, !micOn)}
+        onClick={toggleMic}
         title={micOn ? "Mute Microphone" : "Go On Air with Microphone"}
         className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm uppercase tracking-widest transition-all duration-150 shrink-0 ${
           micOn
