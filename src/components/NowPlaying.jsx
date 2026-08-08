@@ -32,11 +32,11 @@ export default function NowPlaying({ config, mode }) {
   }
 
   return (
-    <div className="bg-gray-900 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
+    <div className="bg-gray-900 rounded-xl px-4 py-4 flex items-center gap-3 flex-wrap min-h-[90px]">
       <button
         onClick={toggleMic}
         title={micOn ? "Mute Microphone" : "Go On Air with Microphone"}
-        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm uppercase tracking-widest transition-all duration-150 shrink-0 ${
+        className={`flex min-h-[52px] items-center gap-2 px-5 py-3 rounded-xl font-bold text-sm uppercase tracking-widest transition-all duration-150 shrink-0 ${
           micOn
             ? 'bg-red-600 text-white shadow-[0_0_18px_#ef444455] animate-pulse'
             : 'bg-gray-800 text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-white'
@@ -52,7 +52,7 @@ export default function NowPlaying({ config, mode }) {
         onClick={radioLive ? stopAct : goLiveAct}
         disabled={radioConnecting}
         title={radioLive ? "Stop Broadcasting" : "Start Broadcasting"}
-        className={`ml-auto flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm uppercase tracking-widest transition-all duration-150 shrink-0 ${
+        className={`ml-auto flex min-h-[52px] items-center gap-2 px-5 py-3 rounded-xl font-bold text-sm uppercase tracking-widest transition-all duration-150 shrink-0 ${
           radioLive
             ? 'bg-green-600 text-white shadow-[0_0_18px_#16a34a55] animate-pulse'
             : radioConnecting
