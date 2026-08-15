@@ -82,27 +82,6 @@ const FEATURES = [
   },
 ]
 
-const DEMO_STATIONS = [
-  {
-    slug: 'demo-sunset-fm',
-    name: 'Sunset FM',
-    logo_url: '',
-    is_live: true,
-    listeners: 42,
-    genre: 'Chillout',
-    description: 'Smooth evening vibes, deep house and ambient sounds to wind down your day.',
-  },
-  {
-    slug: 'demo-bass-nation',
-    name: 'Bass Nation',
-    logo_url: '',
-    is_live: false,
-    listeners: 0,
-    genre: 'Drum & Bass',
-    description: 'The hardest drum and bass, jungle, and neurofunk — 24/7 rolling.',
-  },
-]
-
 export default function LandingPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -110,7 +89,7 @@ export default function LandingPage() {
   const [showLogin, setShowLogin] = useState(false)
   const [showRegister, setShowRegister] = useState(false)
   const [selectedStation, setSelectedStation] = useState(null)
-  const [stations, setStations] = useState(DEMO_STATIONS)
+  const [stations, setStations] = useState([])
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showContact, setShowContact] = useState(false)
 
@@ -121,7 +100,7 @@ export default function LandingPage() {
         const r = await fetch('/api/stations')
         if (r.ok) {
           const data = await r.json()
-          if (data && data.length > 0) {
+          if (Array.isArray(data)) {
             setStations(data)
             // Auto-open station from shared link (?station=slug)
             const slug = searchParams.get('station')
