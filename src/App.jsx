@@ -16,6 +16,7 @@ import ProfileSettings from './components/ProfileSettings'
 import SuperAdmin from './components/SuperAdmin'
 import LandingPage from './pages/LandingPage'
 import StationsPage from './pages/StationsPage'
+import FeaturesPage from './pages/FeaturesPage'
 import PricingPage from './pages/PricingPage'
 import RegisterPage from './pages/RegisterPage'
 import PaymentPage from './pages/PaymentPage'
@@ -308,6 +309,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/stations" element={<StationsPage />} />
+          <Route path="/features" element={<FeaturesPage />} />
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route

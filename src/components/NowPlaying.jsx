@@ -32,7 +32,7 @@ export default function NowPlaying({ config, mode }) {
   }
 
   return (
-    <div className="bg-gray-900 rounded-xl px-4 py-4 flex items-center gap-3 flex-wrap min-h-[90px]">
+    <div className="bg-gray-900 rounded-xl px-4 py-4 flex items-center gap-3 flex-wrap min-h-[84px]">
       <button
         onClick={toggleMic}
         title={micOn ? "Mute Microphone" : "Go On Air with Microphone"}

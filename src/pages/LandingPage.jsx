@@ -127,7 +127,7 @@ export default function LandingPage() {
 
   function scrollToFeatures() {
     setMobileMenuOpen(false)
-    document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })
+    navigate('/features')
   }
 
   function handleLogout() {
@@ -444,6 +444,18 @@ export default function LandingPage() {
               <p className="text-gray-500 text-xs leading-relaxed">{f.desc}</p>
             </div>
           ))}
+        </div>
+
+        <div className="mt-10 text-center">
+          <button
+            onClick={() => navigate('/features')}
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl border border-white/10 hover:border-red-800/60 text-gray-300 hover:text-white text-sm font-semibold transition-all hover:bg-white/5"
+          >
+            Take the Full Feature Tour
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+            </svg>
+          </button>
         </div>
       </section>
 
