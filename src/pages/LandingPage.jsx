@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import LoginModal from '../components/LoginModal'
@@ -6,6 +6,16 @@ import RegisterModal from '../components/RegisterModal'
 import StationModal from '../components/StationModal'
 import ContactModal from '../components/ContactModal'
 import appLogo from '../assets/radioinonestop_logo .png'
+
+// Fisher-Yates shuffle — returns a new shuffled array, leaves the input untouched.
+function shuffled(arr) {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
 
 const FEATURES = [
   {
@@ -90,6 +100,12 @@ export default function LandingPage() {
   const [showRegister, setShowRegister] = useState(false)
   const [selectedStation, setSelectedStation] = useState(null)
   const [stations, setStations] = useState([])
+  // Slugs of the stations shown in the homepage's "Stations on the Air" grid.
+  // Picked once per page load/visit — stays fixed across the 30s polling refresh
+  // so the tiles don't reshuffle under the user, but is re-rolled on every fresh
+  // visit (full refresh, or navigating back to "/"). The full /stations page is
+  // unaffected and keeps its own stable sort order.
+  const [homeSlugs, setHomeSlugs] = useState(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showContact, setShowContact] = useState(false)
 
@@ -102,6 +118,9 @@ export default function LandingPage() {
           const data = await r.json()
           if (Array.isArray(data)) {
             setStations(data)
+            // Pick the homepage's random set of stations once — leave it alone
+            // on subsequent polls so the grid doesn't shuffle mid-visit.
+            setHomeSlugs((prev) => prev !== null ? prev : shuffled(data).slice(0, 8).map((s) => s.slug))
             // Auto-open station from shared link (?station=slug)
             const slug = searchParams.get('station')
             if (slug) {
@@ -116,6 +135,13 @@ export default function LandingPage() {
     const id = setInterval(load, 30_000)
     return () => clearInterval(id)
   }, [searchParams])
+
+  // Resolve the chosen slugs against the latest station data (so listener
+  // counts / live status stay fresh) while keeping the same set and order.
+  const homeStations = useMemo(() => {
+    if (!homeSlugs) return []
+    return homeSlugs.map((slug) => stations.find((s) => s.slug === slug)).filter(Boolean)
+  }, [stations, homeSlugs])
 
   function openLogin() { setMobileMenuOpen(false); setShowRegister(false); setShowLogin(true) }
   function openRegister() { setMobileMenuOpen(false); setShowLogin(false); setShowRegister(true) }
@@ -354,7 +380,7 @@ export default function LandingPage() {
             )}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {stations.slice(0, 8).map(station => (
+            {homeStations.map(station => (
               <div
                 key={station.slug}
                 className="group relative rounded-xl border border-white/5 bg-white/3 hover:border-red-800/60 hover:bg-white/5 transition-all duration-200 overflow-hidden cursor-pointer"
@@ -480,6 +506,21 @@ export default function LandingPage() {
           <button onClick={() => setShowContact(true)} className="text-xs font-medium text-gray-400 transition-colors hover:text-white">Technical Support</button>
         </div>
       </footer>
+
+      {/* ── Floating support chat button ── */}
+      <button
+        onClick={() => setShowContact(true)}
+        aria-label="Contact technical support"
+        title="Need help? Get in touch"
+        className="group fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full rio-logo-gradient pl-4 pr-4 py-4 sm:pr-5 text-white shadow-lg shadow-red-900/40 transition-all hover:shadow-red-900/60 hover:scale-105"
+      >
+        <svg className="w-6 h-6 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+        </svg>
+        <span className="hidden sm:inline max-w-0 overflow-hidden whitespace-nowrap text-sm font-semibold opacity-0 transition-all duration-300 group-hover:max-w-xs group-hover:opacity-100">
+          Need help?
+        </span>
+      </button>
 
       {selectedStation && (
         <StationModal
