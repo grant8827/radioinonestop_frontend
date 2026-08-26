@@ -1059,7 +1059,7 @@ function VideoGoLiveButton({ streamKey, isSuspended = false }) {
 }
 
 // ── Main Player ────────────────────────────────────────────────────────────────
-export default function Player({ mode, config, trackA, trackB, queue = [], onQueuePop, onLoadTrackA, onLoadTrackB, onDeckPlaybackChange, repeatPlaylist = false, onRepeatReload, isSuspended = false }) {
+export default function Player({ mode, config, trackA, trackB, queue = [], onQueuePop, onLoadTrackA, onLoadTrackB, onDeckPlaybackChange, repeatPlaylist = false, onRepeatReload, shufflePlaylist = false, isSuspended = false }) {
   const mediaRef = useRef(null)
   const mediaRefB = useRef(null)
   const hlsRef   = useRef(null)
@@ -1146,7 +1146,11 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
                   setTimeout(r, 5000)
                 })
               }
-              try { await audioEngineRef.current?.resume(); await mb.play(); setPlayingB(true) } catch { /**/ }
+              try {
+                await audioEngineRef.current?.resume(); await mb.play(); setPlayingB(true)
+              } catch {
+                if (!(await playNextAvailable('B'))) return
+              }
             }
           } else {
             let effectiveQueue = queueRef.current
@@ -1164,8 +1168,8 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
               }
               queueRef.current = effectiveQueue
             }
-            const next = effectiveQueue[0]
-            onQueuePopRef.current?.()
+            const next = takeNextAutoTrack()
+            if (!next) return
             const mb = mediaRefB.current
             if (mb) {
               const readyPromise = new Promise((r) => {
@@ -1176,7 +1180,12 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
               onLoadTrackBRef.current?.({ ...next })
               setPlayingB(false); setProgressB(0)
               await readyPromise
-              try { await audioEngineRef.current?.resume(); await mb.play(); setPlayingB(true) } catch { /**/ }
+              try {
+                await audioEngineRef.current?.resume(); await mb.play(); setPlayingB(true)
+              } catch {
+                setAutoDJToast(`Skipped ${next.title || next.name || 'an unavailable track'}`)
+                if (!(await playNextAvailable('B'))) return
+              }
             }
           }
 
@@ -1196,8 +1205,8 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
               if (ma) { ma.pause(); ma.currentTime = 0 }
               setPlaying(false); setProgressA(0)
               if (autoDJRef.current && queueRef.current.length) {
-                const upcoming = queueRef.current[0]
-                onQueuePopRef.current?.()
+                const upcoming = takeNextAutoTrack()
+                if (!upcoming) return
                 onLoadTrackARef.current?.({ ...upcoming })
                 preloadedDeckRef.current = 'A'
               }
@@ -1254,7 +1263,11 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
                   setTimeout(r, 5000)
                 })
               }
-              try { await audioEngineRef.current?.resume(); await ma.play(); setPlaying(true) } catch { /**/ }
+              try {
+                await audioEngineRef.current?.resume(); await ma.play(); setPlaying(true)
+              } catch {
+                if (!(await playNextAvailable('A'))) return
+              }
             }
           } else {
             let effectiveQueue = queueRef.current
@@ -1272,8 +1285,8 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
               }
               queueRef.current = effectiveQueue
             }
-            const next = effectiveQueue[0]
-            onQueuePopRef.current?.()
+            const next = takeNextAutoTrack()
+            if (!next) return
             const ma = mediaRef.current
             if (ma) {
               const readyPromise = new Promise((r) => {
@@ -1284,7 +1297,12 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
               onLoadTrackARef.current?.({ ...next })
               setPlaying(false); setProgressA(0)
               await readyPromise
-              try { await audioEngineRef.current?.resume(); await ma.play(); setPlaying(true) } catch { /**/ }
+              try {
+                await audioEngineRef.current?.resume(); await ma.play(); setPlaying(true)
+              } catch {
+                setAutoDJToast(`Skipped ${next.title || next.name || 'an unavailable track'}`)
+                if (!(await playNextAvailable('A'))) return
+              }
             }
           }
 
@@ -1304,8 +1322,8 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
               if (mb) { mb.pause(); mb.currentTime = 0 }
               setPlayingB(false); setProgressB(0)
               if (autoDJRef.current && queueRef.current.length) {
-                const upcoming = queueRef.current[0]
-                onQueuePopRef.current?.()
+                const upcoming = takeNextAutoTrack()
+                if (!upcoming) return
                 onLoadTrackBRef.current?.({ ...upcoming })
                 preloadedDeckRef.current = 'B'
               }
@@ -1398,7 +1416,9 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
   const preloadedDeckRef    = useRef(null)  // 'A' | 'B' | null — standby deck pre-loaded for next transition
   const earlyTransitionRef  = useRef(null)  // 'A' | 'B' | null — which deck already fired its early transition
   const repeatPlaylistRef   = useRef(false)
+  const shufflePlaylistRef  = useRef(false)
   const onRepeatReloadRef   = useRef(null)
+  const lastAutoTrackRef    = useRef(null)
 
   const [masterVol,  setMasterVol]  = useState(0.85)
   const [masterEqHi,  setMasterEqHi]  = useState(0.5)
@@ -1469,7 +1489,92 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
   useEffect(() => { autoDJRef.current        = autoDJ        }, [autoDJ])
   useEffect(() => { queueRef.current         = queue         }, [queue])
   useEffect(() => { repeatPlaylistRef.current = repeatPlaylist }, [repeatPlaylist])
+  useEffect(() => { shufflePlaylistRef.current = shufflePlaylist }, [shufflePlaylist])
   useEffect(() => { onRepeatReloadRef.current = onRepeatReload }, [onRepeatReload])
+
+  function takeNextAutoTrack(attempted = new Set()) {
+    let available = queueRef.current
+    if (!available.length && repeatPlaylistRef.current) {
+      available = onRepeatReloadRef.current?.() || []
+      queueRef.current = available
+    }
+    if (!available.length) return null
+
+    let candidates = available
+      .map((track, index) => ({ track, index }))
+      .filter(({ track }) => !attempted.has(track.name || track.url))
+    if (candidates.length > 1 && lastAutoTrackRef.current) {
+      const withoutLast = candidates.filter(({ track }) => (track.name || track.url) !== lastAutoTrackRef.current)
+      if (withoutLast.length) candidates = withoutLast
+    }
+    if (!candidates.length) return null
+
+    const selected = shufflePlaylistRef.current
+      ? candidates[Math.floor(Math.random() * candidates.length)]
+      : candidates[0]
+    const nextQueue = [...available]
+    nextQueue.splice(selected.index, 1)
+    if (repeatPlaylistRef.current) nextQueue.push(selected.track)
+    queueRef.current = nextQueue
+    onQueuePopRef.current?.(selected.index)
+    lastAutoTrackRef.current = selected.track.name || selected.track.url
+    return selected.track
+  }
+
+  async function playAutoDeck(deck, track) {
+    const media = deck === 'A' ? mediaRef.current : mediaRefB.current
+    const loadTrack = deck === 'A' ? onLoadTrackARef.current : onLoadTrackBRef.current
+    if (!media || !track) return false
+
+    const ready = new Promise((resolve) => {
+      let settled = false
+      const finish = (ok) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        media.removeEventListener('canplay', onReady)
+        media.removeEventListener('loadeddata', onReady)
+        media.removeEventListener('error', onFailure)
+        resolve(ok)
+      }
+      const onReady = () => finish(true)
+      const onFailure = () => finish(false)
+      const timer = setTimeout(() => finish(media.readyState >= 2), 5000)
+      media.addEventListener('canplay', onReady)
+      media.addEventListener('loadeddata', onReady)
+      media.addEventListener('error', onFailure)
+    })
+
+    loadTrack?.({ ...track })
+    if (deck === 'A') { setPlaying(false); setProgressA(0) }
+    else { setPlayingB(false); setProgressB(0) }
+    if (!(await ready)) return false
+    try {
+      await audioEngineRef.current?.resume()
+      await media.play()
+      if (deck === 'A') setPlaying(true)
+      else setPlayingB(true)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  async function playNextAvailable(deck) {
+    const attempted = new Set()
+    const limit = Math.max(queueRef.current.length, 1)
+    for (let count = 0; count < limit; count += 1) {
+      const track = takeNextAutoTrack(attempted)
+      if (!track) break
+      attempted.add(track.name || track.url)
+      if (await playAutoDeck(deck, track)) return true
+      setAutoDJToast(`Skipped ${track.title || track.name || 'an unavailable track'}`)
+    }
+    setAutoDJToast('No playable tracks remain — Auto DJ paused')
+    setAutoDJ(false)
+    autoDJRef.current = false
+    return false
+  }
 
   // ── Sample pad handlers ────────────────────────────────────────────────────────
   const loadPad = useCallback((idx, file) => {
@@ -1819,8 +1924,8 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
       setAutoDJToast('Queue empty \u2014 add tracks to Auto Playlist first')
       return
     }
-    const nextTrack = q[0]
-    onQueuePopRef.current?.()
+    const nextTrack = takeNextAutoTrack()
+    if (!nextTrack) return
 
     if (!playingB) {
       // Standby = Deck B — load via App state so the UI updates

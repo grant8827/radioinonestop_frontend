@@ -89,6 +89,7 @@ function MainApp() {
   const [deckPlaying, setDeckPlaying] = useState({ A: false, B: false })
   const [queue,          setQueue]          = useState([])
   const [repeatPlaylist, setRepeatPlaylist] = useState(false)
+  const [shufflePlaylist, setShufflePlaylist] = useState(false)
   const [listenerStatus, setListenerStatus] = useState(null)
   const [showListenerModal, setShowListenerModal] = useState(false)
   
@@ -279,14 +280,14 @@ function MainApp() {
           <div className={mode !== 'radio' ? 'hidden' : 'overflow-x-auto'}>
             <div className="flex flex-row gap-4 min-w-240">
               <div className="flex-1 flex flex-col gap-4 min-w-0">
-                <Player mode="radio" config={config} trackA={trackA} trackB={trackB} queue={queue} onQueuePop={repeatPlaylist ? () => setQueue((q) => q.length > 0 ? [...q.slice(1), q[0]] : [...repeatBackupRef.current]) : () => setQueue((q) => q.slice(1))} onLoadTrackA={setTrackA} onLoadTrackB={setTrackB} onDeckPlaybackChange={handleDeckPlaybackChange} repeatPlaylist={repeatPlaylist} onRepeatReload={onRepeatReload} isSuspended={listenerStatus?.status === 'suspended'} />
+                <Player mode="radio" config={config} trackA={trackA} trackB={trackB} queue={queue} onQueuePop={(index = 0) => setQueue((q) => { if (!q.length) return q; const next = [...q]; const [picked] = next.splice(index, 1); return repeatPlaylist ? [...next, picked] : next })} onLoadTrackA={setTrackA} onLoadTrackB={setTrackB} onDeckPlaybackChange={handleDeckPlaybackChange} repeatPlaylist={repeatPlaylist} onRepeatReload={onRepeatReload} shufflePlaylist={shufflePlaylist} isSuspended={listenerStatus?.status === 'suspended'} />
                 <NowPlaying config={config} mode={mode} />
               </div>
               <div className="w-80 shrink-0 flex flex-col gap-3 min-h-0">
                 {/* VIDEO DISABLED: SocialLive camera preview removed. */}
                 <SchedulerRadioMonitor />
                 <div className="min-h-0 overflow-hidden" style={{ height: 530 }}>
-                  <TrackLibrary onTrackLoadA={loadTrackAFromLibrary} onTrackLoadB={loadTrackBFromLibrary} queue={queue} onQueueChange={setQueue} repeatPlaylist={repeatPlaylist} onRepeatChange={setRepeatPlaylist} nowPlayingA={trackA} nowPlayingB={trackB} />
+                  <TrackLibrary onTrackLoadA={loadTrackAFromLibrary} onTrackLoadB={loadTrackBFromLibrary} queue={queue} onQueueChange={setQueue} repeatPlaylist={repeatPlaylist} onRepeatChange={setRepeatPlaylist} shufflePlaylist={shufflePlaylist} onShuffleChange={setShufflePlaylist} nowPlayingA={trackA} nowPlayingB={trackB} />
                 </div>
               </div>
             </div>

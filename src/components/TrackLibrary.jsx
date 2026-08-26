@@ -115,6 +115,8 @@ export default function TrackLibrary({
   onQueueChange,
   repeatPlaylist = false,
   onRepeatChange,
+  shufflePlaylist = false,
+  onShuffleChange,
   nowPlayingA = null,
   nowPlayingB = null,
 }) {
@@ -406,6 +408,22 @@ export default function TrackLibrary({
                 : 'No tracks queued'}
             </span>
             <div className="flex items-center gap-2">
+              {/* Shuffle toggle */}
+              <button
+                onClick={() => onShuffleChange?.(!shufflePlaylist)}
+                title={shufflePlaylist ? 'Shuffle on — click to turn off' : 'Shuffle off — click for random playback'}
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest transition-colors border"
+                style={{
+                  color: shufflePlaylist ? '#fbbf24' : '#4b5563',
+                  background: shufflePlaylist ? '#fbbf2418' : 'transparent',
+                  borderColor: shufflePlaylist ? '#fbbf2440' : '#374151',
+                }}
+              >
+                <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M16 3h5v5l-1.8-1.8-4.6 4.6-1.4-1.4 4.6-4.6L16 3zM3 6h3.6l10.6 10.6L16 18h5v-5l-1.8 1.8L7.4 4H3v2zm0 12h4.4l3.7-3.7-1.4-1.4L6.6 16H3v2z" />
+                </svg>
+                Shuffle
+              </button>
               {/* Repeat toggle */}
               <button
                 onClick={() => onRepeatChange?.(!repeatPlaylist)}
