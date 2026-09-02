@@ -49,6 +49,62 @@ function Field({ label, value }) {
   )
 }
 
+/* Inline audio-only listener used to preview the station's Hub stream. */
+function LiveListenerPlayer({ listenPath }) {
+  const listenUrl = new URL(listenPath, window.location.origin).toString()
+  const [playing, setPlaying] = useState(false)
+  const audioRef = useRef(null)
+
+  function toggle() {
+    const audio = audioRef.current
+    if (!audio) return
+
+    if (playing) {
+      audio.pause()
+      audio.removeAttribute('src')
+      audio.load()
+      setPlaying(false)
+      return
+    }
+
+    audio.src = listenUrl
+    audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false))
+  }
+
+  useEffect(() => () => {
+    const audio = audioRef.current
+    if (audio) {
+      audio.pause()
+      audio.removeAttribute('src')
+    }
+  }, [])
+
+  return (
+    <div>
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Live Station Stream</p>
+      <div className="flex items-center gap-2 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2">
+        <button
+          type="button"
+          onClick={toggle}
+          className={`flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full transition-colors ${playing ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gray-700 hover:bg-gray-600'}`}
+          aria-label={playing ? 'Stop listening' : 'Listen live'}
+        >
+          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+            <path d={playing ? 'M6 19h4V5H6v14zm8-14v14h4V5h-4z' : 'M8 5v14l11-7z'} />
+          </svg>
+        </button>
+        <code className="flex-1 text-sm text-green-400 font-mono truncate select-all">{listenUrl}</code>
+        <CopyButton text={listenUrl} />
+        <a href={listenUrl} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 px-2.5 py-1.5 rounded-md text-xs font-medium border border-gray-600 hover:border-gray-400 text-gray-400 hover:text-white">
+          Open
+        </a>
+      </div>
+      {playing && <p className="mt-1.5 text-xs text-orange-400 animate-pulse">● Listening live</p>}
+      <audio ref={audioRef} preload="none" />
+    </div>
+  )
+}
+
 function useStreamDashboard(token) {
   const [liveStreams, setLiveStreams] = useState([])
   const [viewers, setViewers] = useState(0)
