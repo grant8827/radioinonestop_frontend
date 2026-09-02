@@ -4,7 +4,7 @@ const PLAN_DETAILS = {
   professional: {
     name: 'Professional',
     price: { monthly: 39, yearly: 390 },
-    features: ['Conference live chat', 'Up to 10 participants', 'Priority audio processing', '1000 concurrent listeners']
+    features: ['Conference rooms', 'Up to 10 participants', 'Priority audio processing', '1000 concurrent listeners']
   },
   enterprise: {
     name: 'Enterprise',

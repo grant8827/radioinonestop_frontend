@@ -139,11 +139,6 @@ export function StreamProvider({ children }) {
     radioCleanup()
   }, [])
 
-  // VIDEO DISABLED: camera/screen capture, WHIP publishing, and RTMP relay
-  // controls were removed. Inert values keep old unmounted components compatible.
-  const videoStatus = 'disabled'
-  const startVideo = useCallback(async () => {}, [])
-  const stopVideo = useCallback(() => {}, [])
 
   // Cleanup on unmount
   useEffect(() => () => { radioCleanup() }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -206,7 +201,6 @@ export function StreamProvider({ children }) {
   return (
     <StreamCtx.Provider value={{
       radioStatus, radioError, startRadio, stopRadio,
-      videoStatus, startVideo, stopVideo,
       broadcastMode, setBroadcastMode,
       icecastStatus, setIcecastStatus, icecastError, setIcecastError,
       icecastStartRef, icecastStopRef,

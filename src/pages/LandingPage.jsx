@@ -60,8 +60,8 @@ const FEATURES = [
         <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 01-.825-.242m9.345-8.334a2.126 2.126 0 00-.476-.095 48.64 48.64 0 00-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0011.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155" />
       </svg>
     ),
-    title: 'Live Chat & Analytics',
-    desc: 'Real-time chat and viewer count built in. Engage your audience without third-party plugins.',
+    title: 'Audience Analytics',
+    desc: 'Track your audience with real-time listener counts and built-in reporting.',
     accent: 'text-orange-400',
     border: 'border-orange-900/40',
     bg: 'bg-orange-900/10',
@@ -342,7 +342,7 @@ export default function LandingPage() {
 
           <p className="max-w-2xl mx-auto text-lg text-gray-400 leading-relaxed mb-10">
             Broadcast your radio station, manage your mixer, and connect with listeners.
-            Built-in HLS audio playback, live chat, and browser broadcasting — all from one dashboard.
+            Built-in HLS audio playback, listener analytics, and browser broadcasting — all from one dashboard.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -414,11 +414,7 @@ export default function LandingPage() {
                     {station.description && (
                       <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">{station.description}</p>
                     )}
-                    <div className="flex items-center gap-3 mt-2">
-                      <span className="text-[10px] text-gray-600">
-                        {station.listeners} listener{station.listeners !== 1 ? 's' : ''}
-                      </span>
-                    </div>
+                    {/* Listener count intentionally hidden on home-page station cards. */}
                   </div>
                 </div>
 
@@ -507,7 +503,7 @@ export default function LandingPage() {
         </div>
       </footer>
 
-      {/* ── Floating support chat button ── */}
+      {/* ── Floating technical-support button ── */}
       <button
         onClick={() => setShowContact(true)}
         aria-label="Contact technical support"

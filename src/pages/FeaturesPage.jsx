@@ -29,10 +29,10 @@ const FEATURES = [
     accent: 'text-amber-400',
     border: 'border-amber-900/40',
     bg: 'bg-amber-900/10',
-    desc: 'A full broadcast mixer with dedicated channel strips for your DJ Player, microphone, podcast/video sources, and external line-in or USB gear — all routed down to one master bus.',
+    desc: 'A full broadcast mixer with dedicated channel strips for your DJ Player, microphone, podcast sources, and external line-in or USB gear — all routed down to one master bus.',
     points: [
       'Per-channel gain, pan, and fader control with real-time level metering',
-      'Mix in mic, DJ Player, podcast/video, or external line-in/USB sources side by side',
+      'Mix in mic, DJ Player, podcast sources, or external line-in/USB sources side by side',
       'Monitor and AUX return buses so you can cue up the next source before it goes live',
       'Master section with live recording, so every broadcast is captured as you go',
     ],

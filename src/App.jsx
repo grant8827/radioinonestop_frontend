@@ -268,7 +268,7 @@ function MainApp() {
             <Scheduler />
           </div>
           {mode === 'mixer' && <Mixer config={config} onOpenConference={() => handleModeChange('conference')} />}
-          {/* Keep the live-chat Conference room mounted across tab changes. */}
+          {/* Keep the audio Conference room mounted across tab changes. */}
           <div className={mode !== 'conference' ? 'hidden' : 'contents'}>
             <ConferenceRoom roomId={user?.id || 'studio'} username={stationName || user?.stationName} isActive={mode === 'conference'} onLeave={() => handleModeChange('radio')} onGoToMixer={() => handleModeChange('mixer')} />
           </div>
@@ -284,7 +284,6 @@ function MainApp() {
                 <NowPlaying config={config} mode={mode} />
               </div>
               <div className="w-80 shrink-0 flex flex-col gap-3 min-h-0">
-                {/* VIDEO DISABLED: SocialLive camera preview removed. */}
                 <SchedulerRadioMonitor />
                 <div className="min-h-0 overflow-hidden" style={{ height: 530 }}>
                   <TrackLibrary onTrackLoadA={loadTrackAFromLibrary} onTrackLoadB={loadTrackBFromLibrary} queue={queue} onQueueChange={setQueue} repeatPlaylist={repeatPlaylist} onRepeatChange={setRepeatPlaylist} shufflePlaylist={shufflePlaylist} onShuffleChange={setShufflePlaylist} nowPlayingA={trackA} nowPlayingB={trackB} />

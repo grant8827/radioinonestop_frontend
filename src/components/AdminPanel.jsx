@@ -78,7 +78,6 @@ export default function AdminPanel({ config, onSave, onClose }) {
             <p className="text-xs text-gray-500">
               Derived stream URLs:<br />
               <code className="text-gray-400 break-all">{base}/hls/radio/index.m3u8</code><br />
-              {/* VIDEO DISABLED: video HLS URL removed. */}
             </p>
           </div>
 

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import Hls from 'hls.js'
 import { useAudioEngine } from '../context/AudioEngine'
-import { useStream } from '../context/StreamContext'
 import Knob from './RotaryKnob'
 
 // ── LL-HLS config ──────────────────────────────────────────────────────────────
@@ -1015,49 +1014,6 @@ function CenterMixer({
   )
 }
 
-// ── Go Live Video button (video mode) ─────────────────────────────────────────
-function VideoGoLiveButton({ streamKey, isSuspended = false }) {
-  const { videoStatus, startVideo, stopVideo } = useStream()
-  const videoLive = videoStatus === 'live'
-  const videoConnecting = videoStatus === 'connecting'
-  const isDisabled = videoConnecting || isSuspended
-  
-  return (
-    <button
-      onClick={videoLive ? stopVideo : () => startVideo(streamKey)}
-      disabled={isDisabled}
-      title={
-        isSuspended
-          ? 'Streaming suspended — listener limit exceeded. Upgrade to resume.'
-          : videoLive
-          ? 'Stop video broadcast'
-          : 'Go Live Video — share your screen'
-      }
-      className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-bold text-xs uppercase tracking-widest transition-all duration-150 shrink-0 ${
-        videoLive
-          ? 'bg-red-600 text-white shadow-[0_0_14px_#e0001255] animate-pulse'
-          : isDisabled
-          ? 'bg-gray-800/50 text-gray-600 cursor-not-allowed border border-gray-700'
-          : videoStatus === 'error'
-          ? 'bg-red-900 text-red-300 border border-red-700 hover:border-red-500 hover:text-white'
-          : 'bg-gray-800 text-gray-400 border border-gray-700 hover:border-amber-500 hover:text-amber-400'
-      }`}
-    >
-      {isSuspended && !videoLive && (
-        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 11c-.55 0-1-.45-1-1V8c0-.55.45-1 1-1s1 .45 1 1v4c0 .55-.45 1-1 1zm1 4h-2v-2h2v2z" />
-        </svg>
-      )}
-      {!isSuspended && (
-        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z" />
-        </svg>
-      )}
-      {videoLive ? '● LIVE VIDEO' : videoConnecting ? 'CONNECTING…' : isSuspended ? 'SUSPENDED' : videoStatus === 'error' ? 'RETRY VIDEO' : 'GO LIVE VIDEO'}
-    </button>
-  )
-}
-
 // ── Main Player ────────────────────────────────────────────────────────────────
 export default function Player({ mode, config, trackA, trackB, queue = [], onQueuePop, onLoadTrackA, onLoadTrackB, onDeckPlaybackChange, repeatPlaylist = false, onRepeatReload, shufflePlaylist = false, isSuspended = false }) {
   const mediaRef = useRef(null)
@@ -1784,7 +1740,6 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
     return () => { if (vuRafRef.current) cancelAnimationFrame(vuRafRef.current) }
   }, [audioEngine])
 
-  // VIDEO DISABLED: the player always resolves the radio stream.
   const streamUrl = config?.radioUrl
   const streamKey = streamKeyFromUrl(streamUrl) ?? 'radio'
 
@@ -2063,83 +2018,7 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
 
   return (
     <div className="bg-[#0a0c10] rounded-2xl overflow-hidden border border-[#1e2128]">
-      {/* VIDEO DISABLED: keep the former video player branch unreachable. */}
-      {false ? (
-        <>
-          <div className="relative bg-black aspect-video">
-            <video ref={mediaRef} className="w-full h-full object-contain" playsInline />
-            {!playing && !error && (
-              <button
-                onClick={togglePlay}
-                className="absolute inset-0 flex items-center justify-center bg-black/40 group"
-              >
-                <div className="w-20 h-20 rounded-full bg-red-600 flex items-center justify-center group-hover:bg-red-500 transition-colors shadow-2xl">
-                  <svg className="w-9 h-9 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </div>
-              </button>
-            )}
-            {error && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/70">
-                <p className="text-red-400 text-sm text-center px-6">{error}</p>
-              </div>
-            )}
-          </div>
-          <div className="px-4 py-3 flex items-center gap-3">
-            <button
-              onClick={togglePlay}
-              title={playing ? "Pause" : "Play"}
-              className="w-9 h-9 rounded-full bg-red-600 hover:bg-red-500 flex items-center justify-center transition-colors flex-shrink-0"
-            >
-              {playing ? (
-                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              )}
-            </button>
-            <button onClick={toggleMute} title={muted || volume === 0 ? "Unmute" : "Mute"} className="text-gray-400 hover:text-white transition-colors flex-shrink-0">
-              {muted || volume === 0 ? (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
-                </svg>
-              )}
-            </button>
-            <input
-              type="range" min="0" max="1" step="0.02"
-              value={muted ? 0 : volume}
-              onChange={(e) => handleVolume(parseFloat(e.target.value))}
-              className="flex-1 h-1 accent-red-500 cursor-pointer"
-              title="Volume"
-            />
-            <button onClick={handleFullscreen} title="Fullscreen" className="text-gray-400 hover:text-white transition-colors flex-shrink-0">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
-              </svg>
-            </button>
-            <VideoGoLiveButton streamKey={streamKey} isSuspended={isSuspended} />
-            <span
-              className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 font-medium ${
-                streamLive ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-700 text-gray-400'
-              }`}
-            >
-              {streamLive ? 'LIVE' : 'OFFLINE'}
-            </span>
-            {latency !== null && playing && (
-              <span className="text-xs text-gray-500 flex-shrink-0 tabular-nums">{latency}s</span>
-            )}
-          </div>
-        </>
-      ) : (
-        <div className="select-none">
+      <div className="select-none">
           <audio ref={mediaRef} />
           <audio ref={mediaRefB} />
             <div className="flex items-center gap-2">
@@ -2344,7 +2223,6 @@ export default function Player({ mode, config, trackA, trackB, queue = [], onQue
             />
           </div>
         </div>
-      )}
     </div>
   )
 }

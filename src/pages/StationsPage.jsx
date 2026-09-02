@@ -162,11 +162,7 @@ export default function StationsPage() {
                     {station.description && (
                       <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">{station.description}</p>
                     )}
-                    <div className="flex items-center gap-3 mt-2">
-                      <span className="text-[10px] text-gray-600">
-                        {station.listeners} listener{station.listeners !== 1 ? 's' : ''}
-                      </span>
-                    </div>
+                    {/* Live listener count intentionally hidden from public station cards. */}
                   </div>
                 </div>
 
