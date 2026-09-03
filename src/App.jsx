@@ -76,6 +76,50 @@ function CompletedStationRoute({ children }) {
   return children
 }
 
+function TrialStatus({ endsAt, plan, billingCycle }) {
+  const getRemaining = useCallback(() => {
+    const end = new Date(endsAt).getTime()
+    return Number.isFinite(end) ? Math.max(0, end - Date.now()) : 0
+  }, [endsAt])
+  const [remaining, setRemaining] = useState(getRemaining)
+
+  useEffect(() => {
+    setRemaining(getRemaining())
+    const interval = setInterval(() => setRemaining(getRemaining()), 60000)
+    return () => clearInterval(interval)
+  }, [getRemaining])
+
+  const totalMinutes = Math.ceil(remaining / 60000)
+  const days = Math.floor(totalMinutes / 1440)
+  const hours = Math.floor((totalMinutes % 1440) / 60)
+  const minutes = totalMinutes % 60
+  const timeLeft = days > 0
+    ? `${days} day${days === 1 ? '' : 's'}, ${hours} hour${hours === 1 ? '' : 's'}`
+    : hours > 0
+      ? `${hours} hour${hours === 1 ? '' : 's'}, ${minutes} minute${minutes === 1 ? '' : 's'}`
+      : `${minutes} minute${minutes === 1 ? '' : 's'}`
+  const endDate = new Date(endsAt).toLocaleDateString(undefined, {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  })
+
+  return (
+    <div className="rounded-lg border border-cyan-700/70 bg-cyan-950/60 px-4 py-3 text-cyan-100 flex flex-wrap items-center justify-between gap-2" role="status">
+      <div className="flex items-center gap-2">
+        <span className="rounded bg-cyan-500/20 px-2 py-1 text-xs font-bold uppercase tracking-wider text-cyan-300">Trial</span>
+        <span className="text-sm">
+          <strong>{timeLeft} remaining</strong>
+          <span className="text-cyan-300/80"> · Ends {endDate}</span>
+        </span>
+      </div>
+      <a href={`/payment?plan=${encodeURIComponent(plan || 'starter')}&billing=${encodeURIComponent(billingCycle || 'monthly')}`} className="text-sm font-semibold text-cyan-300 hover:text-white underline underline-offset-2 transition-colors">
+        View subscription options
+      </a>
+    </div>
+  )
+}
+
 function MainApp() {
   const { user, token } = useAuth()
   const { reconnectNeeded, doReconnect, dismissReconnect } = useStream()
@@ -278,6 +322,11 @@ function MainApp() {
 
           {/* Radio player stays mounted so audio elements survive mode switches. */}
           <div className={mode !== 'radio' ? 'hidden' : 'overflow-x-auto'}>
+            {user?.trialActive && user?.trialEndsAt && (
+              <div className="mb-4 min-w-240">
+                <TrialStatus endsAt={user.trialEndsAt} plan={user.plan} billingCycle={user.billingCycle} />
+              </div>
+            )}
             <div className="flex flex-row gap-4 min-w-240">
               <div className="flex-1 flex flex-col gap-4 min-w-0">
                 <Player mode="radio" config={config} trackA={trackA} trackB={trackB} queue={queue} onQueuePop={(index = 0) => setQueue((q) => { if (!q.length) return q; const next = [...q]; const [picked] = next.splice(index, 1); return repeatPlaylist ? [...next, picked] : next })} onLoadTrackA={setTrackA} onLoadTrackB={setTrackB} onDeckPlaybackChange={handleDeckPlaybackChange} repeatPlaylist={repeatPlaylist} onRepeatReload={onRepeatReload} shufflePlaylist={shufflePlaylist} isSuspended={listenerStatus?.status === 'suspended'} />
