@@ -135,6 +135,7 @@ function UsersTab({ token }) {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [editUser, setEditUser] = useState(null)
+  const [deleteUser, setDeleteUser] = useState(null)
   const [actionLoadingId, setActionLoadingId] = useState('')
 
   useEffect(() => {
@@ -189,6 +190,10 @@ function UsersTab({ token }) {
 
   async function handleActionChange(user, action) {
     if (!action) return
+    if (action === 'delete') {
+      setDeleteUser(user)
+      return
+    }
     setActionLoadingId(user.id)
 
     const base = {
@@ -211,6 +216,30 @@ function UsersTab({ token }) {
 
     try {
       await handleUpdate(user.id, base)
+    } finally {
+      setActionLoadingId('')
+    }
+  }
+
+  async function handleDelete(userId, password) {
+    setActionLoadingId(userId)
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ password }),
+      })
+      if (!res.ok) {
+        return (await res.text()).trim() || 'Could not delete this account.'
+      }
+      setDeleteUser(null)
+      await loadUsers()
+      return ''
+    } catch (err) {
+      return err.message || 'Could not delete this account.'
     } finally {
       setActionLoadingId('')
     }
@@ -280,6 +309,7 @@ function UsersTab({ token }) {
                       <option value="activate">Activate</option>
                       <option value="suspend">Suspend</option>
                       <option value="inactive">Inactive</option>
+                      {user.role !== 'admin' && <option value="delete">Delete</option>}
                     </select>
                     <button
                       onClick={() => setEditUser(user)}
@@ -303,6 +333,62 @@ function UsersTab({ token }) {
           onSave={handleUpdate}
         />
       )}
+      {deleteUser && (
+        <DeleteUserModal
+          user={deleteUser}
+          loading={actionLoadingId === deleteUser.id}
+          onClose={() => setDeleteUser(null)}
+          onDelete={handleDelete}
+        />
+      )}
+    </div>
+  )
+}
+
+function DeleteUserModal({ user, loading, onClose, onDelete }) {
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError('')
+    const message = await onDelete(user.id, password)
+    if (message) setError(message)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-gray-900 border border-red-800/60 rounded-2xl p-6 max-w-md w-full">
+        <h3 className="text-xl font-bold text-white">Delete Account</h3>
+        <p className="mt-2 text-sm text-gray-300">
+          This permanently removes <strong>{user.email}</strong> and all of its station data.
+        </p>
+        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Enter this account&apos;s password to confirm
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoFocus
+              autoComplete="off"
+              required
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-red-500"
+            />
+          </div>
+          {error && <p className="text-sm text-red-400">{error}</p>}
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={onClose} disabled={loading} className="px-4 py-2 text-gray-300 hover:text-white disabled:opacity-50">
+              Cancel
+            </button>
+            <button type="submit" disabled={loading || !password} className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-500 disabled:opacity-50">
+              {loading ? 'Deleting…' : 'Delete Permanently'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }
