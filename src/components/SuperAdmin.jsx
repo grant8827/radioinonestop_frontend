@@ -200,6 +200,7 @@ function UsersTab({ token }) {
     // Inactive means suspended and reset to starter/monthly until admin re-activates.
     if (action === 'activate') {
       base.isSuspended = false
+      base.endTrial = true
     } else if (action === 'suspend') {
       base.isSuspended = true
     } else if (action === 'inactive') {

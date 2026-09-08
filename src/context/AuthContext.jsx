@@ -32,6 +32,7 @@ function loadFromStorage() {
       isSuspended: false,
       paymentRequired: false,
       trialActive: false,
+      trialUsed: false,
       trialEndsAt: null,
     } 
   }
@@ -60,6 +61,7 @@ export function AuthProvider({ children }) {
             isSuspended: !!profile.is_suspended,
             paymentRequired: !!profile.payment_required,
             trialActive: !!profile.trial_active,
+            trialUsed: !!profile.trial_used,
             trialEndsAt: profile.trial_ends_at || null,
           } : prev.user,
           profileLoaded: true,
@@ -127,6 +129,7 @@ export function AuthProvider({ children }) {
         isSuspended: false,
         paymentRequired: false,
         trialActive: false,
+        trialUsed: false,
         trialEndsAt: null,
       } : null,
     })

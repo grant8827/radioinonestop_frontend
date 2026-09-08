@@ -14,7 +14,7 @@ const PLAN_INFO = {
 
 export default function PaymentPage() {
   const navigate = useNavigate()
-  const { isAuthenticated, token, refreshProfile } = useAuth()
+  const { isAuthenticated, token, user, refreshProfile } = useAuth()
   const [searchParams] = useSearchParams()
   const requestedPlan = (searchParams.get('plan') || 'starter').toLowerCase()
   const requestedBilling = (searchParams.get('billing') || 'monthly').toLowerCase()
@@ -339,7 +339,7 @@ export default function PaymentPage() {
         )}
 
         {/* Payment Form */}
-        {livePlanInfo?.trialEnabled && paymentReason !== 'trial-ended' && (
+        {livePlanInfo?.trialEnabled && !user?.trialUsed && paymentReason !== 'trial-ended' && (
           <div className="mb-5 rounded-xl border border-cyan-600/40 bg-cyan-950/30 p-5">
             <h2 className="text-lg font-bold text-cyan-200">Start your 30-day free trial</h2>
             <p className="mt-1 text-sm text-gray-300">
